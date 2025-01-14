@@ -6,7 +6,10 @@ project(imgui)
 
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
-execute_process(COMMAND git submodule update --init)
+execute_process(
+	COMMAND git submodule update --init --depth 1
+	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
 
 if("${RENDER}" STREQUAL "")
 	message(WARNING "RENDER not Set, Using Default GLFW_OPENGL3")
