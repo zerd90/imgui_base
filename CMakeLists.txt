@@ -3,17 +3,10 @@ cmake_minimum_required(VERSION 3.11)
 
 # 项目名称
 project(imgui)
-include(FetchContent)
-FetchContent_Declare(imgui # 库名字
-	GIT_REPOSITORY https://github.com/ocornut/imgui.git # 仓库地址
-	GIT_TAG v1.91.4-docking # 库版本
-	GIT_SHALLOW 1
-	SOURCE_DIR ${PROJECT_SOURCE_DIR}/imgui-source # 指定库下载地址
-)
-
-fetchcontent_makeavailable(imgui)
 
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+
+execute_process(COMMAND git submodule update --init)
 
 if("${RENDER}" STREQUAL "")
 	message(WARNING "RENDER not Set, Using Default GLFW_OPENGL3")
