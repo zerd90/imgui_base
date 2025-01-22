@@ -4,8 +4,6 @@ cmake_minimum_required(VERSION 3.11)
 # 项目名称
 project(imgui)
 
-add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-
 execute_process(
 	COMMAND git submodule update --init --depth 1
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
@@ -31,35 +29,93 @@ if(NOT PROJECT_IS_TOP_LEVEL)
 	set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
 		${PROJECT_SOURCE_DIR}/imgui-source/
 		${PROJECT_SOURCE_DIR}/backends
-		${PROJECT_SOURCE_DIR}/3rdparty
 		${PROJECT_SOURCE_DIR}/tools
 		PARENT_SCOPE
 	)
+endif()
+if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} MATCHES GNU)
+set(USING_MINGW ON)
+else()
+set(USING_MINGW OFF)
+endif()
+message(STATUS USING_MINGW=${USING_MINGW})
+if(USING_MINGW)
+	set(PARENT_LINK_LIBRARIES mingw32)
+endif()
 
-	if("${RENDER}" STREQUAL "WIN32_DX11")
-		set(LINK_LIBRARIES ${LINK_LIBRARIES}
+
+if("${RENDER}" STREQUAL "WIN32_DX11")
+	if(NOT PROJECT_IS_TOP_LEVEL)
+		set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
 			${PROJECT_NAME} d3d11
-			PARENT_SCOPE
 		)
+
+		if(USING_MINGW)
+			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+				d3dcompiler dwmapi
+			)
+		endif()
+
 		set(PLATFORM "WIN32" PARENT_SCOPE)
 		set(RENDER_API "D3D11" PARENT_SCOPE)
-	elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
-		set(LINK_LIBRARIES ${LINK_LIBRARIES}
-			${PROJECT_NAME} glfw opengl32
-			PARENT_SCOPE
+	endif()
+elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
+	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+		if(NOT PROJECT_IS_TOP_LEVEL)
+			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+				${PROJECT_NAME} glfw opengl32
+			)
+			set(PLATFORM "GLFW" PARENT_SCOPE)
+			set(RENDER_API "OPENGL3" PARENT_SCOPE)
+		endif()
+	elseif(${CMAKE_SYSTEM_NAME} MATCHES "LINUX")
+		if(NOT PROJECT_IS_TOP_LEVEL)
+			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+				${PROJECT_NAME} glfw
+			)
+			set(PLATFORM "GLFW" PARENT_SCOPE)
+			set(RENDER_API "OPENGL3" PARENT_SCOPE)
+		endif()
+	elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+		if(NOT PROJECT_IS_TOP_LEVEL)
+			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+				${PROJECT_NAME} glfw
+			)
+			set(PLATFORM "GLFW" PARENT_SCOPE)
+			set(RENDER_API "OPENGL3" PARENT_SCOPE)
+		endif()
+	endif()
+
+	set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES}
+		glfw)
+endif()
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+	# find gtk for file dialog
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(GTK4 REQUIRED gtk4)
+	SET(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
+		${GTK4_INCLUDE_DIRS}
+	)
+
+	if(NOT PROJECT_IS_TOP_LEVEL)
+		set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+			${PROJECT_NAME} ${GTK4_LIBRARIES}
 		)
-		set(PLATFORM "GLFW" PARENT_SCOPE)
-		set(RENDER_API "OPENGL3" PARENT_SCOPE)
 	endif()
 endif()
 
-if("${RENDER}" STREQUAL "GLFW_OPENGL3")
-	set(LINK_LIBRARIES ${LINK_LIBRARIES}
-		glfw
+if(USING_MINGW)
+	set(PARENT_LINK_LIBRARIES mingw32 ${PARENT_LINK_LIBRARIES}
 	)
 endif()
 
-
+if(NOT PROJECT_IS_TOP_LEVEL)
+	set(LINK_LIBRARIES ${LINK_LIBRARIES}
+		${PARENT_LINK_LIBRARIES}
+		PARENT_SCOPE
+	)
+endif()
 
 # 使用通配符添加多个源文件
 aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source SRC_LIST)
@@ -69,6 +125,12 @@ set(SRC_LIST ${SRC_LIST}
 	${PROJECT_SOURCE_DIR}/backends/ImGuiApplication.cpp
 	${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.cpp
 )
+
+if(APPLE)
+	set(SRC_LIST ${SRC_LIST}
+		${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.mm
+	)
+endif()
 
 if("${RENDER}" STREQUAL "WIN32_DX11")
 	file(GLOB SRC_RENDER "backends/imgui_impl_dx11.cpp" "backends/imgui_impl_win32.cpp" "backends/imgui_main_win32_dx11.cpp")
@@ -93,5 +155,5 @@ include_directories(${INCLUDE_DIRECTORIES})
 
 if(NOT TARGET ${PROJECT_NAME})
 	add_library(${PROJECT_NAME} STATIC ${SRC_LIST} ${SRC_RENDER})
-	target_link_libraries(${PROJECT_NAME} PUBLIC ${LINK_LIBRARIES})
+	target_link_libraries(${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES})
 endif()

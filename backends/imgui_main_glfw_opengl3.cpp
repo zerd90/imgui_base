@@ -50,6 +50,7 @@ void windowResizeCallback(int x, int y, int width, int height)
 
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
 {
+    IM_UNUSED(window);
     std::vector<std::string> wFiles;
     for (int i = 0; i < count; i++)
     {
@@ -65,6 +66,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 int main(int argc, char **argv)
 #endif
 {
+#ifdef WIN32
+    IM_UNUSED(hInstance);
+    IM_UNUSED(hPrevInstance);
+    IM_UNUSED(lpCmdLine);
+    IM_UNUSED(nShowCmd);
+#else
+#endif
     if (!g_user_app)
     {
         printf("user app not given\n");

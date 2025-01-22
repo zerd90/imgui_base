@@ -770,6 +770,7 @@ static void ImGui_ImplGlfw_UpdateMouseData()
 #else
         const bool is_window_focused = glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0;
 #endif
+        IM_UNUSED(is_window_focused);
         // ** I need the mouse pos when app not focused and mouse button pressed, so I comment this line
         // if (is_window_focused)
         {

@@ -400,6 +400,7 @@ static void ImGui_ImplWin32_UpdateMouseData()
     const bool is_app_focused =
         (focused_window && (focused_window == bd->hWnd || ::IsChild(focused_window, bd->hWnd) ||
                             ImGui::FindViewportByPlatformHandle((void *)focused_window)));
+    IM_UNUSED(is_app_focused);
     // ** I need the mouse pos when app not focused and mouse button pressed, so I comment this line
     // if (is_app_focused)
     {

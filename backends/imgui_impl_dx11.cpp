@@ -792,7 +792,7 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     HRESULT hr = bd->pd3dDevice->CreateTexture2D(&textureDesc, 0, ptex);
     if (FAILED(hr))
     {
-        dbg("failed %#x\n", hr);
+        dbg("failed %#lx\n", hr);
         return -1;
     }
 
@@ -806,7 +806,7 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     hr = bd->pd3dDevice->CreateShaderResourceView(*ptex, &srvDesc, psrv);
     if (FAILED(hr))
     {
-        dbg("failed %#x\n", hr);
+        dbg("failed %#lx\n", hr);
         return -1;
     }
     return 0;
@@ -814,10 +814,8 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
 
 bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
 {
-    int                  ret              = 0;
     ImGui_ImplDX11_Data *bd               = ImGui_ImplDX11_GetBackendData();
-    bool                 textureRecreated = false;
-    if (!bd || !bd->pd3dDeviceContext)
+    if (!bd || !bd->pd3dDeviceContext || !pTexture || !rgbaData || width <= 0 || height <= 0)
     {
         dbg("null\n");
         return false;
@@ -834,7 +832,7 @@ bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int
 
         D3D11_TEXTURE2D_DESC desc;
         nativeTexture->GetDesc(&desc);
-        if (desc.Width != width || desc.Height != height)
+        if (desc.Width != (UINT)width || desc.Height != (UINT)height)
         {
             SAFE_RELEASE_RES(texSRV);
             SAFE_RELEASE_RES(nativeTexture);
@@ -853,15 +851,16 @@ bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int
             ZeroMemory(pTexture, sizeof(*pTexture));
             return false;
         }
-        textureRecreated = true;
     }
 
     bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, rgbaData, (UINT)stride, 0);
 
     pTexture->texture = (ImTextureID)texSRV;
+    pTexture->textureWidth  = width;
+    pTexture->textureHeight = height;
     SAFE_RELEASE_RES(nativeTexture);
 
-    return textureRecreated;
+    return true;
 }
 
 void freeTexture(TextureData *pTexture)

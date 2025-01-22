@@ -20,16 +20,18 @@ struct TextureData
 {
     ~TextureData() { freeTexture(this); }
     TextureData &operator=(const TextureData) = delete;
-    ImTextureID texture = 0;
-    void       *opaque  = nullptr; // used by renderer
+
+    ImTextureID texture       = 0;
+    int         textureWidth  = 0;
+    int         textureHeight = 0;
+    void       *opaque        = nullptr; // used by renderer
 };
 
 typedef struct
 {
-    std::wstring filter; //*.xxx;*.xxx;...
-    std::wstring description;
+    std::string filter; //*.xxx;*.xxx;...
+    std::string description;
 } FilterSpec;
-
 
 template <typename _T>
 static inline auto arrayMakeSharedPtr(size_t length)
@@ -52,16 +54,14 @@ extern ImGuiApplication *g_user_app;
 
 #ifdef WIN32
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
-std::shared_ptr<char[]>    unicodeToUtf8(const wchar_t *wStr);
-std::shared_ptr<wchar_t[]> utf8ToUnicode(const char *str);
+std::shared_ptr<char[]>                    unicodeToUtf8(const wchar_t *wStr);
+std::shared_ptr<wchar_t[]>                 utf8ToUnicode(const char *str);
 #endif
 
 // for Platform
-std::wstring              selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                     std::wstring            initDirPath = std::wstring());
-std::vector<std::wstring> selectMultipleFiles(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                              std::wstring            initDirPath = std::wstring());
-std::wstring              getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                      std::wstring            defaultExt  = std::wstring());
-void                      openDebugWindow();
+std::string selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string initDirPath = std::string());
+std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
+                                             std::string             initDirPath = std::string());
+std::string getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string defaultExt = std::string());
+void        openDebugWindow();
 #endif

@@ -6,14 +6,14 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-#define Assert(expr)                                                            \
-    do                                                                          \
-    {                                                                           \
-        if (!(expr))                                                            \
-        {                                                                       \
-            printf("Asset From (%s %d) fail(%s)\n", __func__, __LINE__, #expr); \
-            abort();                                                            \
-        }                                                                       \
+#define Assert(expr)                                                             \
+    do                                                                           \
+    {                                                                            \
+        if (!(expr))                                                             \
+        {                                                                        \
+            printf("Assert From (%s %d) fail(%s)\n", __func__, __LINE__, #expr); \
+            abort();                                                             \
+        }                                                                        \
     } while (0)
 
 struct SettingValue
@@ -82,9 +82,9 @@ public:
     };
     ImGuiApplication();
     virtual ~ImGuiApplication() {}
-    ImGuiAppRect         getWindowInitialRect() { return mWindowRect; };
+    ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
     void         preset();
-    std::string getAppName() { return mApplicationName; };
+    std::string  getAppName() { return mApplicationName; };
     void         windowRectChange(ImGuiAppRect rect)
     {
         if (rect.x >= 0)
@@ -100,11 +100,11 @@ public:
     // return if need to exit the application
     virtual bool renderUI() { return false; };
 
-    virtual void transferCmdArgs(std::vector<std::string> &args) {};
-    virtual void dropFile(std::vector<std::string> &files) {};
+    virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
+    virtual void dropFile(std::vector<std::string> &files) { IM_UNUSED(files); };
 
-    virtual void setRenderContext(void *data) {};
-    virtual void setWindowHandle(void *handle) {};
+    virtual void setRenderContext(void *data) { IM_UNUSED(data); };
+    virtual void setWindowHandle(void *handle) { IM_UNUSED(handle); };
     // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
     virtual void loadResources() {}
     virtual void newFramePreAction() {}
@@ -121,8 +121,8 @@ protected:
 
 protected:
     // Set these in presetInternal
-    ImGuiAppRect         mWindowRect;
-    std::string mApplicationName;
+    ImGuiAppRect mWindowRect;
+    std::string  mApplicationName;
 
 protected:
     std::vector<SettingValue> mAppSettings;

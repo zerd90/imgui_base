@@ -4,21 +4,20 @@
 #ifdef WIN32
     #include <windows.h>
 #endif
-#include <locale.h>
+
+#include <functional>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
 #include "ImGuiTools.h"
-
-#include "imgui_impl_win32.h"
+#include "ImGuiBaseTypes.h"
 
 using std::map;
 using std::string;
+using std::string_view;
 using std::vector;
 using namespace ImGui;
 
-namespace ImGuiTools
-{
 #ifndef MAX
     #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
@@ -29,7 +28,7 @@ namespace ImGuiTools
 
 #define MAKE_RGBA(r, g, b) (((r) << 24) | ((g) << 16) | ((b) << 8) | 0xff)
 
-static map<TextColorCode, string> gColorStrMap = {
+map<TextColorCode, const char *> gColorStrMap = {
     {       ColorNone,    "\033[0m"},
     {      ColorBlack, "\033[0;30m"},
     {   ColorDarkGray, "\033[1;30m"},
@@ -49,7 +48,7 @@ static map<TextColorCode, string> gColorStrMap = {
     {      ColorWhite, "\033[1;37m"},
 };
 
-static map<string, TextColorCode> gStrColorMap = {
+static map<const string_view, TextColorCode> gStrColorMap = {
     {   "\033[0m",        ColorNone},
     {  "\033[30m",       ColorBlack},
     {"\033[0;30m",       ColorBlack},
@@ -76,8 +75,10 @@ static map<string, TextColorCode> gStrColorMap = {
     {"\033[0;37m",   ColorLightGray},
     {"\033[1;37m",       ColorWhite},
 };
-#define MAKE_COLOR(color)        0x##color
-#define REVERSE_U32(a)           (((a) >> 24) | (((a) >> 8) & 0x0000ff00) | (((a) << 8) & 0x00ff0000) | (((a) << 24) & 0xff000000))
+#define MAKE_COLOR(color) 0x##color
+#define REVERSE_U32(a)                                                                                              \
+    ((uint32_t)(((uint64_t)(a) >> 24) | (((uint64_t)(a) >> 8) & 0x0000ff00) | (((uint64_t)(a) << 8) & 0x00ff0000) | \
+                (((uint64_t)(a) << 24) & 0xff000000)))
 #define REVERSE_U32_COLOR(color) REVERSE_U32(MAKE_COLOR(color))
 static map<TextColorCode, ImU32> ColorValueMap = {
     {       ColorNone, REVERSE_U32_COLOR(000000FF)}, //  #000000FF
@@ -99,31 +100,73 @@ static map<TextColorCode, ImU32> ColorValueMap = {
     {      ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)}, //  #DFDFDFFF
 };
 
+int getUtf8CharSize(const char *str)
+{
+    int     charSize = 1;
+    uint8_t c        = *str;
+    if (c & 0x80)
+    {
+        charSize = 0;
+        while (c & (0x1 << (8 - charSize - 1)))
+            charSize++;
+    }
+    return charSize;
+}
+
 void LoggerWindow::displayTexts()
 {
-
-    std::lock_guard<std::mutex> lock(mLogLock);
+    StdMutexGuard lock(mLogLock);
 
     ImVec2 contentSize = GetContentRegionAvail();
 
+    string showingStr;
+
     bool colorSet = false;
+
+    mTotalLines = 0;
+
+    ResourceGuard guard(
+        [&colorSet]()
+        {
+            if (colorSet)
+            {
+                PopStyleColor(1);
+            }
+        });
+
+    TextColorCode curColor  = ColorNone;
+    bool          newLine   = true;
+    float         lineWidth = 0;
+
     for (auto &log : mLogs)
     {
-        if (log.changeColor)
+        if (log.color != curColor)
         {
             if (colorSet)
             {
                 PopStyleColor(1);
                 colorSet = false;
             }
-            if (log.toColor > ColorNone && log.toColor < ColorButt)
+            if (log.color > ColorNone && log.color < ColorButt)
             {
-                PushStyleColor(ImGuiCol_Text, ColorValueMap[log.toColor]);
+                PushStyleColor(ImGuiCol_Text, ColorValueMap[log.color]);
                 colorSet = true;
             }
         }
 
-        if (CalcTextSize(log.text.c_str()).x > contentSize.x)
+        if (!newLine)
+        {
+            SameLine(0, 0);
+            mTotalLines -= GetTextLineHeightWithSpacing();
+        }
+        else
+        {
+            if (lineWidth > mMaxLineWidth)
+                mMaxLineWidth = lineWidth;
+            lineWidth = 0;
+        }
+
+        if (mWordWrap && GetCursorPosX() + CalcTextSize(log.text.c_str()).x > contentSize.x - GetStyle().ScrollbarSize)
         {
             string &showStr      = log.text;
             size_t  displayStart = 0;
@@ -136,116 +179,119 @@ void LoggerWindow::displayTexts()
                         break;
 
                     // process utf-8 character
-                    int     charSize = 1;
-                    uint8_t c        = showStr[displayStart + displayLength];
-                    if (c & 0x80)
-                    {
-                        charSize = 0;
-                        while (c & (0x1 << (8 - charSize - 1)))
-                            charSize++;
-                    }
+                    int charSize = getUtf8CharSize(&showStr[displayStart + displayLength]);
 
-                    if (CalcTextSize(showStr.substr(displayStart, displayLength + charSize).c_str()).x > contentSize.x)
+                    if (CalcTextSize(showStr.substr(displayStart, displayLength + charSize).c_str()).x >
+                        contentSize.x - GetStyle().ScrollbarSize)
                         break;
 
                     displayLength += charSize;
                 }
-                Text(showStr.substr(displayStart, displayLength).c_str());
+                if (0 == displayLength) // can't display even one character
+                {
+                    return;
+                }
+                Text("%s", showStr.substr(displayStart, displayLength).c_str());
+                mTotalLines += GetTextLineHeightWithSpacing();
                 displayStart += displayLength;
             }
         }
         else
         {
-            Text(log.text.c_str());
+            Text("%s", log.text.c_str());
+            lineWidth += CalcTextSize(log.text.c_str()).x;
+            mTotalLines += GetTextLineHeightWithSpacing();
         }
-        if (!log.endLine)
-        {
-            SameLine(0, 0);
-        }
+        if (log.endLine)
+            newLine = true;
+        else
+            newLine = false;
     }
-    if (colorSet)
-    {
-        PopStyleColor(1);
-    }
+    if (lineWidth > mMaxLineWidth)
+        mMaxLineWidth = lineWidth;
 }
 
-void LoggerWindow::show(const char *title, ImGuiID dock)
+bool positiveDirSelection(ImVec2 start, ImVec2 end)
 {
-    bool manual_unlock = false;
-    if (dock > 0)
-        SetNextWindowDockID(dock, ImGuiCond_Once);
+    return end.y > start.y || (end.y == start.y && end.x > start.x);
+}
 
-    Begin(title, nullptr, ImGuiWindowFlags_HorizontalScrollbar);
+LoggerWindow::LoggerWindow(std::string title, bool embed)
+{
+    if (embed)
+    {
+        mLoggerWindowImpl = new IImGuiChildWindow(title);
+    }
+    else
+    {
+        mLoggerWindowImpl = new IImGuiWindow(title);
+        mLoggerWindowImpl->setHasCloseButton(true);
+    }
+    mLoggerWindowImpl->setContent([this]() { showContent(); });
+}
 
+LoggerWindow::~LoggerWindow()
+{
+    delete mLoggerWindowImpl;
+}
+
+void LoggerWindow::show()
+{
+    mLoggerWindowImpl->show();
+}
+
+void LoggerWindow::setWordWrap(bool wordWrap)
+{
+    if (mWordWrap != wordWrap)
+        mWordWrap = wordWrap;
+    mLogsChanged = true;
+}
+
+void LoggerWindow::showContent()
+{
     if (Button("Scroll Down"))
     {
-        mLocked = false;
+        mScrollLocked = false;
     }
     SameLine();
     if (Button("Clear"))
     {
-        std::lock_guard<std::mutex> lock(mLogLock);
-        mLogs.clear();
+        clear();
     }
+    SameLine();
+    if (Button("Word Wrap"))
+    {
+        setWordWrap(!mWordWrap);
+    }
+
     SameLine();
     if (Button("Copy"))
     {
         copyToClipBoard();
     }
 
-    BeginChild("Log Text");
+    BeginChild("Log Text", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
 
-    if (IsKeyDown(ImGuiKey_MouseWheelY) && GetIO().MouseWheel > 0)
-        mLocked = true;
-    else if (GetScrollY() == GetScrollMaxY())
-        mLocked = false;
+    BeginChild("Log Text Content", ImVec2(mWordWrap ? 0 : mMaxLineWidth, mTotalLines), ImGuiChildFlags_None,
+               ImGuiWindowFlags_NoMove);
 
     displayTexts();
 
-    if (!mLocked)
+    bool hovered = ImGui::IsWindowHovered();
+    if (hovered)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+
+    EndChild();
+
+    if (IsKeyDown(ImGuiKey_MouseWheelY) && GetIO().MouseWheel > 0)
+        mScrollLocked = true;
+    else if (GetScrollY() == GetScrollMaxY())
+        mScrollLocked = false;
+
+    if (!mScrollLocked)
         SetScrollY(GetScrollMaxY());
 
     EndChild();
-    End();
-}
-
-void LoggerWindow::copyToClipBoard()
-{
-    vector<DisplayText> tmpLogs;
-    {
-        std::lock_guard<std::mutex> lock(mLogLock);
-        tmpLogs = mLogs;
-    }
-
-    size_t totalSize = 1; //'\0'
-    for (auto &log : tmpLogs)
-    {
-        totalSize += log.text.length();
-        if (log.endLine)
-            totalSize += 1;
-    }
-
-    HWND hWnd = NULL;
-    OpenClipboard(hWnd);
-    EmptyClipboard();
-    HANDLE hHandle = GlobalAlloc(GMEM_FIXED, totalSize); // get memory
-    char  *pData   = (char *)GlobalLock(hHandle);        // lock the memory
-    memset(pData, 0, totalSize);
-    for (auto &log : tmpLogs)
-    {
-        strncpy(pData, log.text.c_str(), log.text.length());
-        pData += log.text.length();
-        if (log.endLine)
-        {
-            *pData = '\n';
-            pData++;
-        }
-    }
-
-    SetClipboardData(CF_TEXT, hHandle);
-    GlobalUnlock(hHandle);
-    GlobalFree(hHandle);
-    CloseClipboard();
 }
 
 void LoggerWindow::appendString(const char *fmt, ...)
@@ -295,282 +341,326 @@ static const vector<string> gSplitStrings = {
     "\033[35m", "\033[0;35m", "\033[1;35m", "\033[33m", "\033[0;33m", "\033[1;33m", "\033[37m", "\033[0;37m", "\033[1;37m",
 };
 
+string_view startWithStrings(string_view srcString, const vector<string> &cmpStrings)
+{
+    for (size_t i = 0; i < cmpStrings.size(); i++)
+    {
+        if (srcString.substr(0, cmpStrings[i].length()) == cmpStrings[i])
+        {
+            return cmpStrings[i];
+        }
+    }
+    return "";
+}
+
 void LoggerWindow::appendString(const string &appendStr)
 {
-    size_t curPos       = 0;
-    int    lastSplitIdx = -1;
-
-    std::lock_guard<std::mutex> lock(mLogLock);
-    bufferStr.append(appendStr);
-
-    int splitIdx = -1;
-
-    if (bufferStr.length() == splitString(bufferStr, 0, gSplitStrings, splitIdx))
+    if (appendStr.empty())
         return;
 
-    while (curPos < bufferStr.length())
+    StdMutexGuard lock(mLogLock);
+
+    if (mLogs.empty() || mLogs.back().endLine)
     {
-        splitIdx       = -1;
-        size_t nextPos = splitString(bufferStr, curPos, gSplitStrings, splitIdx);
-
-        if (splitIdx < 0)
-        {
-            break;
-        }
-
-        DisplayText curText;
-
-        if (lastSplitIdx > 0 && gStrColorMap.find(gSplitStrings[lastSplitIdx]) != gStrColorMap.end())
-        {
-            curText.changeColor = true;
-            curText.toColor     = gStrColorMap[gSplitStrings[lastSplitIdx]];
-        }
-
-        curText.text = bufferStr.substr(curPos, nextPos - curPos);
-
-        if ("\n" == gSplitStrings[splitIdx] || "\r\n" == gSplitStrings[splitIdx])
-            curText.endLine = true;
-
-        lastSplitIdx = splitIdx;
-
-        curPos = nextPos + gSplitStrings[splitIdx].length();
-
-        if (curText.changeColor || curText.endLine || curText.text.length() > 0)
-        {
-            mLogs.push_back(curText);
-        }
+        mLogs.push_back({});
     }
-    if (lastSplitIdx > 0 && gStrColorMap.find(gSplitStrings[lastSplitIdx]) != gStrColorMap.end())
+    DisplayText *curLine = &mLogs.back();
+    string_view  appendStrView(appendStr);
+
+#define NEW_LINE()               \
+    do                           \
+    {                            \
+        mLogs.push_back({});     \
+        curLine = &mLogs.back(); \
+    } while (0)
+
+    for (size_t i = 0; i < appendStrView.length(); i++)
     {
-        mLogs.push_back({true, gStrColorMap[gSplitStrings[lastSplitIdx]], "", false});
+        string_view splitStr = startWithStrings(appendStrView.substr(i), gSplitStrings);
+        if (splitStr.empty())
+        {
+            curLine->text += appendStrView[i];
+            continue;
+        }
+
+        if (splitStr == "\n" || splitStr == "\r\n")
+        {
+            curLine->endLine = true;
+            if (i < appendStrView.length() - 1) // not the end, add a new line to logs
+            {
+                NEW_LINE();
+            }
+        }
+        else if (gStrColorMap.find(splitStr) != gStrColorMap.end()) // color change
+        {
+            TextColorCode color = gStrColorMap[splitStr];
+            if (curLine->text.empty()) // empty line, just change the color
+            {
+                curLine->color = color;
+            }
+            else // add a new line
+            {
+                NEW_LINE();
+                curLine->color = color;
+            }
+        }
+        i += splitStr.length() - 1;
     }
-    if (curPos >= bufferStr.length())
-        bufferStr.clear();
-    else
-        bufferStr = bufferStr.substr(curPos);
+    mLogsChanged = true;
 }
 
 void LoggerWindow::clear()
 {
+    StdMutexGuard lock(mLogLock);
+    mMaxLineWidth = 0;
+    mTotalLines   = 0;
     mLogs.clear();
+    mLogsChanged = true;
+}
+
+void LoggerWindow::copyToClipBoard()
+{
+    StdMutexGuard lock(mLogLock);
+
+    string totalString;
+    for (auto &log : mLogs)
+    {
+        totalString += log.text;
+        if (log.endLine)
+            totalString += '\n';
+    }
+    ImGui::SetClipboardText(totalString.c_str());
 }
 
 #define SCALE_SPEED (1.2f)
 #define SCALE_MAX   (20.f)
 #define SCALE_MIN   (0.2f)
 
-void ImageWindow::show(std::string title, ImTextureID texture, int imgWidth, int imgHeight, bool embed, DisplayInfo *displayInfo,
-                       bool *p_open, bool canDocking, ImGuiID dockID)
+void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
 {
+    ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
 
-    int windowFlags = ImGuiWindowFlags_NoCollapse;
-    if (!canDocking)
-    {
-        windowFlags |= ImGuiWindowFlags_NoDocking;
-    }
+    ImVec2 cursorPosOnImage  = mImageShowPos + (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
+    mImageScale              = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
+    mImageScale              = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
 
-    if (dockID > 0 && !embed)
-        SetNextWindowDockID(dockID, ImGuiCond_FirstUseEver);
+    imgScaleSize = mImgBaseSize * mImageScale;
 
-    if (0 == dockID && !embed)
-        SetNextWindowSize({640, 480}, ImGuiCond_Appearing);
+    mImageShowPos = cursorPosOnImage - (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
+}
 
-    if (embed)
-        BeginChild(title.c_str());
-    else
-        Begin(title.c_str(), p_open, windowFlags);
+void ImageWindow::handleDrag(ImVec2 &mouseMove)
+{
+    ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
+    mImageShowPos.x = mImageShowPos.x + (-(int)((mouseMove.x) * mTextureWidth / imgScaleSize.x));
+    mImageShowPos.y = mImageShowPos.y + (-(int)((mouseMove.y) * mTextureHeight / imgScaleSize.y));
+}
 
+void ImageWindow::showContent()
+{
     bool oneOnOne = false;
     if (Button("1:1"))
     {
         oneOnOne = true;
+        if(mLinkWith)
+            mLinkWith->setOneOnOne();
     }
     SameLine();
     if (Button("Full"))
     {
         mImageScale = 1;
+        if(mLinkWith)
+            mLinkWith->resetScale();
     }
 
-    BeginChild((title + "render").c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
+    BeginChild((mTitle + "render").c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders,
+               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
 
     ImVec2 winSize;
-    ImVec2 imgBaseSize;
     ImVec2 imgScaleSize;
 
     ImVec2 winShowSize;
     ImVec2 imgShowPos;
 
     ImVec2 winShowStartPos;
-    if (0 == texture)
+    ImVec2 mousePos;
+    ImVec2 winPos;
+
+    if (0 == mTexture)
         goto _CHILD_OVER_;
 
-    winSize     = GetWindowSize();
-    imgBaseSize = winSize;
-    if (winSize.x > imgWidth * winSize.y / imgHeight)
+    winSize      = GetWindowSize();
+    mImgBaseSize = winSize;
+    if (winSize.x > mTextureWidth * winSize.y / mTextureHeight)
     {
-        imgBaseSize.x = imgWidth * winSize.y / imgHeight;
-        imgBaseSize.y = winSize.y;
+        mImgBaseSize.x = mTextureWidth * winSize.y / mTextureHeight;
+        mImgBaseSize.y = winSize.y;
     }
-    else if (winSize.y > imgHeight * winSize.x / imgWidth)
+    else if (winSize.y > mTextureHeight * winSize.x / mTextureWidth)
     {
-        imgBaseSize.x = winSize.x;
-        imgBaseSize.y = imgHeight * winSize.x / imgWidth;
+        mImgBaseSize.x = winSize.x;
+        mImgBaseSize.y = mTextureHeight * winSize.x / mTextureWidth;
     }
 
     if (oneOnOne)
     {
-        mImageScale = imgWidth / imgBaseSize.x;
+        mImageScale = mTextureWidth / mImgBaseSize.x;
     }
-    imgScaleSize = imgBaseSize * mImageScale;
+    imgScaleSize = mImgBaseSize * mImageScale;
 
-    mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaleSize.x - winSize.x) * imgWidth / imgScaleSize.x);
-    mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaleSize.y - winSize.y) * imgHeight / imgScaleSize.y);
+    mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaleSize.x - winSize.x) * mTextureWidth / imgScaleSize.x);
+    mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaleSize.y - winSize.y) * mTextureHeight / imgScaleSize.y);
 
-    imgShowPos.x = mImageShowPos.x * imgScaleSize.x / imgWidth;
-    imgShowPos.y = mImageShowPos.y * imgScaleSize.y / imgHeight;
+    imgShowPos.x = mImageShowPos.x * imgScaleSize.x / mTextureWidth;
+    imgShowPos.y = mImageShowPos.y * imgScaleSize.y / mTextureHeight;
 
     winShowSize.x = MIN(imgScaleSize.x - imgShowPos.x, winSize.x);
     winShowSize.y = MIN(imgScaleSize.y - imgShowPos.y, winSize.y);
 
     winShowStartPos = {(winSize.x - winShowSize.x) / 2, (winSize.y - winShowSize.y) / 2};
     ImGui::SetCursorPos(winShowStartPos);
-    Image(texture, winShowSize, {imgShowPos.x / imgScaleSize.x, imgShowPos.y / imgScaleSize.y},
+    Image(mTexture, winShowSize, {imgShowPos.x / imgScaleSize.x, imgShowPos.y / imgScaleSize.y},
           {(imgShowPos.x + winShowSize.x) / imgScaleSize.x, (imgShowPos.y + winShowSize.y) / imgScaleSize.y});
 
-    if (displayInfo)
-    {
-        displayInfo->zoom = mImageScale;
-    }
+    mDisplayInfo.scale          = mImageScale;
+    mDisplayInfo.showPos.x      = mImageShowPos.x;
+    mDisplayInfo.showPos.y      = mImageShowPos.y;
+    mDisplayInfo.mousePos.x     = -1;
+    mDisplayInfo.mousePos.y     = -1;
+    mDisplayInfo.clickedOnImage = false;
 
     if (!IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
     {
-        mMouseMiddlePressed = false;
+        mMouseLeftPressed = false;
         goto _CHILD_OVER_;
     }
 
-    if (displayInfo)
+    if (IsMouseClicked(ImGuiMouseButton_Left))
     {
-        ImVec2 mousePos             = ImGui::GetMousePos();
-        ImVec2 winPos               = ImGui::GetWindowPos();
+        mDisplayInfo.clickedOnImage = true;
+    }
+
+    mousePos = ImGui::GetMousePos();
+    winPos   = ImGui::GetWindowPos();
+    {
         ImVec2 mousePosInWin        = mousePos - winPos;
         ImVec2 mousePosInImageShow  = mousePosInWin - winShowStartPos;
         mousePosInImageShow.x       = ROUND(0, mousePosInImageShow.x, winShowSize.x);
         mousePosInImageShow.y       = ROUND(0, mousePosInImageShow.y, winShowSize.y);
         ImVec2 mousePosInImageScale = mousePosInImageShow + imgShowPos;
-        displayInfo->mousePos[0]    = ROUND(0, mousePosInImageScale.x * imgWidth / imgScaleSize.x, imgWidth - 1);
-        displayInfo->mousePos[1]    = ROUND(0, mousePosInImageScale.y * imgHeight / imgScaleSize.y, imgHeight - 1);
+        mDisplayInfo.mousePos.x     = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaleSize.x, mTextureWidth - 1);
+        mDisplayInfo.mousePos.y     = ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaleSize.y, mTextureHeight - 1);
     }
 
     if (IsKeyDown(ImGuiKey_MouseWheelY))
     {
-        ImVec2 cursorPosInWindow = GetMousePos() - GetWindowPos();
-        ImVec2 cursorPosOnImage  = mImageShowPos + (cursorPosInWindow * (float)imgWidth / imgScaleSize.x);
-        mImageScale              = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
-        mImageScale              = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
+        ImVec2 mouseInWindow = mousePos - mWinPos;
 
-        imgScaleSize = imgBaseSize * mImageScale;
-
-        mImageShowPos = cursorPosOnImage - (cursorPosInWindow * (float)imgWidth / imgScaleSize.x);
+        handleWheelY(mouseInWindow);
+        if (mLinkWith && !mUnlinkCond())
+            mLinkWith->handleWheelY(mouseInWindow);
     }
 
-    if (IsKeyDown(ImGuiKey_W) || IsKeyDown(ImGuiKey_UpArrow))
-        moveUp();
-    else if (IsKeyReleased(ImGuiKey_W) || IsKeyReleased(ImGuiKey_UpArrow))
-        mlastDownSec[0] = 0;
-
-    if (IsKeyDown(ImGuiKey_S) || IsKeyDown(ImGuiKey_DownArrow))
-        moveDown();
-    else if (IsKeyReleased(ImGuiKey_S) || IsKeyReleased(ImGuiKey_DownArrow))
-        mlastDownSec[1] = 0;
-
-    if (IsKeyDown(ImGuiKey_A) || IsKeyDown(ImGuiKey_LeftArrow))
-        moveLeft();
-    else if (IsKeyReleased(ImGuiKey_A) || IsKeyReleased(ImGuiKey_LeftArrow))
-        mlastDownSec[2] = 0;
-
-    if (IsKeyDown(ImGuiKey_D) || IsKeyDown(ImGuiKey_RightArrow))
-        moveRight();
-    else if (IsKeyReleased(ImGuiKey_D) || IsKeyReleased(ImGuiKey_RightArrow))
-        mlastDownSec[3] = 0;
-
-    if (IsKeyDown(ImGuiKey_MouseMiddle))
+    if (IsKeyDown(ImGuiKey_MouseLeft))
     {
-        ImVec2 mousePos = GetMousePos();
-
-        if (!mMouseMiddlePressed)
+        if (mMouseLeftPressed)
         {
-            mDownMousePos       = mousePos;
-            mDownImageShowPos   = mImageShowPos;
-            mMouseMiddlePressed = true;
+            ImVec2 movement = mousePos - mLastMousePos;
+            handleDrag(movement);
+            if (mLinkWith && !mUnlinkCond())
+                mLinkWith->handleDrag(movement);
         }
+        mLastMousePos = mousePos;
 
-        mImageShowPos.x = mDownImageShowPos.x + (-(int)((mousePos.x - mDownMousePos.x) * imgWidth / imgScaleSize.x));
-        mImageShowPos.y = mDownImageShowPos.y + (-(int)((mousePos.y - mDownMousePos.y) * imgHeight / imgScaleSize.y));
+        if (!mMouseLeftPressed && mFocused)
+            mMouseLeftPressed = true;
     }
-    if (IsKeyReleased(ImGuiKey_MouseMiddle))
-    {
-        mMouseMiddlePressed = false;
-        mDownMousePos       = {0, 0};
-        mDownImageShowPos   = {0, 0};
-    }
+    if (IsKeyReleased(ImGuiKey_MouseLeft))
+        mMouseLeftPressed = false;
 
 _CHILD_OVER_:
     EndChild();
-
-    if (IsKeyReleased(ImGuiKey_Escape) && IsWindowFocused())
-    {
-        if (p_open)
-            *p_open = false;
-    }
-    if (embed)
-        EndChild();
-    else
-        End();
 }
 
-void ImageWindow::reset_scale()
+ImageWindow::ImageWindow(std::string title, bool embed) : IImGuiWindow(title)
+{
+    mIsChildWindow = embed;
+    if (embed)
+        mOpened = true;
+}
+
+void ImageWindow::setTexture(TextureData &texture)
+{
+    mTexture       = texture.texture;
+    mTextureWidth  = texture.textureWidth;
+    mTextureHeight = texture.textureHeight;
+}
+
+const DisplayInfo &ImageWindow::getDisplayInfo()
+{
+    return mDisplayInfo;
+}
+
+void ImageWindow::pushScale(const DisplayInfo &input)
+{
+    mScaleStack.push_back({
+        mImageScale, {mImageShowPos.x, mImageShowPos.y}
+    });
+    mImageScale     = input.scale;
+    mImageShowPos.x = input.showPos.x;
+    mImageShowPos.y = input.showPos.y;
+}
+
+void ImageWindow::setScale(const DisplayInfo &input)
+{
+    mImageScale     = input.scale;
+    mImageShowPos.x = input.showPos.x;
+    mImageShowPos.y = input.showPos.y;
+}
+
+void ImageWindow::popScale()
+{
+    if (mScaleStack.empty())
+        return;
+    mImageScale     = mScaleStack.back().scale;
+    mImageShowPos.x = mScaleStack.back().showPos.x;
+    mImageShowPos.y = mScaleStack.back().showPos.y;
+    mScaleStack.pop_back();
+}
+
+void ImageWindow::resetScale()
 {
     mImageShowPos = {0, 0};
     mImageScale   = 1;
 }
-
-void ImageWindow::setMoveSpeed(float speed)
-{
-    mMoveSpeed = speed;
+void ImageWindow::setOneOnOne() {
+    mImageScale = mTextureWidth / mImgBaseSize.x;
 }
 
-void ImageWindow::moveUp()
+void ImageWindow::linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition)
 {
-    float currSec = static_cast<float>(GetTime());
-    if (mlastDownSec[0] > 0)
-        mImageShowPos.y -= mMoveSpeed * (currSec - mlastDownSec[0]);
-    mlastDownSec[0] = currSec;
+    if (!other)
+        return;
+    other->mLinkWith = this;
+    mLinkWith        = other;
+
+    if (temporallyUnlinkCondition != nullptr)
+    {
+        other->mUnlinkCond = temporallyUnlinkCondition;
+        mUnlinkCond        = temporallyUnlinkCondition;
+    }
 }
 
-void ImageWindow::moveDown()
+void ImageWindow::unlink()
 {
-    float currSec = static_cast<float>(GetTime());
-    if (mlastDownSec[1] > 0)
-        mImageShowPos.y += mMoveSpeed * (currSec - mlastDownSec[1]);
-    mlastDownSec[1] = currSec;
-}
+    if (!mLinkWith)
+        return;
 
-void ImageWindow::moveLeft()
-{
-    float currSec = static_cast<float>(GetTime());
-    if (mlastDownSec[2] > 0)
-        mImageShowPos.x -= mMoveSpeed * (currSec - mlastDownSec[2]);
-    mlastDownSec[2] = currSec;
+    mLinkWith->mUnlinkCond = []() { return false; };
+    mLinkWith->mLinkWith   = nullptr;
+    mLinkWith              = nullptr;
+    mUnlinkCond            = []() { return false; };
 }
-
-void ImageWindow::moveRight()
-{
-    float currSec = static_cast<float>(GetTime());
-    if (mlastDownSec[3] > 0)
-        mImageShowPos.x += mMoveSpeed * (currSec - mlastDownSec[3]);
-    mlastDownSec[3] = currSec;
-}
-
 void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir)
 {
     ImGuiDockNode *dock_node = ImGui::DockContextFindNodeByID(ImGui::GetCurrentContext(), dock);
@@ -585,5 +675,3 @@ void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioDir, ImGuiID *out
         ImGui::DockBuilderSplitNode(dock, splitDir, sizeRatioDir, outDockDir, outDockOppositeDir);
     }
 }
-
-} // namespace ImGuiTools

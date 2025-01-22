@@ -1,58 +1,116 @@
+#ifndef _IMGUI_WINDOW_H_
+#define _IMGUI_WINDOW_H_
+
 #include <string>
 #include <functional>
+#include <map>
 #include "imgui.h"
+#include "ImGuiBaseTypes.h"
 
+// you can derived from this class and override showContent() Or just use setContent()
 class IImGuiWindow
 {
 public:
-    IImGuiWindow(std::string _title, ImGuiHoveredFlags _hoveredFlags = ImGuiHoveredFlags_None);
-    virtual bool show(bool canClose = false);
+    IImGuiWindow(std::string _title);
+    virtual ~IImGuiWindow();
+
+    virtual void show();
     void         enableStatusBar(bool on);
 
+    void setHasCloseButton(bool hasCloseButton);
+
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_WINDOW_FLAGS, WindowFlag, mWindowFlags)
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_CHILD_FLAGS, ChildFlag, mChildFlags)
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_HOVERED_FLAGS, HoveredFlag, mHoveredFlags)
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_FOCUSED_FLAGS, FocusedFlag, mFocusedFlags)
+
     void setContent(std::function<void()> content);
-	void setStatus(std::string statusString);
+    void setStatus(std::string statusString);
     void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
+
+    void setStyle(IMGUI_STYLE_VAR style, ImVec2 value);
+    void setStyle(IMGUI_STYLE_VAR style, float value);
+    void removeStyle(IMGUI_STYLE_VAR style);
+
+    void setStyleColor(IMGUI_COLOR_STYLE style, ImVec4 value);
+    void setStyleColor(IMGUI_COLOR_STYLE style, ImU32 value);
+    void removeStyleColor(IMGUI_COLOR_STYLE style);
+
+    void open();
+    void close();
+
+    bool isOpened();
+    bool isFocused();
+    bool justClosed();
+    bool isHovered();
+    bool isMouseEntered();
+    bool isMouseLeft();
+
+    const ImVec2 &getContentRegion();
 
 protected:
     virtual void showContent();
-
-public:
-    std::string      title;
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_None;
-
-    bool              opened       = false;
-    ImGuiHoveredFlags hoveredFlags = ImGuiHoveredFlags_None;
-    bool              hovered      = false;
-    ImVec2            winSize;
-    ImVec2            contentRegionSize;
+    void         updateWindowStatus();
+    void         pushStyles();
+    void         popStyles();
 
 protected:
-    ImVec2      manualSize;
-    ImGuiCond   manualSizeCond    = ImGuiCond_Always;
+    // Property
+    std::string         mTitle;
+    IMGUI_WINDOW_FLAGS  mWindowFlags   = ImGuiWindowFlags_None;
+    bool                mIsChildWindow = false;
+    IMGUI_CHILD_FLAGS   mChildFlags    = ImGuiChildFlags_None;
+    IMGUI_HOVERED_FLAGS mHoveredFlags  = ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem |
+                                        ImGuiHoveredFlags_AllowWhenBlockedByPopup;
+    IMGUI_FOCUSED_FLAGS mFocusedFlags  = ImGuiFocusedFlags_ChildWindows;
+
+    bool mHasCloseButton = true;
+
+    // Status
+    bool   mOpened       = false;
+    bool   mJustClosed   = false;
+    bool   mHovered      = false;
+    bool   mMouseEntered = false;
+    bool   mMouseLeft    = false;
+    bool   mFocused      = false;
+    ImVec2 mWinSize;
+    ImVec2 mWinPos;
+    ImVec2 mContentRegionSize;
+
+protected:
+    ImVec2      mManualSize;
+    ImGuiCond   mManualSizeCond   = ImGuiCond_Always;
     bool        mStatusBarEnabled = false;
     std::string mStatusString;
 
 private:
-    std::function<void()> mContentCallback;
+    std::function<void()>               mContentCallback;
+    std::map<IMGUI_STYLE_VAR, ImVec2>   mStylesVec2;
+    std::map<IMGUI_STYLE_VAR, float>    mStylesFloat;
+    std::map<IMGUI_COLOR_STYLE, ImVec4> mStylesColor;
 };
 
 class IImGuiChildWindow : public IImGuiWindow
 {
 public:
-    IImGuiChildWindow(std::string _title, ImGuiHoveredFlags _hoveredFlags = ImGuiHoveredFlags_None);
-    virtual bool show(bool canClose) override;
-
-public:
-    ImGuiChildFlags childFlags = ImGuiChildFlags_None;
+    IImGuiChildWindow(std::string title) : IImGuiWindow(title)
+    {
+        mIsChildWindow = true;
+        mOpened        = true;
+    }
 };
 
-class IImGuiPopup : public IImGuiWindow
+class ImGuiPopup : public IImGuiWindow
 {
 public:
-    IImGuiPopup(std::string _title, ImGuiHoveredFlags _hoveredFlags = ImGuiHoveredFlags_None);
-    virtual bool show(bool canClose) override;
+    ImGuiPopup(std::string _title);
+    virtual void show() override;
     void         open();
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_POPUP_FLAGS, PopupFlag, mPopupFlags)
 
 private:
     bool mShouldOpen = false;
+    IMGUI_POPUP_FLAGS mPopupFlags = ImGuiPopupFlags_None;
 };
+
+#endif

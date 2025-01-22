@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "ImGuiApplication.h"
 
 ImGuiApplication::ImGuiApplication()
@@ -59,6 +60,8 @@ void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettings
 
     switch (setting.mType)
     {
+        default:
+            break;
         case SettingValue::SettingInt:
         {
             int *pVal = (int *)setting.mVal;
@@ -120,6 +123,8 @@ void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettings
                 return;
             switch (setting.mType)
             {
+                default:
+                    break;
                 case SettingValue::SettingArrInt:
                 {
                     int *arr = (int *)setting.mVal;
@@ -182,6 +187,7 @@ void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettings
 
 void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf)
 {
+    IM_UNUSED(imgui_ctx);
     ImGuiApplication *app = (ImGuiApplication *)handler->UserData;
     if (!app)
         return;
@@ -229,7 +235,7 @@ void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGu
                 break;
             case SettingValue::SettingVecStdString:
                 std::vector<std::string> *vecString = (std::vector<std::string> *)setting.mVal;
-                for (int i = 0; i < vecString->size(); i++)
+                for (size_t i = 0; i < vecString->size(); i++)
                 {
                     buf->appendf("%s\n", (*vecString)[i].c_str());
                 }

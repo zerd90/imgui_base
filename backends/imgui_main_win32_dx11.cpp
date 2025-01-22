@@ -11,7 +11,6 @@
 #include "imgui_impl_dx11.h"
 #include <d3d11.h>
 #include <tchar.h>
-#include <memory>
 
 // Data
 static ID3D11Device           *g_pd3dDevice        = nullptr;
@@ -29,8 +28,12 @@ void           CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // Main code
-int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
+    IM_UNUSED(hInstance);
+    IM_UNUSED(hPrevInstance);
+    IM_UNUSED(lpCmdLine);
+    IM_UNUSED(nShowCmd);
     if (!g_user_app)
     {
         printf("user app not given\n");
@@ -349,7 +352,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             // extract files here
             wchar_t filename[MAX_PATH];
 
-            UINT                      count = DragQueryFileW(hDrop, -1, NULL, 0);
+            UINT                      count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
             std::vector<std::string> files;
             for (UINT i = 0; i < count; ++i)
             {

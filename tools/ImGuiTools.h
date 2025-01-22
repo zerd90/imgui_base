@@ -4,9 +4,12 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <mutex>
 
 #include "imgui.h"
+
+#include "ImGuiWindow.h"
+#include "imgui_impl_common.h"
+
 #ifndef IN_RANGE
     #define IN_RANGE(lower, x, upper) ((lower) <= (x) && (x) <= (upper))
 #endif
@@ -19,8 +22,6 @@
     (((mousePos).x >= (winPos).x) && ((mousePos).x < (winPos).x + (winSize).x) && ((mousePos).y >= (winPos).y) && \
      ((mousePos).y < (winPos).y + (winSize).y))
 
-namespace ImGuiTools
-{
 typedef enum
 {
     ColorNone,
@@ -43,74 +44,102 @@ typedef enum
     ColorButt,
 } TextColorCode;
 
-extern std::map<TextColorCode, std::string> gColorStrMap;
+extern std::map<TextColorCode, const char *> gColorStrMap;
 
 struct DisplayText
 {
-    bool         changeColor = false;
-    TextColorCode toColor     = ColorButt;
-    std::string  text;
-    bool         endLine = false;
+    std::string   text;
+    TextColorCode color   = ColorNone;
+    bool          endLine = false;
 };
 
 class LoggerWindow
 {
 public:
-    using KeyboardCallback = void(*)(void *userData, int key);
-    void show(const char *title, ImGuiID dock = 0);
-    void copyToClipBoard();
+    LoggerWindow(std::string title, bool embed);
+    virtual ~LoggerWindow();
+
+    void show();
+
+    void setWordWrap(bool wordWrap);
+
     void appendString(const char *fmt, ...);
     void appendString(const char *fmt, va_list vl);
     void appendString(const std::string &str);
     void clear();
 
-private:
-    void displayTexts();
+    void copyToClipBoard();
 
 private:
+    void displayTexts();
+    void showContent();
+
+private:
+    std::string   mTitle;
+    IImGuiWindow *mLoggerWindowImpl;
+
     std::vector<DisplayText> mLogs;
-    std::mutex           mLogLock;
-    std::string          bufferStr;
-    bool                 mLocked               = false;
+
+    StdMutex    mLogLock;
+    std::string bufferStr;
+    bool        mScrollLocked = false;
+    bool        mWordWrap     = false;
+
+    std::vector<std::string> mShowLogs;
+
+    bool  mLogsChanged  = false;
+    float mTotalLines   = 0;
+    float mMaxLineWidth = 0;
 };
 
 struct DisplayInfo
 {
-    float zoom        = 1.f;
-    float mousePos[2] = {0, 0};
+    float  scale          = 1.f;
+    ImVec2 showPos        = {0, 0}; // coordinate in Image
+    ImVec2 mousePos       = {0, 0}; // coordinate in Image
+    bool   clickedOnImage = false;
 };
 
-class ImageWindow
+class ImageWindow : public IImGuiWindow
 {
 public:
-    void show(std::string title, ImTextureID texture, int w, int h, bool embed = false, DisplayInfo *displayInfo = nullptr, bool *p_open = nullptr,
-                 bool canDocking = true, ImGuiID dockID = 0);
+    ImageWindow(std::string title, bool embed);
 
-    void reset_scale();
+    void               setTexture(TextureData &texture);
+    const DisplayInfo &getDisplayInfo();
 
-    // move speed by keyboard, pixel per second
-    void setMoveSpeed(float speed);
+    void pushScale(const DisplayInfo &input);
+    void popScale();
+    void setScale(const DisplayInfo &input);
+    void resetScale();
+    void setOneOnOne();
+
+    void linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition);
+    void unlink();
+
+protected:
+    virtual void showContent() override;
+    void         handleWheelY(ImVec2 &mouseInWindow);
+    void         handleDrag(ImVec2 &mouseMove);
 
 private:
-    void moveLeft();
-    void moveRight();
-    void moveUp();
-    void moveDown();
+    ImTextureID mTexture       = 0;
+    int         mTextureWidth  = 0;
+    int         mTextureHeight = 0;
+    DisplayInfo mDisplayInfo;
 
-private:
-    float      mMoveSpeed             = 1000;
-    ImVec2   mImageShowPos         = {0, 0};
-    float    mImageScale           = 1.f;
-    bool     mMouseMiddlePressed = false;
-    ImVec2   mDownMousePos          = {0, 0};
-    ImVec2   mDownImageShowPos      = {0, 0};
-    ImVec2   m_img_available        = {0, 0};
-    float mlastDownSec[4]         = {0};
+    std::vector<DisplayInfo> mScaleStack;
+
+    ImVec2 mImgBaseSize      = {0, 0};
+    ImVec2 mImageShowPos     = {0, 0};
+    float  mImageScale       = 1.f;
+    bool   mMouseLeftPressed = false;
+    ImVec2 mLastMousePos     = {0, 0};
+
+    ImageWindow          *mLinkWith = nullptr;
+    std::function<bool()> mUnlinkCond = []() { return false; };
 };
 
-void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,
-               ImGuiID *outDockOppositeDir);
-
-} // namespace ImGuiTools
+void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir);
 
 #endif
