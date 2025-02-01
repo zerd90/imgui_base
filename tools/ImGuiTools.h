@@ -6,9 +6,9 @@
 #include <map>
 
 #include "imgui.h"
+#include "imgui_impl_common.h"
 
 #include "ImGuiWindow.h"
-#include "imgui_impl_common.h"
 
 #ifndef IN_RANGE
     #define IN_RANGE(lower, x, upper) ((lower) <= (x) && (x) <= (upper))
@@ -53,13 +53,11 @@ struct DisplayText
     bool          endLine = false;
 };
 
-class LoggerWindow
+class LoggerWindow : public IImGuiWindow
 {
 public:
     LoggerWindow(std::string title, bool embed);
     virtual ~LoggerWindow();
-
-    void show();
 
     void setWordWrap(bool wordWrap);
 
@@ -72,11 +70,9 @@ public:
 
 private:
     void displayTexts();
-    void showContent();
+    virtual void showContent() override;
 
 private:
-    std::string   mTitle;
-    IImGuiWindow *mLoggerWindowImpl;
 
     std::vector<DisplayText> mLogs;
 

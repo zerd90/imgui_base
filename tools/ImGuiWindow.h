@@ -7,11 +7,25 @@
 #include "imgui.h"
 #include "ImGuiBaseTypes.h"
 
+struct SMenuItem
+{
+    SMenuItem() {}
+    SMenuItem(const std::string &setLabel) { label = setLabel; }
+    std::string           label;
+    std::string           shortcut;
+    bool                  enabled = true;
+    std::function<bool()> enabledCondition;
+
+    std::vector<SMenuItem> subMenus;
+    std::function<void()>  menuCallback;
+    bool                  *selected = nullptr;
+};
+
 // you can derived from this class and override showContent() Or just use setContent()
 class IImGuiWindow
 {
 public:
-    IImGuiWindow(std::string _title);
+    IImGuiWindow(std::string title);
     virtual ~IImGuiWindow();
 
     virtual void show();
@@ -48,6 +62,12 @@ public:
 
     const ImVec2 &getContentRegion();
 
+    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback = nullptr,
+                 bool *selected = nullptr, const char *shortcut = nullptr);
+    void addMenu(std::vector<std::string> labelLayers, bool *selected, const char *shortcut = nullptr);
+    void setMenuEnabled(std::vector<std::string> labelLayers, bool enabled);
+    void setMenuEnabledCondition(std::vector<std::string> labelLayers, std::function<bool()> condition);
+
 protected:
     virtual void showContent();
     void         updateWindowStatus();
@@ -60,9 +80,9 @@ protected:
     IMGUI_WINDOW_FLAGS  mWindowFlags   = ImGuiWindowFlags_None;
     bool                mIsChildWindow = false;
     IMGUI_CHILD_FLAGS   mChildFlags    = ImGuiChildFlags_None;
-    IMGUI_HOVERED_FLAGS mHoveredFlags  = ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem |
-                                        ImGuiHoveredFlags_AllowWhenBlockedByPopup;
-    IMGUI_FOCUSED_FLAGS mFocusedFlags  = ImGuiFocusedFlags_ChildWindows;
+    IMGUI_HOVERED_FLAGS mHoveredFlags  = ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
+                                        | ImGuiHoveredFlags_AllowWhenBlockedByPopup;
+    IMGUI_FOCUSED_FLAGS mFocusedFlags = ImGuiFocusedFlags_ChildWindows;
 
     bool mHasCloseButton = true;
 
@@ -75,7 +95,8 @@ protected:
     bool   mFocused      = false;
     ImVec2 mWinSize;
     ImVec2 mWinPos;
-    ImVec2 mContentRegionSize;
+    ImVec2 mContentRegionSize; // considering scroll
+    ImVec2 mDisplayRegionSize; // excluding scroll
 
 protected:
     ImVec2      mManualSize;
@@ -84,6 +105,7 @@ protected:
     std::string mStatusString;
 
 private:
+    SMenuItem                           mMenuBarItems;
     std::function<void()>               mContentCallback;
     std::map<IMGUI_STYLE_VAR, ImVec2>   mStylesVec2;
     std::map<IMGUI_STYLE_VAR, float>    mStylesFloat;
@@ -109,7 +131,7 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_POPUP_FLAGS, PopupFlag, mPopupFlags)
 
 private:
-    bool mShouldOpen = false;
+    bool              mShouldOpen = false;
     IMGUI_POPUP_FLAGS mPopupFlags = ImGuiPopupFlags_None;
 };
 

@@ -116,7 +116,6 @@
 
     #include <Shlobj.h>
     #include <shlwapi.h>
-    #include <vector>
 
     // Using XInput for gamepad (will load DLL dynamically)
     #ifndef IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
@@ -128,19 +127,16 @@ typedef DWORD(WINAPI *PFN_XInputGetState)(DWORD, XINPUT_STATE *);
     // Clang/GCC warnings with -Weverything
     #if defined(__clang__)
         #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wcast-function-type" // warning: cast between
-                                                                // incompatible function types (for
+        #pragma clang diagnostic ignored "-Wcast-function-type" // warning: cast between            \
+                                                                // incompatible function types (for \
                                                                 // loader)
     #endif
     #if defined(__GNUC__)
         #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored \
-            "-Wpragmas" // warning: unknown option after '#pragma GCC diagnostic' kind
-        #pragma GCC diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible
+        #pragma GCC diagnostic ignored "-Wpragmas"            // warning: unknown option after '#pragma GCC diagnostic' kind
+        #pragma GCC diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible \
                                                               // function types (for loader)
     #endif
-
-#include "imgui_impl_common.h"
 
 // Forward Declarations
 static void ImGui_ImplWin32_InitMultiViewportSupport(bool platform_has_own_dc);
@@ -178,9 +174,7 @@ struct ImGui_ImplWin32_Data
 // multi-context.
 static ImGui_ImplWin32_Data *ImGui_ImplWin32_GetBackendData()
 {
-    return ImGui::GetCurrentContext()
-             ? (ImGui_ImplWin32_Data *)ImGui::GetIO().BackendPlatformUserData
-             : nullptr;
+    return ImGui::GetCurrentContext() ? (ImGui_ImplWin32_Data *)ImGui::GetIO().BackendPlatformUserData : nullptr;
 }
 
 // Functions
@@ -190,8 +184,9 @@ static void ImGui_ImplWin32_UpdateKeyboardCodePage()
     ImGui_ImplWin32_Data *bd              = ImGui_ImplWin32_GetBackendData();
     HKL                   keyboard_layout = ::GetKeyboardLayout(0);
     LCID                  keyboard_lcid   = MAKELCID(HIWORD(keyboard_layout), SORT_DEFAULT);
-    if (::GetLocaleInfoA(keyboard_lcid, (LOCALE_RETURN_NUMBER | LOCALE_IDEFAULTANSICODEPAGE),
-                         (LPSTR)&bd->KeyboardCodePage, sizeof(bd->KeyboardCodePage)) == 0)
+    if (::GetLocaleInfoA(keyboard_lcid, (LOCALE_RETURN_NUMBER | LOCALE_IDEFAULTANSICODEPAGE), (LPSTR)&bd->KeyboardCodePage,
+                         sizeof(bd->KeyboardCodePage))
+        == 0)
         bd->KeyboardCodePage = CP_ACP; // Fallback to default ANSI code page when fails.
 }
 
@@ -211,15 +206,13 @@ static bool ImGui_ImplWin32_InitEx(void *hwnd, bool platform_has_own_dc)
     ImGui_ImplWin32_Data *bd   = IM_NEW(ImGui_ImplWin32_Data)();
     io.BackendPlatformUserData = (void *)bd;
     io.BackendPlatformName     = "imgui_impl_win32";
-    io.BackendFlags |=
-        ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
-    io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests
-                                                         // (optional, rarely used)
-    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on
-                                                               // the Platform side (optional)
-    io.BackendFlags |=
-        ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with
-                                                   // correct data (optional)
+    io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;         // We can honor GetMouseCursor() values (optional)
+    io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;          // We can honor io.WantSetMousePos requests
+                                                                  // (optional, rarely used)
+    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;    // We can create multi-viewports on
+                                                                  // the Platform side (optional)
+    io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with
+                                                                  // correct data (optional)
 
     bd->hWnd            = (HWND)hwnd;
     bd->TicksPerSecond  = perf_frequency;
@@ -248,10 +241,9 @@ static bool ImGui_ImplWin32_InitEx(void *hwnd, bool platform_has_own_dc)
     for (int n = 0; n < IM_ARRAYSIZE(xinput_dll_names); n++)
         if (HMODULE dll = ::LoadLibraryA(xinput_dll_names[n]))
         {
-            bd->XInputDLL = dll;
-            bd->XInputGetCapabilities =
-                (PFN_XInputGetCapabilities)::GetProcAddress(dll, "XInputGetCapabilities");
-            bd->XInputGetState = (PFN_XInputGetState)::GetProcAddress(dll, "XInputGetState");
+            bd->XInputDLL             = dll;
+            bd->XInputGetCapabilities = (PFN_XInputGetCapabilities)::GetProcAddress(dll, "XInputGetCapabilities");
+            bd->XInputGetState        = (PFN_XInputGetState)::GetProcAddress(dll, "XInputGetState");
             break;
         }
     #endif // IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
@@ -286,9 +278,8 @@ void ImGui_ImplWin32_Shutdown()
 
     io.BackendPlatformName     = nullptr;
     io.BackendPlatformUserData = nullptr;
-    io.BackendFlags &= ~(ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_HasSetMousePos |
-                         ImGuiBackendFlags_HasGamepad | ImGuiBackendFlags_PlatformHasViewports |
-                         ImGuiBackendFlags_HasMouseHoveredViewport);
+    io.BackendFlags &= ~(ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_HasSetMousePos | ImGuiBackendFlags_HasGamepad
+                         | ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseHoveredViewport);
     IM_DELETE(bd);
 }
 
@@ -348,8 +339,7 @@ static bool IsVkDown(int vk)
     return (::GetKeyState(vk) & 0x8000) != 0;
 }
 
-static void ImGui_ImplWin32_AddKeyEvent(ImGuiKey key, bool down, int native_keycode,
-                                        int native_scancode = -1)
+static void ImGui_ImplWin32_AddKeyEvent(ImGuiKey key, bool down, int native_keycode, int native_scancode = -1)
 {
     ImGuiIO &io = ImGui::GetIO();
     io.AddKeyEvent(key, down);
@@ -397,9 +387,9 @@ static void ImGui_ImplWin32_UpdateMouseData()
     bool  has_mouse_screen_pos = ::GetCursorPos(&mouse_screen_pos) != 0;
 
     HWND       focused_window = ::GetForegroundWindow();
-    const bool is_app_focused =
-        (focused_window && (focused_window == bd->hWnd || ::IsChild(focused_window, bd->hWnd) ||
-                            ImGui::FindViewportByPlatformHandle((void *)focused_window)));
+    const bool is_app_focused = (focused_window
+                                 && (focused_window == bd->hWnd || ::IsChild(focused_window, bd->hWnd)
+                                     || ImGui::FindViewportByPlatformHandle((void *)focused_window)));
     IM_UNUSED(is_app_focused);
     // ** I need the mouse pos when app not focused and mouse button pressed, so I comment this line
     // if (is_app_focused)
@@ -472,17 +462,14 @@ static void ImGui_ImplWin32_UpdateGamepads()
     {
         XINPUT_CAPABILITIES caps = {};
         bd->HasGamepad =
-            bd->XInputGetCapabilities
-                ? (bd->XInputGetCapabilities(0, XINPUT_FLAG_GAMEPAD, &caps) == ERROR_SUCCESS)
-                : false;
+            bd->XInputGetCapabilities ? (bd->XInputGetCapabilities(0, XINPUT_FLAG_GAMEPAD, &caps) == ERROR_SUCCESS) : false;
         bd->WantUpdateHasGamepad = false;
     }
 
     io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
     XINPUT_STATE    xinput_state;
     XINPUT_GAMEPAD &gamepad = xinput_state.Gamepad;
-    if (!bd->HasGamepad || bd->XInputGetState == nullptr ||
-        bd->XInputGetState(0, &xinput_state) != ERROR_SUCCESS)
+    if (!bd->HasGamepad || bd->XInputGetState == nullptr || bd->XInputGetState(0, &xinput_state) != ERROR_SUCCESS)
         return;
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
 
@@ -512,22 +499,14 @@ static void ImGui_ImplWin32_UpdateGamepads()
     MAP_ANALOG(ImGuiKey_GamepadR2, gamepad.bRightTrigger, XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255);
     MAP_BUTTON(ImGuiKey_GamepadL3, XINPUT_GAMEPAD_LEFT_THUMB);
     MAP_BUTTON(ImGuiKey_GamepadR3, XINPUT_GAMEPAD_RIGHT_THUMB);
-    MAP_ANALOG(ImGuiKey_GamepadLStickLeft, gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               -32768);
-    MAP_ANALOG(ImGuiKey_GamepadLStickRight, gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               +32767);
-    MAP_ANALOG(ImGuiKey_GamepadLStickUp, gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               +32767);
-    MAP_ANALOG(ImGuiKey_GamepadLStickDown, gamepad.sThumbLY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               -32768);
-    MAP_ANALOG(ImGuiKey_GamepadRStickLeft, gamepad.sThumbRX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               -32768);
-    MAP_ANALOG(ImGuiKey_GamepadRStickRight, gamepad.sThumbRX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               +32767);
-    MAP_ANALOG(ImGuiKey_GamepadRStickUp, gamepad.sThumbRY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               +32767);
-    MAP_ANALOG(ImGuiKey_GamepadRStickDown, gamepad.sThumbRY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE,
-               -32768);
+    MAP_ANALOG(ImGuiKey_GamepadLStickLeft, gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+    MAP_ANALOG(ImGuiKey_GamepadLStickRight, gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+    MAP_ANALOG(ImGuiKey_GamepadLStickUp, gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+    MAP_ANALOG(ImGuiKey_GamepadLStickDown, gamepad.sThumbLY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+    MAP_ANALOG(ImGuiKey_GamepadRStickLeft, gamepad.sThumbRX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
+    MAP_ANALOG(ImGuiKey_GamepadRStickRight, gamepad.sThumbRX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+    MAP_ANALOG(ImGuiKey_GamepadRStickUp, gamepad.sThumbRY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
+    MAP_ANALOG(ImGuiKey_GamepadRStickDown, gamepad.sThumbRY, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
         #undef MAP_BUTTON
         #undef MAP_ANALOG
     #endif // #ifndef IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
@@ -540,13 +519,12 @@ static BOOL CALLBACK ImGui_ImplWin32_UpdateMonitors_EnumFunc(HMONITOR monitor, H
     if (!::GetMonitorInfo(monitor, &info))
         return TRUE;
     ImGuiPlatformMonitor imgui_monitor;
-    imgui_monitor.MainPos        = ImVec2((float)info.rcMonitor.left, (float)info.rcMonitor.top);
-    imgui_monitor.MainSize       = ImVec2((float)(info.rcMonitor.right - info.rcMonitor.left),
-                                          (float)(info.rcMonitor.bottom - info.rcMonitor.top));
-    imgui_monitor.WorkPos        = ImVec2((float)info.rcWork.left, (float)info.rcWork.top);
-    imgui_monitor.WorkSize       = ImVec2((float)(info.rcWork.right - info.rcWork.left),
-                                          (float)(info.rcWork.bottom - info.rcWork.top));
-    imgui_monitor.DpiScale       = ImGui_ImplWin32_GetDpiScaleForMonitor(monitor);
+    imgui_monitor.MainPos = ImVec2((float)info.rcMonitor.left, (float)info.rcMonitor.top);
+    imgui_monitor.MainSize =
+        ImVec2((float)(info.rcMonitor.right - info.rcMonitor.left), (float)(info.rcMonitor.bottom - info.rcMonitor.top));
+    imgui_monitor.WorkPos  = ImVec2((float)info.rcWork.left, (float)info.rcWork.top);
+    imgui_monitor.WorkSize = ImVec2((float)(info.rcWork.right - info.rcWork.left), (float)(info.rcWork.bottom - info.rcWork.top));
+    imgui_monitor.DpiScale = ImGui_ImplWin32_GetDpiScaleForMonitor(monitor);
     imgui_monitor.PlatformHandle = (void *)monitor;
     if (imgui_monitor.DpiScale <= 0.0f)
         return TRUE; // Some accessibility applications are declaring virtual monitors with a DPI of
@@ -570,8 +548,7 @@ static void ImGui_ImplWin32_UpdateMonitors()
 void ImGui_ImplWin32_NewFrame()
 {
     ImGui_ImplWin32_Data *bd = ImGui_ImplWin32_GetBackendData();
-    IM_ASSERT(bd != nullptr &&
-              "Context or backend not initialized? Did you call ImGui_ImplWin32_Init()?");
+    IM_ASSERT(bd != nullptr && "Context or backend not initialized? Did you call ImGui_ImplWin32_Init()?");
     ImGuiIO &io = ImGui::GetIO();
 
     // Setup display size (every frame to accommodate for window resizing)
@@ -594,8 +571,7 @@ void ImGui_ImplWin32_NewFrame()
     ImGui_ImplWin32_ProcessKeyEventsWorkarounds();
 
     // Update OS mouse cursor with the cursor requested by imgui
-    ImGuiMouseCursor mouse_cursor =
-        io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
+    ImGuiMouseCursor mouse_cursor = io.MouseDrawCursor ? ImGuiMouseCursor_None : ImGui::GetMouseCursor();
     if (bd->LastMouseCursor != mouse_cursor)
     {
         bd->LastMouseCursor = mouse_cursor;
@@ -896,8 +872,7 @@ static ImGuiMouseSource GetMouseSourceFromMessageExtraInfo()
     return ImGuiMouseSource_Mouse;
 }
 
-IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam,
-                                                      LPARAM lParam)
+IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     // Most backends don't have silent checks like this one, but we need it because WndProc are
     // called early in CreateWindow(). We silently allow both context or just only backend data to
@@ -919,9 +894,8 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
             if (bd->MouseTrackedArea != area)
             {
                 TRACKMOUSEEVENT tme_cancel = {sizeof(tme_cancel), TME_CANCEL, hwnd, 0};
-                TRACKMOUSEEVENT tme_track  = {
-                    sizeof(tme_track),
-                    (DWORD)((area == 2) ? (TME_LEAVE | TME_NONCLIENT) : TME_LEAVE), hwnd, 0};
+                TRACKMOUSEEVENT tme_track  = {sizeof(tme_track), (DWORD)((area == 2) ? (TME_LEAVE | TME_NONCLIENT) : TME_LEAVE),
+                                              hwnd, 0};
                 if (bd->MouseTrackedArea != 0)
                     ::TrackMouseEvent(&tme_cancel);
                 ::TrackMouseEvent(&tme_track);
@@ -929,11 +903,9 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
             }
             POINT mouse_pos         = {(LONG)GET_X_LPARAM(lParam), (LONG)GET_Y_LPARAM(lParam)};
             bool  want_absolute_pos = (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
-            if (msg == WM_MOUSEMOVE &&
-                want_absolute_pos) // WM_MOUSEMOVE are client-relative coordinates.
+            if (msg == WM_MOUSEMOVE && want_absolute_pos) // WM_MOUSEMOVE are client-relative coordinates.
                 ::ClientToScreen(hwnd, &mouse_pos);
-            if (msg == WM_NCMOUSEMOVE &&
-                !want_absolute_pos) // WM_NCMOUSEMOVE are absolute coordinates.
+            if (msg == WM_NCMOUSEMOVE && !want_absolute_pos) // WM_NCMOUSEMOVE are absolute coordinates.
                 ::ScreenToClient(hwnd, &mouse_pos);
             io.AddMouseSourceEvent(mouse_source);
             io.AddMousePosEvent((float)mouse_pos.x, (float)mouse_pos.y);
@@ -1030,8 +1002,7 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
             io.AddMouseWheelEvent(0.0f, (float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA);
             return 0;
         case WM_MOUSEHWHEEL:
-            io.AddMouseWheelEvent(-(float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA,
-                                  0.0f);
+            io.AddMouseWheelEvent(-(float)GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA, 0.0f);
             return 0;
         case WM_KEYDOWN:
         case WM_KEYUP:
@@ -1065,39 +1036,33 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
                     // events are corrected in ImGui_ImplWin32_ProcessKeyEventsWorkarounds()
                     if (IsVkDown(VK_LSHIFT) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftShift, is_key_down, VK_LSHIFT,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftShift, is_key_down, VK_LSHIFT, scancode);
                     }
                     if (IsVkDown(VK_RSHIFT) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightShift, is_key_down, VK_RSHIFT,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightShift, is_key_down, VK_RSHIFT, scancode);
                     }
                 }
                 else if (vk == VK_CONTROL)
                 {
                     if (IsVkDown(VK_LCONTROL) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftCtrl, is_key_down, VK_LCONTROL,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftCtrl, is_key_down, VK_LCONTROL, scancode);
                     }
                     if (IsVkDown(VK_RCONTROL) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightCtrl, is_key_down, VK_RCONTROL,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightCtrl, is_key_down, VK_RCONTROL, scancode);
                     }
                 }
                 else if (vk == VK_MENU)
                 {
                     if (IsVkDown(VK_LMENU) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftAlt, is_key_down, VK_LMENU,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_LeftAlt, is_key_down, VK_LMENU, scancode);
                     }
                     if (IsVkDown(VK_RMENU) == is_key_down)
                     {
-                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightAlt, is_key_down, VK_RMENU,
-                                                    scancode);
+                        ImGui_ImplWin32_AddKeyEvent(ImGuiKey_RightAlt, is_key_down, VK_RMENU, scancode);
                     }
                 }
             }
@@ -1120,8 +1085,7 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARA
             else
             {
                 wchar_t wch = 0;
-                ::MultiByteToWideChar(bd->KeyboardCodePage, MB_PRECOMPOSED, (char *)&wParam, 1,
-                                      &wch, 1);
+                ::MultiByteToWideChar(bd->KeyboardCodePage, MB_PRECOMPOSED, (char *)&wParam, 1, &wch, 1);
                 io.AddInputCharacter(wch);
             }
             return 0;
@@ -1171,8 +1135,7 @@ static BOOL _IsWindowsVersionOrGreater(WORD major, WORD minor, WORD)
     static PFN_RtlVerifyVersionInfo RtlVerifyVersionInfoFn = nullptr;
     if (RtlVerifyVersionInfoFn == nullptr)
         if (HMODULE ntdllModule = ::GetModuleHandleA("ntdll.dll"))
-            RtlVerifyVersionInfoFn =
-                (PFN_RtlVerifyVersionInfo)GetProcAddress(ntdllModule, "RtlVerifyVersionInfo");
+            RtlVerifyVersionInfoFn = (PFN_RtlVerifyVersionInfo)GetProcAddress(ntdllModule, "RtlVerifyVersionInfo");
     if (RtlVerifyVersionInfoFn == nullptr)
         return FALSE;
 
@@ -1183,21 +1146,14 @@ static BOOL _IsWindowsVersionOrGreater(WORD major, WORD minor, WORD)
     versionInfo.dwMinorVersion         = minor;
     VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
     VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
-    return (RtlVerifyVersionInfoFn(&versionInfo, VER_MAJORVERSION | VER_MINORVERSION,
-                                   conditionMask) == 0)
-             ? TRUE
-             : FALSE;
+    return (RtlVerifyVersionInfoFn(&versionInfo, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0) ? TRUE : FALSE;
 }
 
-    #define _IsWindowsVistaOrGreater() \
-        _IsWindowsVersionOrGreater(HIBYTE(0x0600), LOBYTE(0x0600), 0) // _WIN32_WINNT_VISTA
-    #define _IsWindows8OrGreater() \
-        _IsWindowsVersionOrGreater(HIBYTE(0x0602), LOBYTE(0x0602), 0) // _WIN32_WINNT_WIN8
-    #define _IsWindows8Point1OrGreater() \
-        _IsWindowsVersionOrGreater(HIBYTE(0x0603), LOBYTE(0x0603), 0) // _WIN32_WINNT_WINBLUE
-    #define _IsWindows10OrGreater()                                \
-        _IsWindowsVersionOrGreater(HIBYTE(0x0A00), LOBYTE(0x0A00), \
-                                   0) // _WIN32_WINNT_WINTHRESHOLD / _WIN32_WINNT_WIN10
+    #define _IsWindowsVistaOrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0600), LOBYTE(0x0600), 0)   // _WIN32_WINNT_VISTA
+    #define _IsWindows8OrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0602), LOBYTE(0x0602), 0)       // _WIN32_WINNT_WIN8
+    #define _IsWindows8Point1OrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0603), LOBYTE(0x0603), 0) // _WIN32_WINNT_WINBLUE
+    #define _IsWindows10OrGreater() \
+        _IsWindowsVersionOrGreater(HIBYTE(0x0A00), LOBYTE(0x0A00), 0) // _WIN32_WINNT_WINTHRESHOLD / _WIN32_WINNT_WIN10
 
     #ifndef DPI_ENUMS_DECLARED
 typedef enum
@@ -1221,8 +1177,7 @@ DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
     #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
         #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 (DPI_AWARENESS_CONTEXT) - 4
     #endif
-typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(
-    PROCESS_DPI_AWARENESS); // Shcore.lib + dll, Windows 8.1+
+typedef HRESULT(WINAPI *PFN_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS); // Shcore.lib + dll, Windows 8.1+
 typedef HRESULT(WINAPI *PFN_GetDpiForMonitor)(HMONITOR, MONITOR_DPI_TYPE, UINT *,
                                               UINT *); // Shcore.lib + dll, Windows 8.1+
 typedef DPI_AWARENESS_CONTEXT(WINAPI *PFN_SetThreadDpiAwarenessContext)(
@@ -1239,8 +1194,7 @@ void ImGui_ImplWin32_EnableDpiAwareness()
     {
         static HINSTANCE user32_dll = ::LoadLibraryA("user32.dll"); // Reference counted per-process
         if (PFN_SetThreadDpiAwarenessContext SetThreadDpiAwarenessContextFn =
-                (PFN_SetThreadDpiAwarenessContext)::GetProcAddress(user32_dll,
-                                                                   "SetThreadDpiAwarenessContext"))
+                (PFN_SetThreadDpiAwarenessContext)::GetProcAddress(user32_dll, "SetThreadDpiAwarenessContext"))
         {
             SetThreadDpiAwarenessContextFn(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
             return;
@@ -1262,7 +1216,7 @@ void ImGui_ImplWin32_EnableDpiAwareness()
 }
 
     #if defined(_MSC_VER) && !defined(NOGDI)
-        #pragma comment(lib, "gdi32") // Link with gdi32.lib for GetDeviceCaps(). MinGW will require
+        #pragma comment(lib, "gdi32") // Link with gdi32.lib for GetDeviceCaps(). MinGW will require \
                                       // linking with '-lgdi32'
     #endif
 
@@ -1271,11 +1225,10 @@ float ImGui_ImplWin32_GetDpiScaleForMonitor(void *monitor)
     UINT xdpi = 96, ydpi = 96;
     if (_IsWindows8Point1OrGreater())
     {
-        static HINSTANCE shcore_dll = ::LoadLibraryA("shcore.dll"); // Reference counted per-process
+        static HINSTANCE            shcore_dll         = ::LoadLibraryA("shcore.dll"); // Reference counted per-process
         static PFN_GetDpiForMonitor GetDpiForMonitorFn = nullptr;
         if (GetDpiForMonitorFn == nullptr && shcore_dll != nullptr)
-            GetDpiForMonitorFn =
-                (PFN_GetDpiForMonitor)::GetProcAddress(shcore_dll, "GetDpiForMonitor");
+            GetDpiForMonitorFn = (PFN_GetDpiForMonitor)::GetProcAddress(shcore_dll, "GetDpiForMonitor");
         if (GetDpiForMonitorFn != nullptr)
         {
             GetDpiForMonitorFn((HMONITOR)monitor, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
@@ -1304,8 +1257,7 @@ float ImGui_ImplWin32_GetDpiScaleForHwnd(void *hwnd)
 //--------------------------------------------------------------------------------------------------------
 
     #if defined(_MSC_VER)
-        #pragma comment( \
-            lib, "dwmapi") // Link with dwmapi.lib. MinGW will require linking with '-ldwmapi'
+        #pragma comment(lib, "dwmapi") // Link with dwmapi.lib. MinGW will require linking with '-ldwmapi'
     #endif
 
 // [experimental]
@@ -1322,8 +1274,7 @@ void ImGui_ImplWin32_EnableAlphaCompositing(void *hwnd)
 
     BOOL  opaque;
     DWORD color;
-    if (_IsWindows8OrGreater() ||
-        (SUCCEEDED(::DwmGetColorizationColor(&color, &opaque)) && !opaque))
+    if (_IsWindows8OrGreater() || (SUCCEEDED(::DwmGetColorizationColor(&color, &opaque)) && !opaque))
     {
         HRGN           region = ::CreateRectRgn(0, 0, -1, -1);
         DWM_BLURBEHIND bb     = {};
@@ -1367,8 +1318,7 @@ struct ImGui_ImplWin32_ViewportData
     ~ImGui_ImplWin32_ViewportData() { IM_ASSERT(Hwnd == nullptr); }
 };
 
-static void ImGui_ImplWin32_GetWin32StyleFromViewportFlags(ImGuiViewportFlags flags,
-                                                           DWORD *out_style, DWORD *out_ex_style)
+static void ImGui_ImplWin32_GetWin32StyleFromViewportFlags(ImGuiViewportFlags flags, DWORD *out_style, DWORD *out_ex_style)
 {
     if (flags & ImGuiViewportFlags_NoDecoration)
         *out_style = WS_POPUP;
@@ -1402,17 +1352,16 @@ static void ImGui_ImplWin32_CreateWindow(ImGuiViewport *viewport)
     vd->HwndParent = ImGui_ImplWin32_GetHwndFromViewportID(viewport->ParentViewportId);
 
     // Create window
-    RECT rect = {(LONG)viewport->Pos.x, (LONG)viewport->Pos.y,
-                 (LONG)(viewport->Pos.x + viewport->Size.x),
+    RECT rect = {(LONG)viewport->Pos.x, (LONG)viewport->Pos.y, (LONG)(viewport->Pos.x + viewport->Size.x),
                  (LONG)(viewport->Pos.y + viewport->Size.y)};
     ::AdjustWindowRectEx(&rect, vd->DwStyle, FALSE, vd->DwExStyle);
-    vd->Hwnd      = ::CreateWindowExW(vd->DwExStyle, L"ImGui Platform", L"Untitled",
-                                      vd->DwStyle, // Style, class name, window name
-                                      rect.left, rect.top, rect.right - rect.left,
-                                      rect.bottom - rect.top, // Window area
-                                      vd->HwndParent, nullptr, ::GetModuleHandle(nullptr),
-                                      nullptr); // Owner window, Menu, Instance, Param
-    vd->HwndOwned = true;
+    vd->Hwnd                        = ::CreateWindowExW(vd->DwExStyle, L"ImGui Platform", L"Untitled",
+                                                        vd->DwStyle, // Style, class name, window name
+                                                        rect.left, rect.top, rect.right - rect.left,
+                                                        rect.bottom - rect.top, // Window area
+                                                        vd->HwndParent, nullptr, ::GetModuleHandle(nullptr),
+                                                        nullptr); // Owner window, Menu, Instance, Param
+    vd->HwndOwned                   = true;
     viewport->PlatformRequestResize = false;
     viewport->PlatformHandle = viewport->PlatformHandleRaw = vd->Hwnd;
 
@@ -1423,8 +1372,7 @@ static void ImGui_ImplWin32_CreateWindow(ImGuiViewport *viewport)
 static void ImGui_ImplWin32_DestroyWindow(ImGuiViewport *viewport)
 {
     ImGui_ImplWin32_Data *bd = ImGui_ImplWin32_GetBackendData();
-    if (ImGui_ImplWin32_ViewportData *vd =
-            (ImGui_ImplWin32_ViewportData *)viewport->PlatformUserData)
+    if (ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)viewport->PlatformUserData)
     {
         if (::GetCapture() == vd->Hwnd)
         {
@@ -1498,9 +1446,7 @@ static void ImGui_ImplWin32_UpdateWindow(ImGuiViewport *viewport)
         // (Optional) Update TopMost state if it changed _after_ creation
         bool top_most_changed = (vd->DwExStyle & WS_EX_TOPMOST) != (new_ex_style & WS_EX_TOPMOST);
         HWND insert_after =
-            top_most_changed
-                ? ((viewport->Flags & ImGuiViewportFlags_TopMost) ? HWND_TOPMOST : HWND_NOTOPMOST)
-                : 0;
+            top_most_changed ? ((viewport->Flags & ImGuiViewportFlags_TopMost) ? HWND_TOPMOST : HWND_NOTOPMOST) : 0;
         UINT swp_flag = top_most_changed ? 0 : SWP_NOZORDER;
 
         // Apply flags and position (since it is affected by flags)
@@ -1508,12 +1454,11 @@ static void ImGui_ImplWin32_UpdateWindow(ImGuiViewport *viewport)
         vd->DwExStyle = new_ex_style;
         ::SetWindowLong(vd->Hwnd, GWL_STYLE, vd->DwStyle);
         ::SetWindowLong(vd->Hwnd, GWL_EXSTYLE, vd->DwExStyle);
-        RECT rect = {(LONG)viewport->Pos.x, (LONG)viewport->Pos.y,
-                     (LONG)(viewport->Pos.x + viewport->Size.x),
+        RECT rect = {(LONG)viewport->Pos.x, (LONG)viewport->Pos.y, (LONG)(viewport->Pos.x + viewport->Size.x),
                      (LONG)(viewport->Pos.y + viewport->Size.y)};
         ::AdjustWindowRectEx(&rect, vd->DwStyle, FALSE, vd->DwExStyle); // Client to Screen
-        ::SetWindowPos(vd->Hwnd, insert_after, rect.left, rect.top, rect.right - rect.left,
-                       rect.bottom - rect.top, swp_flag | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        ::SetWindowPos(vd->Hwnd, insert_after, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
+                       swp_flag | SWP_NOACTIVATE | SWP_FRAMECHANGED);
         ::ShowWindow(vd->Hwnd, SW_SHOWNA); // This is necessary when we alter the style
         viewport->PlatformRequestMove = viewport->PlatformRequestResize = true;
     }
@@ -1541,11 +1486,9 @@ static void ImGui_ImplWin32_SetWindowPos(ImGuiViewport *viewport, ImVec2 pos)
     IM_ASSERT(vd->Hwnd != 0);
     RECT rect = {(LONG)pos.x, (LONG)pos.y, (LONG)pos.x, (LONG)pos.y};
     if (viewport->Flags & ImGuiViewportFlags_OwnedByApp)
-        ImGui_ImplWin32_UpdateWin32StyleFromWindow(
-            viewport); // Not our window, poll style before using
+        ImGui_ImplWin32_UpdateWin32StyleFromWindow(viewport); // Not our window, poll style before using
     ::AdjustWindowRectEx(&rect, vd->DwStyle, FALSE, vd->DwExStyle);
-    ::SetWindowPos(vd->Hwnd, nullptr, rect.left, rect.top, 0, 0,
-                   SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
+    ::SetWindowPos(vd->Hwnd, nullptr, rect.left, rect.top, 0, 0, SWP_NOZORDER | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 static ImVec2 ImGui_ImplWin32_GetWindowSize(ImGuiViewport *viewport)
@@ -1563,8 +1506,7 @@ static void ImGui_ImplWin32_SetWindowSize(ImGuiViewport *viewport, ImVec2 size)
     IM_ASSERT(vd->Hwnd != 0);
     RECT rect = {0, 0, (LONG)size.x, (LONG)size.y};
     if (viewport->Flags & ImGuiViewportFlags_OwnedByApp)
-        ImGui_ImplWin32_UpdateWin32StyleFromWindow(
-            viewport); // Not our window, poll style before using
+        ImGui_ImplWin32_UpdateWin32StyleFromWindow(viewport);       // Not our window, poll style before using
     ::AdjustWindowRectEx(&rect, vd->DwStyle, FALSE, vd->DwExStyle); // Client to Screen
     ::SetWindowPos(vd->Hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
                    SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
@@ -1646,8 +1588,7 @@ static void ImGui_ImplWin32_OnChangedViewport(ImGuiViewport *viewport)
     #endif
 }
 
-static LRESULT CALLBACK ImGui_ImplWin32_WndProcHandler_PlatformWindow(HWND hWnd, UINT msg,
-                                                                      WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK ImGui_ImplWin32_WndProcHandler_PlatformWindow(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     // Allow secondary viewport WndProc to be called regardless of current context
     ImGuiContext *hwnd_ctx = (ImGuiContext *)::GetPropA(hWnd, "IMGUI_CONTEXT");

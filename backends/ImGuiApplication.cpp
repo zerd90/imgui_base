@@ -3,7 +3,7 @@
 
 ImGuiApplication::ImGuiApplication()
 {
-    mWindowRect = {100, 100, 640, 480};
+    mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
     setApp(this);
 }

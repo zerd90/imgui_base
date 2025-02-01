@@ -6,9 +6,12 @@
 
 #include "imgui.h"
 
-using StdMutex           = std::mutex;
-using StdMutexGuard      = std::lock_guard<StdMutex>;
-using StdMutexUniqueLock = std::unique_lock<StdMutex>;
+using StdMutex            = std::mutex;
+using StdMutexGuard       = std::lock_guard<StdMutex>;
+using StdMutexUniqueLock  = std::unique_lock<StdMutex>;
+using StdRMutex           = std::recursive_mutex;
+using StdRMutexGuard      = std::lock_guard<StdRMutex>;
+using StdRMutexUniqueLock = std::unique_lock<StdRMutex>;
 
 using IMGUI_COLOR_STYLE     = enum ImGuiCol_;
 using IMGUI_COND            = enum ImGuiCond_;

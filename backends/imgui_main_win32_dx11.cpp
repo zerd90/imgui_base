@@ -7,8 +7,10 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include "imgui_impl_common.h"
-#include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#include "imgui_impl_win32.h"
+#include "ImGuiBaseTypes.h"
+
 #include <d3d11.h>
 #include <tchar.h>
 
@@ -16,7 +18,6 @@
 static ID3D11Device           *g_pd3dDevice        = nullptr;
 static ID3D11DeviceContext    *g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain         *g_pSwapChain        = nullptr;
-static bool                    g_SwapChainOccluded = false;
 static UINT                    g_ResizeWidth = 0, g_ResizeHeight = 0;
 static ID3D11RenderTargetView *g_mainRenderTargetView = nullptr;
 
@@ -26,6 +27,80 @@ void           CleanupDeviceD3D();
 void           CreateRenderTarget();
 void           CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+StdRMutex gEventLock;
+
+bool doGUIRender()
+{
+    static ImVec4   clear_color         = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    static ImGuiIO *io                  = nullptr;
+    static bool     g_SwapChainOccluded = false;
+    MSG             msg;
+
+    if (!io)
+        io = &ImGui::GetIO();
+
+    // to support multi viewports, there would be Windows created in this thread
+    while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
+    {
+        ::TranslateMessage(&msg);
+        ::DispatchMessage(&msg);
+    }
+
+    // Handle window being minimized or screen locked
+    if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
+    {
+        ::Sleep(10);
+        return false;
+    }
+    g_SwapChainOccluded = false;
+
+    StdRMutexUniqueLock locker(gEventLock);
+    // Handle window resize (we don't resize directly in the WM_SIZE handler)
+    if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
+    {
+        CleanupRenderTarget();
+        g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
+        g_ResizeWidth = g_ResizeHeight = 0;
+        CreateRenderTarget();
+    }
+
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+
+    g_user_app->newFramePreAction();
+
+    ImGui::NewFrame();
+
+    if (g_user_app->renderUI())
+        return true;
+
+    // Rendering
+    ImGui::Render();
+    g_user_app->endFramePostAction();
+    locker.unlock();
+
+    const float clear_color_with_alpha[4] = {clear_color.x * clear_color.w, clear_color.y * clear_color.w,
+                                             clear_color.z * clear_color.w, clear_color.w};
+    g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    // Update and Render additional Platform Windows
+    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
+
+    // Present
+    HRESULT hr = g_pSwapChain->Present(1, 0); // Present with vsync
+    // HRESULT hr          = g_pSwapChain->Present(0, 0); // Present without vsync
+    g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
+
+    return false;
+}
 
 // Main code
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
@@ -58,7 +133,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc,          0L,     0L, GetModuleHandle(nullptr), nullptr, nullptr,
                       nullptr,    nullptr,    L"ImGui Example", nullptr};
     ::RegisterClassExW(&wc);
-    
+
     HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName().c_str()).get(), WS_OVERLAPPEDWINDOW,
                                   g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y,
                                   g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h, nullptr, nullptr,
@@ -106,17 +181,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
-    struct
-    {
-        ID3D11Device        *device;
-        ID3D11DeviceContext *context;
-    } d3d11_device = {g_pd3dDevice, g_pd3dDeviceContext};
-
-    g_user_app->setRenderContext(&d3d11_device);
-
     g_user_app->loadResources();
-
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     {
         std::vector<std::string> tmpArgs;
@@ -128,6 +193,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Main loop
+
+    RenderThread renderThread(doGUIRender);
+    renderThread.start();
+
     bool done = false;
     while (!done)
     {
@@ -144,55 +213,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (done)
             break;
 
-        // Handle window being minimized or screen locked
-        if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
-        {
-            ::Sleep(10);
-            continue;
-        }
-        g_SwapChainOccluded = false;
-
-        // Handle window resize (we don't resize directly in the WM_SIZE handler)
-        if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
-        {
-            CleanupRenderTarget();
-            g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
-            g_ResizeWidth = g_ResizeHeight = 0;
-            CreateRenderTarget();
-        }
-
-        // Start the Dear ImGui frame
-        ImGui_ImplDX11_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-
-        g_user_app->newFramePreAction();
-
-        ImGui::NewFrame();
-
-        if (g_user_app->renderUI())
+        if (!renderThread.isRunning())
             break;
 
-        // Rendering
-        ImGui::Render();
-        g_user_app->endFramePostAction();
-        const float clear_color_with_alpha[4] = {clear_color.x * clear_color.w, clear_color.y * clear_color.w,
-                                                 clear_color.z * clear_color.w, clear_color.w};
-        g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-        g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-        // Update and Render additional Platform Windows
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-        }
-
-        // Present
-        HRESULT hr = g_pSwapChain->Present(1, 0);   // Present with vsync
-        // HRESULT hr          = g_pSwapChain->Present(0, 0); // Present without vsync
-        g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
+        ::Sleep(10);
     }
+
+    renderThread.stop();
 
     g_user_app->exit();
 
@@ -310,13 +337,16 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 // inputs to dear imgui, and hide them from your application based on those two flags.
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    StdRMutexUniqueLock locker(gEventLock);
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
+    locker.unlock();
 
     switch (msg)
     {
         case WM_SIZE:
         {
+            locker.lock();
             if (wParam == SIZE_MINIMIZED)
                 return 0;
             g_ResizeWidth  = (UINT)LOWORD(lParam); // Queue resize
@@ -352,7 +382,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             // extract files here
             wchar_t filename[MAX_PATH];
 
-            UINT                      count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
+            UINT                     count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
             std::vector<std::string> files;
             for (UINT i = 0; i < count; ++i)
             {

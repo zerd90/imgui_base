@@ -1,23 +1,21 @@
-
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <algorithm>
 #include "ImGuiItem.h"
 
 using namespace ImGui;
 using std::string;
 
-IImGuiItem::IImGuiItem(std::string &&label)
+IImGuiItem::IImGuiItem(const std::string &label)
 {
     mLabel = label;
 }
 
-IImGuiItem::IImGuiItem(std::string &label) : IImGuiItem(std::move(label)) {}
-
-void IImGuiItem::setLabel(std::string &label)
+IImGuiItem::IImGuiItem()
 {
-    setLabel(std::move(label));
+    mLabel = "##" + std::to_string(rand());
 }
 
-void IImGuiItem::setLabel(std::string &&label)
+void IImGuiItem::setLabel(const std::string &label)
 {
     if (mLabel != label)
         mLabel = label;
@@ -33,6 +31,7 @@ void IImGuiItem::show(bool newLine)
     if (!newLine)
         SameLine();
 
+    mItemPos = ImGui::GetCursorScreenPos();
     if (showItem() && mActionCallbacks[ImGuiItemNativeActive])
         mActionCallbacks[ImGuiItemNativeActive]();
 
@@ -59,7 +58,7 @@ void IImGuiItem::addActionCallback(ImGuiItemAction action, std::function<void()>
 
 void IImGuiItem::setItemSize(ImVec2 size)
 {
-    if (mManualItemSize.x != size.x && mManualItemSize.y != size.y)
+    if (mManualItemSize.x != size.x || mManualItemSize.y != size.y)
         mManualItemSize = size;
 }
 
@@ -90,8 +89,9 @@ void IImGuiItem::updateItemStatus()
     UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }
 
-ImGuiButton::ImGuiButton(std::string &&label) : IImGuiItem(label) {}
-ImGuiButton::ImGuiButton(std::string &label) : ImGuiButton(std::move(label)) {}
+ImGuiButton::ImGuiButton() : IImGuiItem() {}
+
+ImGuiButton::ImGuiButton(const std::string &label) : IImGuiItem(label) {}
 
 bool ImGuiButton::showItem()
 {
@@ -100,11 +100,23 @@ bool ImGuiButton::showItem()
     return pressed;
 }
 
-ImGuiArrowButton::ImGuiArrowButton(std::string &&label, ImGuiDir dir) : IImGuiItem(label)
+ImGuiImageButton::ImGuiImageButton() : ImGuiButton() {}
+
+bool ImGuiImageButton::showItem()
+{
+    return ImageButton(mLabel.c_str(), mImageTexture, mManualItemSize - ImGui::GetStyle().FramePadding * 2, {0, 0},
+                       {1, 1}, mBgColor, mTintColor);
+}
+void ImGuiImageButton::setImageTexture(ImTextureID texture)
+{
+    if (mImageTexture != texture)
+        mImageTexture = texture;
+}
+
+ImGuiArrowButton::ImGuiArrowButton(ImGuiDir dir)
 {
     mArrowDir = dir;
 }
-ImGuiArrowButton::ImGuiArrowButton(std::string &label, ImGuiDir dir) : ImGuiArrowButton(std::move(label), dir) {}
 
 bool ImGuiArrowButton::showItem()
 {
@@ -119,13 +131,11 @@ ImGuiText::ImGuiText()
         mHintSize = CalcTextSize(mLabel.c_str());
 }
 
-ImGuiText::ImGuiText(std::string &&text) : IImGuiItem(text)
+ImGuiText::ImGuiText(const std::string &text) : IImGuiItem(text)
 {
     if (GetCurrentContext()) // check if ImGui is initialized
         mHintSize = CalcTextSize(mLabel.c_str());
 }
-
-ImGuiText::ImGuiText(std::string &text) : ImGuiText(std::move(text)) {}
 
 bool ImGuiText::showItem()
 {
@@ -159,31 +169,24 @@ bool ImGuiText::showItem()
     return false;
 }
 
-void ImGuiText::setText(std::string &text)
-{
-    setText(std::move(text));
-}
-
-void ImGuiText::setText(std::string &&text)
+void ImGuiText::setText(const std::string &text)
 {
     setLabel(text);
     if (GetCurrentContext()) // check if ImGui is initialized
         mHintSize = CalcTextSize(mLabel.c_str());
 }
 
-ImGuiCheckbox::ImGuiCheckbox(std::string &&label) : IImGuiItem(label) {}
-ImGuiCheckbox::ImGuiCheckbox(std::string &label) : ImGuiCheckbox(std::move(label)) {}
+ImGuiCheckbox::ImGuiCheckbox(const std::string &label) : IImGuiItem(label) {}
 
 bool ImGuiCheckbox::showItem()
 {
     return Checkbox(mLabel.c_str(), &mChecked);
 }
 
-IImGuiInput::IImGuiInput(std::string &&label, bool labelOnLeft) : IImGuiItem(label)
+IImGuiInput::IImGuiInput(const std::string &label, bool labelOnLeft) : IImGuiItem(label)
 {
     mLabelOnLeft = labelOnLeft;
 }
-IImGuiInput::IImGuiInput(std::string &label, bool labelOnLeft) : IImGuiInput(std::move(label), labelOnLeft) {}
 
 void IImGuiInput::setSpacing(float spacing)
 {
@@ -217,8 +220,8 @@ bool IImGuiInput::showItem()
     }
 
     if (mManualItemSize.x > 0)
-        SetNextItemWidth(mManualItemSize.x - ImGui::CalcTextSize(mLabel.c_str(), nullptr, true).x -
-                         mSpacing); // this set the width of the input box, not include the label
+        SetNextItemWidth(mManualItemSize.x - ImGui::CalcTextSize(mLabel.c_str(), nullptr, true).x
+                         - mSpacing); // this set the width of the input box, not include the label
 
     bool res = showInputItem();
     if (!mLabelOnLeft)
@@ -226,18 +229,12 @@ bool IImGuiInput::showItem()
     return res;
 }
 
-ImGuiInputCombo::ImGuiInputCombo(std::string &&title, bool labelOnLeft) : IImGuiInput(title, labelOnLeft) {}
-ImGuiInputCombo::ImGuiInputCombo(std::string &title, bool labelOnLeft) : ImGuiInputCombo(std::move(title), labelOnLeft) {}
+ImGuiInputCombo::ImGuiInputCombo(const std::string &title, bool labelOnLeft) : IImGuiInput(title, labelOnLeft) {}
 
-void ImGuiInputCombo::addSelectableItem(ComboTag tag, std::string &itemDisplayStr)
-{
-    addSelectableItem(tag, std::move(itemDisplayStr));
-}
-
-void ImGuiInputCombo::addSelectableItem(ComboTag tag, std::string &&itemDisplayStr)
+void ImGuiInputCombo::addSelectableItem(ComboTag tag, const std::string &itemDisplayStr)
 {
     mSelects[tag] = itemDisplayStr;
-    if(1 == mSelects.size())
+    if (1 == mSelects.size())
         mCurrSelect = tag;
 }
 
@@ -257,7 +254,7 @@ bool ImGuiInputCombo::showInputItem()
     ComboTag lastSelect = mCurrSelect;
     if (BeginCombo(mLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str()))
     {
-        for(auto &item : mSelects)
+        for (auto &item : mSelects)
         {
             const bool is_selected = (mCurrSelect == item.first);
             if (ImGui::Selectable(item.second.c_str(), is_selected))
@@ -276,6 +273,7 @@ void ImGuiInputGroup::addInput(IImGuiInput *input)
 {
     mInputGroup.push_back(input);
     input->setLabelPosition(mLabelOnLeft);
+    input->setItemSize(mManualItemSize);
 }
 
 void ImGuiInputGroup::removeInput(IImGuiInput *input)
@@ -396,4 +394,53 @@ void ImGuiInputGroup::setSpacing()
         }
         break;
     }
+}
+
+void ImGuiProgressBar::setFraction(float newFraction)
+{
+    if (mFraction == newFraction)
+        return;
+    if (newFraction < 0)
+        newFraction = 0;
+    if (newFraction > 1)
+        newFraction = 1;
+
+    mFraction = newFraction;
+}
+
+float ImGuiProgressBar::getFraction()
+{
+    return mFraction;
+}
+
+bool ImGuiProgressBar::isClicked(IMGUI_MOUSE_BUTTON button, ImVec2 *pos)
+{
+    if (button >= ImGuiMouseButton_COUNT)
+        return false;
+    if (mIsClicked[button])
+    {
+        if (pos)
+            *pos = mClickedPos[button];
+        return true;
+    }
+
+    return false;
+}
+
+bool ImGuiProgressBar::showItem()
+{
+    for (auto &buttClicked : mIsClicked)
+        buttClicked = false;
+
+    ProgressBar(mFraction, mManualItemSize, mShowInfo.c_str());
+    ImVec2 mousePos = GetMousePos();
+    for (int i = 0; i < ImGuiMouseButton_COUNT; i++)
+    {
+        if (IsItemClicked(i))
+        {
+            mIsClicked[i]  = true;
+            mClickedPos[i] = mousePos;
+        }
+    }
+    return false;
 }

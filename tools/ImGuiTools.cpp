@@ -1,7 +1,7 @@
 
 #include <map>
 
-#ifdef WIN32
+#if defined(ON_WINDOWS)
     #include <windows.h>
 #endif
 
@@ -49,55 +49,39 @@ map<TextColorCode, const char *> gColorStrMap = {
 };
 
 static map<const string_view, TextColorCode> gStrColorMap = {
-    {   "\033[0m",        ColorNone},
-    {  "\033[30m",       ColorBlack},
-    {"\033[0;30m",       ColorBlack},
-    {"\033[1;30m",    ColorDarkGray},
-    {  "\033[31m",         ColorRed},
-    {"\033[0;31m",         ColorRed},
-    {"\033[1;31m",    ColorLightRed},
-    {  "\033[32m",       ColorGreen},
-    {"\033[0;32m",       ColorGreen},
-    {"\033[1;32m",  ColorLightGreen},
-    {  "\033[33m",       ColorBrown},
-    {"\033[0;33m",       ColorBrown},
-    {"\033[1;33m",      ColorYellow},
-    {  "\033[34m",        ColorBlue},
-    {"\033[0;34m",        ColorBlue},
-    {"\033[1;34m",   ColorLightBlue},
-    {  "\033[35m",      ColorPurple},
-    {"\033[0;35m",      ColorPurple},
-    {"\033[1;35m", ColorLightPurple},
-    {  "\033[36m",        ColorCyan},
-    {"\033[0;36m",        ColorCyan},
-    {"\033[1;36m",   ColorLightCyan},
-    {  "\033[37m",   ColorLightGray},
-    {"\033[0;37m",   ColorLightGray},
-    {"\033[1;37m",       ColorWhite},
+    {"\033[0m", ColorNone},           {"\033[30m", ColorBlack},     {"\033[0;30m", ColorBlack},
+    {"\033[1;30m", ColorDarkGray},    {"\033[31m", ColorRed},       {"\033[0;31m", ColorRed},
+    {"\033[1;31m", ColorLightRed},    {"\033[32m", ColorGreen},     {"\033[0;32m", ColorGreen},
+    {"\033[1;32m", ColorLightGreen},  {"\033[33m", ColorBrown},     {"\033[0;33m", ColorBrown},
+    {"\033[1;33m", ColorYellow},      {"\033[34m", ColorBlue},      {"\033[0;34m", ColorBlue},
+    {"\033[1;34m", ColorLightBlue},   {"\033[35m", ColorPurple},    {"\033[0;35m", ColorPurple},
+    {"\033[1;35m", ColorLightPurple}, {"\033[36m", ColorCyan},      {"\033[0;36m", ColorCyan},
+    {"\033[1;36m", ColorLightCyan},   {"\033[37m", ColorLightGray}, {"\033[0;37m", ColorLightGray},
+    {"\033[1;37m", ColorWhite},
 };
 #define MAKE_COLOR(color) 0x##color
-#define REVERSE_U32(a)                                                                                              \
-    ((uint32_t)(((uint64_t)(a) >> 24) | (((uint64_t)(a) >> 8) & 0x0000ff00) | (((uint64_t)(a) << 8) & 0x00ff0000) | \
-                (((uint64_t)(a) << 24) & 0xff000000)))
+#define REVERSE_U32(a)                                                                                            \
+    ((uint32_t)(((uint64_t)(a) >> 24) | (((uint64_t)(a) >> 8) & 0x0000ff00) | (((uint64_t)(a) << 8) & 0x00ff0000) \
+                | (((uint64_t)(a) << 24) & 0xff000000)))
 #define REVERSE_U32_COLOR(color) REVERSE_U32(MAKE_COLOR(color))
 static map<TextColorCode, ImU32> ColorValueMap = {
-    {       ColorNone, REVERSE_U32_COLOR(000000FF)}, //  #000000FF
-    {      ColorBlack, REVERSE_U32_COLOR(111111FF)}, //  #111111FF
-    {   ColorDarkGray, REVERSE_U32_COLOR(2B2B2BFF)}, //  #2B2B2BFF
-    {        ColorRed, REVERSE_U32_COLOR(C00E0EFF)}, //  #C00E0EFF
-    {   ColorLightRed, REVERSE_U32_COLOR(E73C3CFF)}, //  #E73C3CFF
-    {      ColorGreen, REVERSE_U32_COLOR(0EB160FF)}, //  #0EB160FF
-    { ColorLightGreen, REVERSE_U32_COLOR(1CEB83FF)}, //  #1CEB83FF
-    {      ColorBrown, REVERSE_U32_COLOR(7C7C0DFF)}, //  #7C7C0DFF
-    {     ColorYellow, REVERSE_U32_COLOR(DEC018FF)}, //  #DEC018FF
-    {       ColorBlue, REVERSE_U32_COLOR(0731ECFF)}, //  #0731ECFF
-    {  ColorLightBlue, REVERSE_U32_COLOR(6980E6FF)}, //  #6980E6FF
-    {     ColorPurple, REVERSE_U32_COLOR(7A0867FF)}, //  #7A0867FF
+    {ColorNone, REVERSE_U32_COLOR(000000FF)},        //  #000000FF
+    {ColorBlack, REVERSE_U32_COLOR(111111FF)},       //  #111111FF
+    {ColorDarkGray, REVERSE_U32_COLOR(2B2B2BFF)},    //  #2B2B2BFF
+    {ColorRed, REVERSE_U32_COLOR(C00E0EFF)},         //  #C00E0EFF
+    {ColorLightRed, REVERSE_U32_COLOR(E73C3CFF)},    //  #E73C3CFF
+    {ColorGreen, REVERSE_U32_COLOR(0EB160FF)},       //  #0EB160FF
+    {ColorLightGreen, REVERSE_U32_COLOR(1CEB83FF)},  //  #1CEB83FF
+    {ColorBrown, REVERSE_U32_COLOR(7C7C0DFF)},       //  #7C7C0DFF
+    {ColorYellow, REVERSE_U32_COLOR(DEC018FF)},      //  #DEC018FF
+    {ColorBlue, REVERSE_U32_COLOR(0731ECFF)},        //  #0731ECFF
+    {ColorLightBlue, REVERSE_U32_COLOR(6980E6FF)},   //  #6980E6FF
+    {ColorPurple, REVERSE_U32_COLOR(7A0867FF)},      //  #7A0867FF
     {ColorLightPurple, REVERSE_U32_COLOR(C930AFFF)}, //  #C930AFFF
-    {       ColorCyan, REVERSE_U32_COLOR(12DEECFF)}, //  #12DEECFF
-    {  ColorLightCyan, REVERSE_U32_COLOR(75E8F0FF)}, //  #75E8F0FF
-    {  ColorLightGray, REVERSE_U32_COLOR(797979FF)}, //  #797979FF
-    {      ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)}, //  #DFDFDFFF
+    {ColorCyan, REVERSE_U32_COLOR(12DEECFF)},        //  #12DEECFF
+    {ColorLightCyan, REVERSE_U32_COLOR(75E8F0FF)},   //  #75E8F0FF
+    {ColorLightGray, REVERSE_U32_COLOR(797979FF)},   //  #797979FF
+    {ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)},       //  #DFDFDFFF
 };
 
 int getUtf8CharSize(const char *str)
@@ -181,8 +165,8 @@ void LoggerWindow::displayTexts()
                     // process utf-8 character
                     int charSize = getUtf8CharSize(&showStr[displayStart + displayLength]);
 
-                    if (CalcTextSize(showStr.substr(displayStart, displayLength + charSize).c_str()).x >
-                        contentSize.x - GetStyle().ScrollbarSize)
+                    if (CalcTextSize(showStr.substr(displayStart, displayLength + charSize).c_str()).x
+                        > contentSize.x - GetStyle().ScrollbarSize)
                         break;
 
                     displayLength += charSize;
@@ -216,29 +200,15 @@ bool positiveDirSelection(ImVec2 start, ImVec2 end)
     return end.y > start.y || (end.y == start.y && end.x > start.x);
 }
 
-LoggerWindow::LoggerWindow(std::string title, bool embed)
+LoggerWindow::LoggerWindow(std::string title, bool embed) : IImGuiWindow(title)
 {
     if (embed)
-    {
-        mLoggerWindowImpl = new IImGuiChildWindow(title);
-    }
+        mIsChildWindow = true;
     else
-    {
-        mLoggerWindowImpl = new IImGuiWindow(title);
-        mLoggerWindowImpl->setHasCloseButton(true);
-    }
-    mLoggerWindowImpl->setContent([this]() { showContent(); });
+        mHasCloseButton = true;
 }
 
-LoggerWindow::~LoggerWindow()
-{
-    delete mLoggerWindowImpl;
-}
-
-void LoggerWindow::show()
-{
-    mLoggerWindowImpl->show();
-}
+LoggerWindow::~LoggerWindow() {}
 
 void LoggerWindow::setWordWrap(bool wordWrap)
 {
@@ -270,7 +240,8 @@ void LoggerWindow::showContent()
         copyToClipBoard();
     }
 
-    BeginChild("Log Text", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
+    BeginChild("Log Text", ImVec2(0, 0), ImGuiChildFlags_None,
+               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
 
     BeginChild("Log Text Content", ImVec2(mWordWrap ? 0 : mMaxLineWidth, mTotalLines), ImGuiChildFlags_None,
                ImGuiWindowFlags_NoMove);
@@ -336,9 +307,10 @@ size_t splitString(const string &str, size_t start, const vector<string> &splitS
 }
 
 static const vector<string> gSplitStrings = {
-    "\n",       "\r\n",       "\033[0m",    "\033[30m", "\033[0;30m", "\033[1;30m", "\033[34m", "\033[0;34m", "\033[1;34m",
-    "\033[32m", "\033[0;32m", "\033[1;32m", "\033[36m", "\033[0;36m", "\033[1;36m", "\033[31m", "\033[0;31m", "\033[1;31m",
-    "\033[35m", "\033[0;35m", "\033[1;35m", "\033[33m", "\033[0;33m", "\033[1;33m", "\033[37m", "\033[0;37m", "\033[1;37m",
+    "\n",         "\r\n",       "\033[0m",    "\033[30m",   "\033[0;30m", "\033[1;30m", "\033[34m",
+    "\033[0;34m", "\033[1;34m", "\033[32m",   "\033[0;32m", "\033[1;32m", "\033[36m",   "\033[0;36m",
+    "\033[1;36m", "\033[31m",   "\033[0;31m", "\033[1;31m", "\033[35m",   "\033[0;35m", "\033[1;35m",
+    "\033[33m",   "\033[0;33m", "\033[1;33m", "\033[37m",   "\033[0;37m", "\033[1;37m",
 };
 
 string_view startWithStrings(string_view srcString, const vector<string> &cmpStrings)
@@ -433,16 +405,16 @@ void LoggerWindow::copyToClipBoard()
 }
 
 #define SCALE_SPEED (1.2f)
-#define SCALE_MAX   (20.f)
-#define SCALE_MIN   (0.2f)
+#define SCALE_MAX (20.f)
+#define SCALE_MIN (0.2f)
 
 void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
 {
     ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
 
-    ImVec2 cursorPosOnImage  = mImageShowPos + (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
-    mImageScale              = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
-    mImageScale              = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
+    ImVec2 cursorPosOnImage = mImageShowPos + (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
+    mImageScale             = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
+    mImageScale             = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
 
     imgScaleSize = mImgBaseSize * mImageScale;
 
@@ -452,8 +424,8 @@ void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
 void ImageWindow::handleDrag(ImVec2 &mouseMove)
 {
     ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
-    mImageShowPos.x = mImageShowPos.x + (-(int)((mouseMove.x) * mTextureWidth / imgScaleSize.x));
-    mImageShowPos.y = mImageShowPos.y + (-(int)((mouseMove.y) * mTextureHeight / imgScaleSize.y));
+    mImageShowPos.x     = mImageShowPos.x + (-(int)((mouseMove.x) * mTextureWidth / imgScaleSize.x));
+    mImageShowPos.y     = mImageShowPos.y + (-(int)((mouseMove.y) * mTextureHeight / imgScaleSize.y));
 }
 
 void ImageWindow::showContent()
@@ -462,14 +434,14 @@ void ImageWindow::showContent()
     if (Button("1:1"))
     {
         oneOnOne = true;
-        if(mLinkWith)
+        if (mLinkWith)
             mLinkWith->setOneOnOne();
     }
     SameLine();
     if (Button("Full"))
     {
         mImageScale = 1;
-        if(mLinkWith)
+        if (mLinkWith)
             mLinkWith->resetScale();
     }
 
@@ -548,8 +520,9 @@ void ImageWindow::showContent()
         mousePosInImageShow.x       = ROUND(0, mousePosInImageShow.x, winShowSize.x);
         mousePosInImageShow.y       = ROUND(0, mousePosInImageShow.y, winShowSize.y);
         ImVec2 mousePosInImageScale = mousePosInImageShow + imgShowPos;
-        mDisplayInfo.mousePos.x     = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaleSize.x, mTextureWidth - 1);
-        mDisplayInfo.mousePos.y     = ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaleSize.y, mTextureHeight - 1);
+        mDisplayInfo.mousePos.x = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaleSize.x, mTextureWidth - 1);
+        mDisplayInfo.mousePos.y =
+            ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaleSize.y, mTextureHeight - 1);
     }
 
     if (IsKeyDown(ImGuiKey_MouseWheelY))
@@ -603,9 +576,7 @@ const DisplayInfo &ImageWindow::getDisplayInfo()
 
 void ImageWindow::pushScale(const DisplayInfo &input)
 {
-    mScaleStack.push_back({
-        mImageScale, {mImageShowPos.x, mImageShowPos.y}
-    });
+    mScaleStack.push_back({mImageScale, {mImageShowPos.x, mImageShowPos.y}});
     mImageScale     = input.scale;
     mImageShowPos.x = input.showPos.x;
     mImageShowPos.y = input.showPos.y;
@@ -633,7 +604,8 @@ void ImageWindow::resetScale()
     mImageShowPos = {0, 0};
     mImageScale   = 1;
 }
-void ImageWindow::setOneOnOne() {
+void ImageWindow::setOneOnOne()
+{
     mImageScale = mTextureWidth / mImgBaseSize.x;
 }
 

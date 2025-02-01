@@ -1,6 +1,6 @@
 // Dear ImGui: standalone example application for GLFW + OpenGL 3, using programmable pipeline
-// (GLFW is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation,
-// etc.)
+// (GLFW is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context
+// creation, etc.)
 
 // Learn about Dear ImGui:
 // - FAQ                  https://dearimgui.com/faq
@@ -12,23 +12,23 @@
 #include "imgui_impl_common.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "ImGuiBaseTypes.h"
+
 #include <stdio.h>
-#include <stdlib.h>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
     #include <GLES2/gl2.h>
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#ifdef WIN32
-#include <wtypes.h>
+#if defined(ON_WINDOWS)
+    #include <wtypes.h>
 #endif
 
-
-// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with
-// old VS compilers. To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do
-// using this pragma. Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is
-// adequate for your version of Visual Studio.
+// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and
+// compatibility with old VS compilers. To link with VS2010-era libraries, VS2015+ requires linking with
+// legacy_stdio_definitions.lib, which we do using this pragma. Your own project should not be affected, as you are
+// likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
     #pragma comment(lib, "legacy_stdio_definitions")
 #endif
@@ -51,6 +51,9 @@ void windowResizeCallback(int x, int y, int width, int height)
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
 {
     IM_UNUSED(window);
+#if defined(ON_WINDOWS)
+    StdRMutexUniqueLock locker(glfwGetEventLock());
+#endif
     std::vector<std::string> wFiles;
     for (int i = 0; i < count; i++)
     {
@@ -59,14 +62,89 @@ void dropFileCallback(GLFWwindow *window, int count, const char **files)
     g_user_app->dropFile(wFiles);
 }
 
+bool doGUIRender(const char *glsl_version, GLFWwindow *window)
+{
+    static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    static ImGuiIO *io          = nullptr;
+    if (!io)
+    {
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1); // Enable vsync
+                             // Setup Platform/Renderer backends
+#ifdef __EMSCRIPTEN__
+        ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
+#endif
+        ImGui_ImplOpenGL3_Init(glsl_version);
+
+        g_user_app->loadResources();
+
+        io = &ImGui::GetIO();
+    }
+
+#if defined(ON_WINDOWS)
+    glfwPollEvents();
+#endif
+
+    if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
+    {
+        ImGui_ImplGlfw_Sleep(10);
+        return false;
+    }
+
+    // Start the Dear ImGui frame
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+
+#if defined(ON_WINDOWS)
+    StdRMutexUniqueLock locker(glfwGetEventLock());
+#endif
+
+    g_user_app->newFramePreAction();
+
+    ImGui::NewFrame();
+
+    if (g_user_app->renderUI())
+        return true;
+
+    // Rendering
+    ImGui::Render();
+    g_user_app->endFramePostAction();
+
+#if defined(ON_WINDOWS)
+    locker.unlock();
+#endif
+
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+    glViewport(0, 0, display_w, display_h);
+    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // Update and Render additional Platform Windows
+    // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste
+    // this code elsewhere.
+    //  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        GLFWwindow *backup_current_context = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_current_context);
+    }
+
+    glfwSwapBuffers(window);
+    return false;
+}
+
 // Main code
-#ifdef WIN32
+#if defined(ON_WINDOWS)
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 #else
 int main(int argc, char **argv)
 #endif
 {
-#ifdef WIN32
+#if defined(ON_WINDOWS)
     IM_UNUSED(hInstance);
     IM_UNUSED(hPrevInstance);
     IM_UNUSED(lpCmdLine);
@@ -79,7 +157,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-#ifdef WIN32
+#if defined(ON_WINDOWS)
     int  argc;
     auto argv = CommandLineToArgvA(&argc);
 #endif
@@ -129,9 +207,6 @@ int main(int argc, char **argv)
     ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
     glfwSetDropCallback(window, dropFileCallback);
 
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-
     // Setup Dear ImGui context
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
@@ -140,7 +215,8 @@ int main(int argc, char **argv)
     // io.ConfigViewportsNoAutoMerge = true;
     // io.ConfigViewportsNoTaskBarIcon = true;
 
-    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular
+    // ones.
     ImGuiStyle &style = ImGui::GetStyle();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
@@ -148,94 +224,61 @@ int main(int argc, char **argv)
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-#ifdef __EMSCRIPTEN__
-    ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
-#endif
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-    g_user_app->loadResources();
-
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     {
         std::vector<std::string> tmpArgs;
         for (int i = 0; i < argc; i++)
         {
-            #ifdef WIN32
+#if defined(ON_WINDOWS)
             tmpArgs.push_back(argv[i].get());
-            #else
+#else
 
             tmpArgs.push_back(argv[i]);
-            #endif
+#endif
         }
         g_user_app->transferCmdArgs(tmpArgs);
     }
 
-    bool done = false;
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+
+#if defined(ON_WINDOWS)
+    RenderThread renderThread([window, glsl_version]() -> bool { return doGUIRender(glsl_version, window); });
+    renderThread.start();
+#endif
+
     // Main loop
 #ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
-    // You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
+    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the
+    // imgui.ini file. You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
     io.IniFilename = nullptr;
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
     while (!glfwWindowShouldClose(window))
 #endif
     {
-        if (done)
-            break;
-
         // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your
-        // copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite
-        // your copy of the keyboard data. Generally you may always pass all inputs to dear imgui, and hide them from your
-        // application based on those two flags.
+        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your
+        // inputs.
+        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or
+        // clear/overwrite your copy of the mouse data.
+        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or
+        // clear/overwrite your copy of the keyboard data. Generally you may always pass all inputs to dear imgui, and
+        // hide them from your application based on those two flags.
         glfwPollEvents();
-        if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
-        {
-            ImGui_ImplGlfw_Sleep(10);
-            continue;
-        }
 
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-
-        g_user_app->newFramePreAction();
-
-        ImGui::NewFrame();
-
-        done = g_user_app->renderUI();
-
-        // Rendering
-        ImGui::Render();
-        g_user_app->endFramePostAction();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        // Update and Render additional Platform Windows
-        // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code
-        // elsewhere.
-        //  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            GLFWwindow *backup_current_context = glfwGetCurrentContext();
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-            glfwMakeContextCurrent(backup_current_context);
-        }
-
-        glfwSwapBuffers(window);
+#if defined(ON_WINDOWS)
+        if (!renderThread.isRunning())
+            break;
+#else
+        if (doGUIRender(glsl_version, window))
+            break;
+#endif
     }
 #ifdef __EMSCRIPTEN__
     EMSCRIPTEN_MAINLOOP_END;
+#endif
+
+#if defined(ON_WINDOWS)
+    renderThread.stop();
 #endif
 
     g_user_app->exit();

@@ -103,7 +103,6 @@ public:
     virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
     virtual void dropFile(std::vector<std::string> &files) { IM_UNUSED(files); };
 
-    virtual void setRenderContext(void *data) { IM_UNUSED(data); };
     virtual void setWindowHandle(void *handle) { IM_UNUSED(handle); };
     // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
     virtual void loadResources() {}

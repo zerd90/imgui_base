@@ -1,3 +1,7 @@
+
+#include <algorithm>
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui_internal.h"
 #include "ImGuiWindow.h"
 
 using namespace ImGui;
@@ -25,15 +29,50 @@ void IImGuiWindow::show()
 
     pushStyles();
 
+    if (!mMenuBarItems.subMenus.empty() && !(mWindowFlags & ImGuiWindowFlags_MenuBar))
+    {
+        mWindowFlags |= ImGuiWindowFlags_MenuBar;
+    }
+
     if (mIsChildWindow)
         needShowContent = BeginChild(mTitle.c_str(), mManualSize, mChildFlags, mWindowFlags);
     else
         needShowContent = Begin(mTitle.c_str(), mHasCloseButton ? &mOpened : nullptr, mWindowFlags);
 
-    popStyles();
-
     updateWindowStatus();
+    if (!mMenuBarItems.subMenus.empty())
+    {
+        if (BeginMenuBar())
+        {
+            std::function<void(SMenuItem)> showMenuItem = [&showMenuItem](SMenuItem menuItem)
+            {
+                if (menuItem.subMenus.empty())
+                {
+                    if (MenuItem(menuItem.label.c_str(),
+                                 menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(), menuItem.selected,
+                                 menuItem.enabledCondition != nullptr ? menuItem.enabledCondition() : menuItem.enabled)
+                        && menuItem.menuCallback != nullptr)
+                        menuItem.menuCallback();
+                }
+                else
+                {
+                    if (BeginMenu(menuItem.label.c_str(), menuItem.enabledCondition != nullptr
+                                                              ? menuItem.enabledCondition()
+                                                              : menuItem.enabled))
+                    {
+                        for (auto &subMenu : menuItem.subMenus)
+                            showMenuItem(subMenu);
+                        EndMenu();
+                    }
+                }
+            };
 
+            for (auto &menuItem : mMenuBarItems.subMenus)
+                showMenuItem(menuItem);
+
+            EndMenuBar();
+        }
+    }
     if (!needShowContent)
         goto _WINDOW_END_;
 
@@ -45,7 +84,7 @@ void IImGuiWindow::show()
         auto   style      = GetStyle();
         tmpWinSize.y -= (GetTextLineHeightWithSpacing() + style.DockingSeparatorSize + style.ItemSpacing.y);
 
-        string childWindowName = mTitle + string(" ##Main Content");
+        string childWindowName = mTitle + string("##Main Content");
         if (!ImGui::BeginChild(childWindowName.c_str(), tmpWinSize))
             needShowContent = false;
     }
@@ -65,6 +104,7 @@ _WINDOW_END_:
         EndChild();
     else
         End();
+    popStyles();
 
     if (!mOpened)
         mJustClosed = true;
@@ -184,6 +224,35 @@ const ImVec2 &IImGuiWindow::getContentRegion()
     return mContentRegionSize;
 }
 
+void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, std::function<void()> callback, bool *selected,
+                           const char *shortcut)
+{
+    SMenuItem *pCurrMenu = &mMenuBarItems;
+    for (auto &currLabel : labelLayers)
+    {
+        auto nextMenu = std::find_if(pCurrMenu->subMenus.begin(), pCurrMenu->subMenus.end(),
+                                     [currLabel](SMenuItem &menuItem) { return menuItem.label == currLabel; });
+        if (nextMenu == pCurrMenu->subMenus.end())
+        {
+            pCurrMenu->subMenus.push_back(SMenuItem(currLabel));
+            pCurrMenu = &pCurrMenu->subMenus.back();
+        }
+        else
+        {
+            pCurrMenu = &(*nextMenu);
+        }
+    }
+    pCurrMenu->menuCallback = callback;
+    pCurrMenu->selected     = selected;
+    if (shortcut)
+        pCurrMenu->shortcut = shortcut;
+}
+
+void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, bool *selected, const char *shortcut)
+{
+    addMenu(labelLayers, nullptr, selected, shortcut);
+}
+
 void IImGuiWindow::showContent()
 {
     if (mContentCallback != nullptr)
@@ -195,7 +264,11 @@ void IImGuiWindow::updateWindowStatus()
     mWinPos            = GetWindowPos();
     mWinSize           = GetWindowSize();
     mContentRegionSize = GetContentRegionAvail();
-    mFocused           = IsWindowFocused(mFocusedFlags);
+    mDisplayRegionSize = mWinSize - ImGui::GetStyle().WindowPadding * 2;
+    if (mWindowFlags & ImGuiWindowFlags_MenuBar)
+        mDisplayRegionSize.y -= ImGui::GetCurrentWindowRead()->MenuBarHeight;
+
+    mFocused = IsWindowFocused(mFocusedFlags);
 
     bool currHovered = IsWindowHovered(mHoveredFlags);
     if (mHovered != currHovered)
@@ -232,7 +305,6 @@ void IImGuiWindow::popStyles()
     PopStyleVar((int)(mStylesVec2.size() + mStylesFloat.size()));
     PopStyleColor((int)(mStylesColor.size()));
 }
-
 
 ImGuiPopup::ImGuiPopup(std::string title) : IImGuiWindow(title) {}
 

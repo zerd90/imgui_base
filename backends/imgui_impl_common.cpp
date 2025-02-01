@@ -10,9 +10,9 @@ void setApp(ImGuiApplication *app)
     g_user_app = app;
 }
 
-#ifdef WIN32
-    #include <Windows.h>
+#if defined(ON_WINDOWS)
     #include <Shlobj.h>
+    #include <Windows.h>
     #include <shlwapi.h>
     #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                                 \
         do                                                                                                \
@@ -36,7 +36,7 @@ void setApp(ImGuiApplication *app)
         } while (0)
 #endif
 
-#ifdef WIN32
+#if defined(ON_WINDOWS)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc)
 {
     wchar_t **wArgv;
@@ -134,9 +134,9 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
         return results;
 
     FILEOPENDIALOGOPTIONS dwFlags;
-    DWORD dwNumItems = 0;                                      // number of items in multiple selection
-    hr = pfd->GetOptions(&dwFlags);
-    hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT);
+    DWORD                 dwNumItems = 0; // number of items in multiple selection
+    hr                               = pfd->GetOptions(&dwFlags);
+    hr                               = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
     if (!defaultPath.empty())
@@ -158,7 +158,7 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
     if (FAILED(hr))
         goto _OVER_;
 
-    hr               = pSelResultArray->GetCount(&dwNumItems); // get number of selected items
+    hr = pSelResultArray->GetCount(&dwNumItems); // get number of selected items
     for (DWORD i = 0; i < dwNumItems; i++)
     {
         IShellItem *pSelOneItem = NULL;
@@ -467,3 +467,71 @@ void openDebugWindow() {}
 #elif defined(__APPLE__)
 // in imgui_impl_common.mm
 #endif
+
+RenderThread::RenderThread(std::function<bool()> renderFunction)
+{
+    mRenderAction = renderFunction;
+}
+
+RenderThread::~RenderThread()
+{
+    stop();
+}
+
+int RenderThread::start()
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (NULL != mThread)
+    {
+        return -1;
+    }
+
+    mState      = STATE_RUNNING;
+    mIsContinue = true;
+    mThread     = new std::thread(entry, this);
+
+    return 0;
+}
+
+int RenderThread::stop()
+{
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (NULL != mThread)
+    {
+        mIsContinue = false;
+        mThread->join();
+        delete mThread;
+        mThread = NULL;
+    }
+    mState = STATE_UNSTART;
+
+    return 0;
+}
+
+RenderThread::THREAD_STATE_E RenderThread::getState()
+{
+    return mState;
+}
+
+bool RenderThread::isRunning()
+{
+    return (STATE_RUNNING == mState);
+}
+
+void RenderThread::entry(void *opaque)
+{
+    if (opaque)
+        ((RenderThread *)opaque)->task();
+}
+
+void RenderThread::task()
+{
+    while (mIsContinue)
+    {
+        if (mRenderAction())
+            break;
+    }
+
+    mState = STATE_FINISHED;
+}

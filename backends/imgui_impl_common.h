@@ -5,9 +5,16 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <imgui.h>
+#include <thread>
+#include <mutex>
+#include <functional>
+#include "imgui.h"
 
 #include "ImGuiApplication.h"
+
+#if defined(WIN32) || defined(_WIN32)
+    #define ON_WINDOWS
+#endif
 
 // for Renderer
 
@@ -44,15 +51,14 @@ static inline auto arrayMakeSharedPtr(size_t length, _T defaultValue)
 {
     auto ptr = std::shared_ptr<_T[]>(new _T[length]);
     for (size_t i = 0; i < length; i++)
-    {
         ptr[i] = defaultValue;
-    }
+
     return ptr;
 }
 
 extern ImGuiApplication *g_user_app;
 
-#ifdef WIN32
+#if defined(ON_WINDOWS)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
 std::shared_ptr<char[]>                    unicodeToUtf8(const wchar_t *wStr);
 std::shared_ptr<wchar_t[]>                 utf8ToUnicode(const char *str);
@@ -64,4 +70,41 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
                                              std::string             initDirPath = std::string());
 std::string getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string defaultExt = std::string());
 void        openDebugWindow();
+
+class RenderThread
+{
+public:
+    enum THREAD_STATE_E
+    {
+        STATE_UNSTART,
+        STATE_RUNNING,
+        STATE_FINISHED,
+    };
+
+    // renderFunction should return true if app exit
+    RenderThread(std::function<bool()> renderFunction);
+    virtual ~RenderThread();
+
+    int start();
+    int stop();
+
+    THREAD_STATE_E getState();
+    bool           isRunning();
+
+protected:
+    THREAD_STATE_E mState = STATE_UNSTART;
+
+private:
+    static void entry(void *opaque);
+
+    virtual void task();
+
+    bool mIsContinue = false;
+
+    std::function<bool()> mRenderAction = nullptr;
+
+    std::thread *mThread = nullptr;
+    std::mutex   mMutex;
+};
+
 #endif

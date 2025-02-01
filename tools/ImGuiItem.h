@@ -21,10 +21,8 @@ enum ImGuiItemAction
 class IImGuiItem
 {
 public:
-    IImGuiItem(std::string &&label);
-    IImGuiItem(std::string &label);
-    void               setLabel(std::string &_label);
-    void               setLabel(std::string &&_label);
+    IImGuiItem(const std::string &label);
+    void               setLabel(const std::string &_label);
     const std::string &getLabel();
 
     // Action through callbacks
@@ -32,6 +30,7 @@ public:
     void showDisabled(bool disabled, bool newLine = true);
 
     void         addActionCallback(ImGuiItemAction action, std::function<void()> callbackFunc);
+    const ImVec2 itemPos() { return mItemPos; }
     const ImVec2 itemSize() { return mItemSize; }
     virtual void setItemSize(ImVec2 size);
     virtual void setItemWidth(float width);
@@ -47,15 +46,16 @@ public:
     GET_STATUS_FUNC(NativeActive)
 
 protected:
-    IImGuiItem() {}
+    IImGuiItem();
     virtual bool showItem() = 0;
     // maybe override by classes which are not a real ImGuiItem
     virtual void updateItemStatus();
 
 protected:
-    IMGUI_HOVERED_FLAGS mHoveredFlags   = ImGuiHoveredFlags_None;
-    ImVec2              mItemSize       = {0, 0};
-    ImVec2              mManualItemSize = {0, 0};
+    IMGUI_HOVERED_FLAGS mHoveredFlags = ImGuiHoveredFlags_None;
+    ImVec2              mItemPos;
+    ImVec2              mItemSize;
+    ImVec2              mManualItemSize;
     std::string         mLabel;
 
 private:
@@ -66,8 +66,7 @@ private:
 class ImGuiCheckbox : public IImGuiItem
 {
 public:
-    ImGuiCheckbox(std::string &label);
-    ImGuiCheckbox(std::string &&label);
+    ImGuiCheckbox(const std::string &label);
     bool isStateChanged() { return isNativeActive(); }
 
     bool isChecked() { return mChecked; }
@@ -83,20 +82,32 @@ private:
 class ImGuiButton : public IImGuiItem
 {
 public:
-    ImGuiButton(std::string &label);
-    ImGuiButton(std::string &&label);
+    ImGuiButton();
+    ImGuiButton(const std::string &label);
     bool isPressed() { return isNativeActive(); }
 
 protected:
     virtual bool showItem() override;
 };
 
-class ImGuiArrowButton : public IImGuiItem
+class ImGuiImageButton : public ImGuiButton
 {
 public:
-    ImGuiArrowButton(std::string &label, ImGuiDir dir);
-    ImGuiArrowButton(std::string &&label, ImGuiDir dir);
-    bool isPressed() { return isNativeActive(); }
+    ImGuiImageButton();
+    void setImageTexture(ImTextureID texture);
+
+protected:
+    virtual bool showItem() override;
+private:
+    ImTextureID mImageTexture = 0;
+    ImVec4      mBgColor      = {0, 0, 0, 0};
+    ImVec4      mTintColor    = {1, 1, 1, 1};
+};
+
+class ImGuiArrowButton : public ImGuiButton
+{
+public:
+    ImGuiArrowButton(ImGuiDir dir);
 
 protected:
     virtual bool showItem() override;
@@ -109,10 +120,8 @@ class ImGuiText : public IImGuiItem
 {
 public:
     ImGuiText();
-    ImGuiText(std::string &text);
-    ImGuiText(std::string &&text);
-    virtual void setText(std::string &text);
-    virtual void setText(std::string &&text);
+    ImGuiText(const std::string &text);
+    virtual void setText(const std::string &text);
 
     const ImVec2 &hintSize() { return mHintSize; }
 
@@ -126,8 +135,8 @@ private:
 class IImGuiInput : public IImGuiItem
 {
 public:
-    IImGuiInput(std::string &label, bool labelOnLeft);
-    IImGuiInput(std::string &&label, bool labelOnLeft);
+    IImGuiInput() : IImGuiItem() {}
+    IImGuiInput(const std::string &label, bool labelOnLeft);
     // spacing between label and input box
     void setSpacing(float spacing);
 
@@ -146,12 +155,10 @@ template <typename T>
 class ImGuiInput : public IImGuiInput
 {
 public:
-    ImGuiInput(std::string &&label, T &initalValue, bool labelOnLeft = false)
-        : IImGuiInput(label, labelOnLeft)
+    ImGuiInput(const std::string &label, T &initalValue, bool labelOnLeft = false) : IImGuiInput(label, labelOnLeft)
     {
         mValue = initalValue;
     }
-    ImGuiInput(std::string &label, T &initalValue, bool labelOnLeft = false) : ImGuiInput(std::move(label), initalValue, labelOnLeft) {}
 
     const T &getValue() { return mValue; }
     void     setValue(T &newValue) { mValue = newValue; }
@@ -202,23 +209,78 @@ using ComboTag = int;
 class ImGuiInputCombo : public IImGuiInput
 {
 public:
-    ImGuiInputCombo(std::string &&title, bool labelOnLeft = false);
-    ImGuiInputCombo(std::string &title, bool labelOnLeft = false);
+    ImGuiInputCombo(const std::string &title, bool labelOnLeft = false);
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_COMBO_FLAGS, ComboFlag, mComboFlags)
 
-    void addSelectableItem(ComboTag tag, std::string &&itemDisplayStr);
-    void addSelectableItem(ComboTag tag, std::string &itemDisplayStr);
-    void removeSelectableItem(ComboTag tag);
-    ComboTag  getSelected();
+    void     addSelectableItem(ComboTag tag, const std::string &itemDisplayStr);
+    void     removeSelectableItem(ComboTag tag);
+    ComboTag getSelected();
 
 protected:
     virtual bool showInputItem() override;
 
 private:
-    IMGUI_COMBO_FLAGS mComboFlags = ImGuiComboFlags_WidthFitPreview;
+    IMGUI_COMBO_FLAGS               mComboFlags = ImGuiComboFlags_WidthFitPreview;
     std::map<ComboTag, std::string> mSelects;
-    ComboTag mCurrSelect = 0;
+    ComboTag                        mCurrSelect = 0;
 };
+
+template <typename T, int sliderCount>
+class ImGuiInputSlider : public IImGuiInput
+{
+public:
+    ImGuiInputSlider() : IImGuiInput() {}
+    ImGuiInputSlider(const std::string &label, bool labelOnLeft) : IImGuiInput(label, labelOnLeft)
+    {
+        static_assert(!(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint16_t>
+                        || std::is_same_v<T, int16_t> || std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>
+                        || std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float>
+                        || std::is_same_v<T, double>));
+    }
+
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_SLIDER_FLAGS, SliderFlag, mSliderFlags)
+
+    void setMaximum(T maximum) { mValueMaximum = maximum; }
+
+    void setMinimum(T minimum) { mValueMinimum = minimum; }
+
+protected:
+    virtual bool showInputItem() override
+    {
+        std::string    showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+        IMGUI_DATATYPE dataType  = std::is_same_v<T, uint8_t>    ? ImGuiDataType_U8
+                                   : std::is_same_v<T, int8_t>   ? ImGuiDataType_S8
+                                   : std::is_same_v<T, uint16_t> ? ImGuiDataType_U16
+                                   : std::is_same_v<T, int16_t>  ? ImGuiDataType_S16
+                                   : std::is_same_v<T, uint32_t> ? ImGuiDataType_U32
+                                   : std::is_same_v<T, int32_t>  ? ImGuiDataType_S32
+                                   : std::is_same_v<T, uint64_t> ? ImGuiDataType_U64
+                                   : std::is_same_v<T, int64_t>  ? ImGuiDataType_S64
+                                   : std::is_same_v<T, float>    ? ImGuiDataType_Float
+                                                                 : ImGuiDataType_Double;
+        if constexpr (sliderCount > 1)
+            return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum, mFormat,
+                                 mSliderFlags);
+        else
+            return SliderScalar(showLabel.c_str(), dataType, mValues, &mValueMinimum, &mValueMaximum, mFormat, mSliderFlags);
+    }
+
+private:
+    T mValueMinimum = std::numeric_limits<T>::min();
+    T mValueMaximum = std::numeric_limits<T>::max();
+    T mValues[sliderCount];
+
+    IMGUI_SLIDER_FLAGS mSliderFlags = ImGuiSliderFlags_AlwaysClamp;
+    const char        *mFormat      = nullptr;
+};
+
+using ImGuiSliderInt  = ImGuiInputSlider<int32_t, 1>;
+using ImGuiSliderInt2 = ImGuiInputSlider<int32_t, 2>;
+using ImGuiSliderInt3 = ImGuiInputSlider<int32_t, 3>;
+
+using ImGuiSliderFloat  = ImGuiInputSlider<float, 1>;
+using ImGuiSliderFloat2 = ImGuiInputSlider<float, 2>;
+using ImGuiSliderFloat3 = ImGuiInputSlider<float, 3>;
 
 enum ImGuiInputGroupStyle
 {
@@ -251,6 +313,25 @@ private:
 
     float mSpacing     = -1;
     bool  mLabelOnLeft = false;
+};
+
+class ImGuiProgressBar : public IImGuiItem
+{
+public:
+    ImGuiProgressBar() : IImGuiItem() {}
+    void  setFraction(float newFraction);
+    float getFraction();
+    bool  isClicked(IMGUI_MOUSE_BUTTON button, ImVec2 *pos);
+
+protected:
+    virtual bool showItem() override;
+
+private:
+    float       mFraction;
+    std::string mShowInfo;
+
+    bool   mIsClicked[ImGuiMouseButton_COUNT] = {false};
+    ImVec2 mClickedPos[ImGuiMouseButton_COUNT];
 };
 
 #endif

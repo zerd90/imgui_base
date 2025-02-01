@@ -15,13 +15,15 @@ if("${RENDER}" STREQUAL "")
 endif()
 
 if("${RENDER}" STREQUAL "GLFW_OPENGL3")
-	find_package(glfw3 REQUIRED)
+	find_package(glfw3 QUIET)
 
 	if(glfw3_FOUND)
 		message(STATUS "glfw3 found ${glfw3_DIR} ${glfw3_INCLUDE_DIRS} ${glfw3_LIBS}")
+		set(LINK_GLFW_LIBRARY glfw)
 	else()
-		message(FATAL_ERROR "Can't find glfw")
-	endif()
+		message(WARNING "Can't find glfw, set the include_directories and link_directories")
+		set(LINK_GLFW_LIBRARY glfw3)
+		endif()
 endif()
 
 # 指定模块对外头文件 #
@@ -63,7 +65,7 @@ elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
 	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 		if(NOT PROJECT_IS_TOP_LEVEL)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} glfw opengl32
+				${PROJECT_NAME} ${LINK_GLFW_LIBRARY} opengl32
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
@@ -71,7 +73,7 @@ elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
 	elseif(${CMAKE_SYSTEM_NAME} MATCHES "LINUX")
 		if(NOT PROJECT_IS_TOP_LEVEL)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} glfw
+				${PROJECT_NAME} ${LINK_GLFW_LIBRARY}
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
@@ -79,7 +81,7 @@ elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
 	elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 		if(NOT PROJECT_IS_TOP_LEVEL)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} glfw
+				${PROJECT_NAME} ${LINK_GLFW_LIBRARY}
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
@@ -87,7 +89,7 @@ elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
 	endif()
 
 	set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES}
-		glfw)
+		${LINK_GLFW_LIBRARY})
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -105,11 +107,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 	endif()
 endif()
 
-if(USING_MINGW)
-	set(PARENT_LINK_LIBRARIES mingw32 ${PARENT_LINK_LIBRARIES}
-	)
-endif()
-
 if(NOT PROJECT_IS_TOP_LEVEL)
 	set(LINK_LIBRARIES ${LINK_LIBRARIES}
 		${PARENT_LINK_LIBRARIES}
@@ -118,16 +115,16 @@ if(NOT PROJECT_IS_TOP_LEVEL)
 endif()
 
 # 使用通配符添加多个源文件
-aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source SRC_LIST)
-aux_source_directory(${PROJECT_SOURCE_DIR}/3rdparty SRC_LIST)
-aux_source_directory(${PROJECT_SOURCE_DIR}/tools SRC_LIST)
-set(SRC_LIST ${SRC_LIST}
+aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source IMGUI_BASE_SRC_LIST)
+aux_source_directory(${PROJECT_SOURCE_DIR}/3rdparty IMGUI_BASE_SRC_LIST)
+aux_source_directory(${PROJECT_SOURCE_DIR}/tools IMGUI_BASE_SRC_LIST)
+set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 	${PROJECT_SOURCE_DIR}/backends/ImGuiApplication.cpp
 	${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.cpp
 )
 
 if(APPLE)
-	set(SRC_LIST ${SRC_LIST}
+	set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 		${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.mm
 	)
 endif()
@@ -154,6 +151,6 @@ set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
 include_directories(${INCLUDE_DIRECTORIES})
 
 if(NOT TARGET ${PROJECT_NAME})
-	add_library(${PROJECT_NAME} STATIC ${SRC_LIST} ${SRC_RENDER})
+	add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${SRC_RENDER})
 	target_link_libraries(${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES})
 endif()
