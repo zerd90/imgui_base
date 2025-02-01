@@ -127,15 +127,12 @@ typedef DWORD(WINAPI *PFN_XInputGetState)(DWORD, XINPUT_STATE *);
     // Clang/GCC warnings with -Weverything
     #if defined(__clang__)
         #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Wcast-function-type" // warning: cast between            \
-                                                                // incompatible function types (for \
-                                                                // loader)
+        #pragma clang diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible function types (for loader)
     #endif
     #if defined(__GNUC__)
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wpragmas"            // warning: unknown option after '#pragma GCC diagnostic' kind
-        #pragma GCC diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible \
-                                                              // function types (for loader)
+        #pragma GCC diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible function types (for loader)
     #endif
 
 // Forward Declarations
@@ -1216,8 +1213,7 @@ void ImGui_ImplWin32_EnableDpiAwareness()
 }
 
     #if defined(_MSC_VER) && !defined(NOGDI)
-        #pragma comment(lib, "gdi32") // Link with gdi32.lib for GetDeviceCaps(). MinGW will require \
-                                      // linking with '-lgdi32'
+        #pragma comment(lib, "gdi32") // Link with gdi32.lib for GetDeviceCaps(). MinGW will require linking with '-lgdi32'
     #endif
 
 float ImGui_ImplWin32_GetDpiScaleForMonitor(void *monitor)
