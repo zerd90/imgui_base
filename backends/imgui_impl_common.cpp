@@ -527,11 +527,18 @@ void RenderThread::entry(void *opaque)
 
 void RenderThread::task()
 {
+#if defined(ON_WINDOWS)
+    CoInitialize(nullptr);
+#endif
     while (mIsContinue)
     {
         if (mRenderAction())
             break;
     }
+
+#if defined(ON_WINDOWS)
+    CoUninitialize();
+#endif
 
     mState = STATE_FINISHED;
 }

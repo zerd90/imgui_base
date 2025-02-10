@@ -926,7 +926,7 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     ZeroMemory(&srvDesc, sizeof(srvDesc));
     srvDesc.Format                    = DXGI_FORMAT_R8G8B8A8_UNORM;
     srvDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels       = -1;
+    srvDesc.Texture2D.MipLevels       = 0xFFFFFFFF;
     srvDesc.Texture2D.MostDetailedMip = 0;
     hr                                = bd->pd3dDevice->CreateShaderResourceView(*ptex, &srvDesc, psrv);
     if (FAILED(hr))

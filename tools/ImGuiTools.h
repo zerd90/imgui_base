@@ -56,7 +56,7 @@ struct DisplayText
 class LoggerWindow : public IImGuiWindow
 {
 public:
-    LoggerWindow(std::string title, bool embed);
+    LoggerWindow(std::string title, bool embed = false);
     virtual ~LoggerWindow();
 
     void setWordWrap(bool wordWrap);
@@ -99,7 +99,7 @@ struct DisplayInfo
 class ImageWindow : public IImGuiWindow
 {
 public:
-    ImageWindow(std::string title, bool embed);
+    ImageWindow(std::string title, bool embed = false);
 
     void               setTexture(TextureData &texture);
     const DisplayInfo &getDisplayInfo();

@@ -110,9 +110,11 @@ class ResourceGuard
 public:
     ResourceGuard(std::function<void()> func);
     virtual ~ResourceGuard();
+    void dismiss();
 
 private:
     std::function<void()> releaseFunction = nullptr;
+    bool mDismissed = false;
 };
 
 #endif

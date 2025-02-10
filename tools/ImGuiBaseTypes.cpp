@@ -59,6 +59,11 @@ ResourceGuard::ResourceGuard(std::function<void()> func) : releaseFunction(func)
 
 ResourceGuard::~ResourceGuard()
 {
-    if (releaseFunction)
+    if (!mDismissed)
         releaseFunction();
-    }
+}
+
+void ResourceGuard::dismiss()
+{
+    mDismissed = true;
+}
