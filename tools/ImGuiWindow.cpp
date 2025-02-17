@@ -96,7 +96,12 @@ void IImGuiWindow::show()
     {
         EndChild();
         Separator();
+        if(0 == mStatusStringColor )
+            mStatusStringColor = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_Text]);
+
+        PushStyleColor(ImGuiCol_Text, mStatusStringColor);
         Text("%s", mStatusString.c_str());
+        PopStyleColor();
     }
 
 _WINDOW_END_:
@@ -127,10 +132,14 @@ void IImGuiWindow::setContent(std::function<void()> content)
     mContentCallback = content;
 }
 
-void IImGuiWindow::setStatus(std::string statusString)
+void IImGuiWindow::setStatus(std::string statusString, ImU32 color)
 {
     if (mStatusString != statusString)
         mStatusString = statusString;
+    if (color > 0)
+    {
+        mStatusStringColor = color;
+    }
 }
 
 void IImGuiWindow::setSize(ImVec2 size, ImGuiCond cond)

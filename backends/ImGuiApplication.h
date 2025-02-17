@@ -36,18 +36,21 @@ struct SettingValue
 
         // variable length
         SettingVector       = 0x00030000,
-        SettingVecStdString = 0x00030001,
+        SettingVectorInt    = 0x00030001,
+        SettingVectorFloat  = 0x00030002,
+        SettingVectorDouble = 0x00030003,
+        SettingVecStdString = 0x00030004,
     };
-    SettingValue(SettingType type, std::string name, void *valAddr) : mType(type), mName(name), mVal(valAddr) { checkVariable(); }
-    SettingValue(SettingType type, std::string name, void *valAddr, double minVal, double maxVal, double defVal, int arrLen = 0)
+    SettingValue(SettingType type, std::string name, void *valAddr, double minVal, double maxVal, double defVal,
+                 int arrLen = 0)
         : mType(type), mName(name), mVal(valAddr), mArrLen(arrLen), mBorderVAl({minVal, maxVal, defVal})
     {
         checkVariable();
     }
+    SettingValue(SettingType type, std::string name, void *valAddr) : SettingValue(type, name, valAddr, 0, 0, 0, 0) {}
     SettingValue(SettingType type, std::string name, void *valAddr, int arrLen)
-        : mType(type), mName(name), mVal(valAddr), mArrLen(arrLen)
+        : SettingValue(type, name, valAddr, 0, 0, 0, arrLen)
     {
-        checkVariable();
     }
 
 private:
@@ -112,11 +115,53 @@ public:
     virtual void exit() {}
 
     static void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
-    static void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry, const char *line);
-    static void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf);
+    static void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
+                                             const char *line);
+    static void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
+                                             ImGuiTextBuffer *buf);
 
 protected:
     virtual void presetInternal() {}
+
+    // call addSetting in presetInternal or the constructor of derived class
+    void addSetting(SettingValue::SettingType type, std::string name, void *valAddr, double minVal = 0,
+                    double maxVal = 0, double defVal = 0);
+
+    void addSettingArr(SettingValue::SettingType type, std::string name, void *valAddr, int arrLen, double minVal = 0,
+                       double maxVal = 0, double defVal = 0);
+
+    template <typename T>
+    void addSetting(const std::string &name, T *valAddr, double minVal = 0, double maxVal = 0, double defVal = 0)
+    {
+        if constexpr (std::is_same_v<std::decay_t<T>, int> || std::is_enum_v<std::decay_t<T>>)
+            addSetting(SettingValue::SettingInt, name, valAddr, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, float>)
+            addSetting(SettingValue::SettingFloat, name, valAddr, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, double>)
+            addSetting(SettingValue::SettingDouble, name, valAddr, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, std::string>)
+            addSetting(SettingValue::SettingStdString, name, valAddr, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, bool>)
+            addSetting(SettingValue::SettingBool, name, valAddr);
+        else if constexpr (std::is_same_v<std::decay_t<T>, std::vector<std::string>>)
+            addSetting(SettingValue::SettingVecStdString, name, valAddr);
+        else
+            static_assert(false);
+    }
+
+    template <typename T>
+    void addSettingArr(const std::string &name, T *valAddr, int arrLen, double minVal = 0, double maxVal = 0,
+                       double defVal = 0)
+    {
+        if constexpr (std::is_same_v<std::decay_t<T>, int> || std::is_enum_v<std::decay_t<T>>)
+            addSettingArr(SettingValue::SettingArrInt, name, valAddr, arrLen, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, float>)
+            addSettingArr(SettingValue::SettingArrFloat, name, valAddr, arrLen, minVal, maxVal, defVal);
+        else if constexpr (std::is_same_v<std::decay_t<T>, double>)
+            addSettingArr(SettingValue::SettingArrDouble, name, valAddr, arrLen, minVal, maxVal, defVal);
+        else
+            static_assert(false);
+    }
 
 protected:
     // Set these in presetInternal

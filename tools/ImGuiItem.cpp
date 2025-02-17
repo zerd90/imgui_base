@@ -1,5 +1,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <algorithm>
+#include "imgui_internal.h"
 #include "ImGuiItem.h"
 
 using namespace ImGui;
@@ -32,9 +33,16 @@ void IImGuiItem::show(bool newLine)
         SameLine();
 
     mItemPos = ImGui::GetCursorScreenPos();
-    if (showItem() && mActionCallbacks[ImGuiItemNativeActive])
-        mActionCallbacks[ImGuiItemNativeActive]();
-
+    if (showItem())
+    {
+        mItemStatus[ImGuiItemNativeActive] = true;
+        if (nullptr != mActionCallbacks[ImGuiItemNativeActive])
+            mActionCallbacks[ImGuiItemNativeActive]();
+    }
+    else
+    {
+        mItemStatus[ImGuiItemNativeActive] = false;
+    }
     updateItemStatus();
 }
 
@@ -278,9 +286,9 @@ void ImGuiInputGroup::addInput(IImGuiInput *input)
 
 void ImGuiInputGroup::removeInput(IImGuiInput *input)
 {
-    mInputGroup.erase(
-        std::remove_if(mInputGroup.begin(), mInputGroup.end(), [&input](IImGuiInput *toFind) { return input == toFind; }),
-        mInputGroup.end());
+    mInputGroup.erase(std::remove_if(mInputGroup.begin(), mInputGroup.end(),
+                                     [&input](IImGuiInput *toFind) { return input == toFind; }),
+                      mInputGroup.end());
 }
 
 void ImGuiInputGroup::setSpacing(float spacing)
@@ -441,6 +449,143 @@ bool ImGuiProgressBar::showItem()
             mIsClicked[i]  = true;
             mClickedPos[i] = mousePos;
         }
+    }
+    return false;
+}
+
+ImGuiItemTable::ImGuiItemTable() : IImGuiItem() {}
+
+ImGuiItemTable::ImGuiItemTable(const std::string &label) : IImGuiItem(label) {}
+
+void ImGuiItemTable::addColumn(const std::string &name)
+{
+    if (std::find(mColumnNames.begin(), mColumnNames.end(), name) != mColumnNames.end())
+        return;
+    mColumnNames.push_back(name);
+    for (auto &row : mRows)
+    {
+        // empty data
+        row.push_back("");
+    }
+}
+
+void ImGuiItemTable::insertColumn(unsigned int index, const std::string &name)
+{
+    if (index < 0)
+        return;
+
+    if (index >= mColumnNames.size())
+    {
+        addColumn(name);
+        return;
+    }
+
+    mColumnNames.insert(mColumnNames.begin() + index, name);
+    for (auto &row : mRows)
+    {
+        row.insert(row.begin() + index, "");
+    }
+}
+
+void ImGuiItemTable::removeColumn(const std::string &name)
+{
+    for (unsigned int i = 0; i < mColumnNames.size(); i++)
+    {
+        if (mColumnNames[i] == name)
+        {
+            removeColumn(i);
+            break;
+        }
+    }
+}
+
+void ImGuiItemTable::clearColumns()
+{
+    mColumnNames.clear();
+    for (auto &row : mRows)
+        row.clear();
+}
+
+void ImGuiItemTable::getRow(unsigned int index, std::vector<std::string> &row)
+{
+    if (index < 0 || index >= mRows.size())
+        return;
+
+    row = mRows[index];
+}
+
+void ImGuiItemTable::removeRow(unsigned int index)
+{
+    if (index < 0 || index >= mRows.size())
+        return;
+
+    mRows.erase(mRows.begin() + index);
+}
+
+void ImGuiItemTable::clearRows()
+{
+    mRows.clear();
+}
+
+void ImGuiItemTable::addEmptyRow()
+{
+    mRows.push_back(std::vector<std::string>(mColumnNames.size()));
+}
+
+void ImGuiItemTable::removeColumn(unsigned int index)
+{
+    for (auto &row : mRows)
+    {
+        if (index < row.size())
+            row.erase(row.begin() + index);
+    }
+    mColumnNames.erase(mColumnNames.begin() + index);
+}
+
+void ImGuiItemTable::ScrollFreeze(int rows, int cols)
+{
+    mFreezeCols = cols;
+    mFreezeRows = rows;
+}
+
+void ImGuiItemTable::ScrollFreezeRows(int rows)
+{
+    mFreezeRows = rows;
+}
+
+void ImGuiItemTable::ScrollFreezeCols(int cols)
+{
+    mFreezeCols = cols;
+}
+
+bool ImGuiItemTable::showItem()
+{
+    if (ImGui::BeginTable(mLabel.c_str(), (int)mColumnNames.size(), mTableFlags))
+    {
+        ImGui::TableSetupScrollFreeze(mFreezeCols, mFreezeRows);
+
+        for (auto &col : mColumnNames)
+            ImGui::TableSetupColumn(col.c_str());
+
+        ImGui::TableSetupScrollFreeze(0, 1);
+
+        for (auto &headerSize : mHeadersSize)
+            headerSize.y = ImGui::TableGetHeaderRowHeight();
+        for (auto &headerPosition : mHeadersPosition)
+            headerPosition.y = ImGui::GetCursorScreenPos().y;
+        ImGui::TableHeadersRow();
+
+        for (auto row : mRows)
+        {
+            ImGui::TableNextRow();
+            for (auto &col : row)
+            {
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(col.c_str());
+            }
+        }
+
+        ImGui::EndTable();
     }
     return false;
 }

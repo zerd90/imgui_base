@@ -105,11 +105,11 @@ DECLARE_FLAG_OPERATIONS(IMGUI_WINDOW_FLAGS);
             variable = flags;                                         \
     }
 
-class ResourceGuard
+class ImGuiResourceGuard
 {
 public:
-    ResourceGuard(std::function<void()> func);
-    virtual ~ResourceGuard();
+    ImGuiResourceGuard(std::function<void()> func);
+    virtual ~ImGuiResourceGuard();
     void dismiss();
 
 private:

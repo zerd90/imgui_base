@@ -39,7 +39,7 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_FOCUSED_FLAGS, FocusedFlag, mFocusedFlags)
 
     void setContent(std::function<void()> content);
-    void setStatus(std::string statusString);
+    void setStatus(std::string statusString, ImU32 color = 0);
     void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
 
     void setStyle(IMGUI_STYLE_VAR style, ImVec2 value);
@@ -103,6 +103,7 @@ protected:
     ImGuiCond   mManualSizeCond   = ImGuiCond_Always;
     bool        mStatusBarEnabled = false;
     std::string mStatusString;
+    ImU32 mStatusStringColor;
 
 private:
     SMenuItem                           mMenuBarItems;

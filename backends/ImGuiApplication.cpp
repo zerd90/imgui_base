@@ -41,7 +41,8 @@ void *ImGuiApplication::WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSetting
     return nullptr;
 }
 
-void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry, const char *line)
+void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
+                                                   const char *line)
 {
     if ('\0' == *line) // empty line
         return;
@@ -176,6 +177,24 @@ void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettings
             }
             break;
         }
+        case SettingValue::SettingVectorInt:
+        {
+            std::vector<int> *vecInt = (std::vector<int> *)setting.mVal;
+            vecInt->push_back(atoi(line));
+        }
+        break;
+        case SettingValue::SettingVectorFloat:
+        {
+            std::vector<float> *vecFloat = (std::vector<float> *)setting.mVal;
+            vecFloat->push_back((float)atof(line));
+        }
+        break;
+        case SettingValue::SettingVectorDouble:
+        {
+            std::vector<double> *vecDouble = (std::vector<double> *)setting.mVal;
+            vecDouble->push_back(atof(line));
+        }
+        break;
         case SettingValue::SettingVecStdString:
         {
             std::vector<std::string> *vecString = (std::vector<std::string> *)setting.mVal;
@@ -185,7 +204,8 @@ void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettings
     }
 }
 
-void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf)
+void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
+                                                   ImGuiTextBuffer *buf)
 {
     IM_UNUSED(imgui_ctx);
     ImGuiApplication *app = (ImGuiApplication *)handler->UserData;
@@ -233,15 +253,55 @@ void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGu
                     buf->appendf("%lf%c", ((double *)setting.mVal)[i], ", "[(setting.mArrLen - 1) == i]);
                 }
                 break;
+            case SettingValue::SettingVectorInt:
+            {
+                std::vector<int> *vecInt = (std::vector<int> *)setting.mVal;
+                for (size_t i = 0; i < vecInt->size(); i++)
+                {
+                    buf->appendf("%d\n", (*vecInt)[i]);
+                }
+                break;
+            }
+            case SettingValue::SettingVectorFloat:
+            {
+                std::vector<float> *vecFloat = (std::vector<float> *)setting.mVal;
+                for (size_t i = 0; i < vecFloat->size(); i++)
+                {
+                    buf->appendf("%f\n", (*vecFloat)[i]);
+                }
+                break;
+            }
+            case SettingValue::SettingVectorDouble:
+            {
+                std::vector<double> *vecDouble = (std::vector<double> *)setting.mVal;
+                for (size_t i = 0; i < vecDouble->size(); i++)
+                {
+                    buf->appendf("%lf\n", (*vecDouble)[i]);
+                }
+                break;
+            }
             case SettingValue::SettingVecStdString:
+            {
                 std::vector<std::string> *vecString = (std::vector<std::string> *)setting.mVal;
                 for (size_t i = 0; i < vecString->size(); i++)
                 {
                     buf->appendf("%s\n", (*vecString)[i].c_str());
                 }
                 break;
-                break;
+            }
         }
         buf->append("\n");
     }
+}
+
+void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name, void *valAddr, double minVal,
+                                  double maxVal, double defVal)
+{
+    mAppSettings.push_back(SettingValue(type, name, valAddr, minVal, maxVal, defVal));
+}
+
+void ImGuiApplication::addSettingArr(SettingValue::SettingType type, std::string name, void *valAddr, int arrLen,
+                                     double minVal, double maxVal, double defVal)
+{
+    mAppSettings.push_back(SettingValue(type, name, valAddr, minVal, maxVal, defVal, arrLen));
 }

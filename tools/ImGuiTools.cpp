@@ -1,5 +1,6 @@
 
 #include <map>
+#include <string_view>
 
 #if defined(ON_WINDOWS)
     #include <windows.h>
@@ -109,8 +110,8 @@ void LoggerWindow::displayTexts()
 
     mTotalLines = 0;
 
-    ResourceGuard guard(
-        [&colorSet]()
+    ImGuiResourceGuard guard(
+        [&]()
         {
             if (colorSet)
             {

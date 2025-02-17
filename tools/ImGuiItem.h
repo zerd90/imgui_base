@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <functional>
+#include <limits>
 #include "imgui.h"
 #include "ImGuiBaseTypes.h"
 
@@ -48,7 +49,7 @@ public:
 protected:
     IImGuiItem();
     virtual bool showItem() = 0;
-    // maybe override by classes which are not a real ImGuiItem
+    // maybe override by classes which are not a imgui internal item
     virtual void updateItemStatus();
 
 protected:
@@ -98,6 +99,7 @@ public:
 
 protected:
     virtual bool showItem() override;
+
 private:
     ImTextureID mImageTexture = 0;
     ImVec4      mBgColor      = {0, 0, 0, 0};
@@ -229,14 +231,8 @@ template <typename T, int sliderCount>
 class ImGuiInputSlider : public IImGuiInput
 {
 public:
-    ImGuiInputSlider() : IImGuiInput() {}
-    ImGuiInputSlider(const std::string &label, bool labelOnLeft) : IImGuiInput(label, labelOnLeft)
-    {
-        static_assert(!(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint16_t>
-                        || std::is_same_v<T, int16_t> || std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>
-                        || std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float>
-                        || std::is_same_v<T, double>));
-    }
+    ImGuiInputSlider() : IImGuiInput() { getDataType(); }
+    ImGuiInputSlider(const std::string &label, bool labelOnLeft) : IImGuiInput(label, labelOnLeft) { getDataType(); }
 
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_SLIDER_FLAGS, SliderFlag, mSliderFlags)
 
@@ -245,30 +241,42 @@ public:
     void setMinimum(T minimum) { mValueMinimum = minimum; }
 
 protected:
+    void getDataType()
+    {
+        static_assert(!(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint16_t>
+                        || std::is_same_v<T, int16_t> || std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>
+                        || std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float>
+                        || std::is_same_v<T, double>));
+
+        dataType = std::is_same_v<T, uint8_t>  ? ImGuiDataType_U8
+                 : std::is_same_v<T, int8_t>   ? ImGuiDataType_S8
+                 : std::is_same_v<T, uint16_t> ? ImGuiDataType_U16
+                 : std::is_same_v<T, int16_t>  ? ImGuiDataType_S16
+                 : std::is_same_v<T, uint32_t> ? ImGuiDataType_U32
+                 : std::is_same_v<T, int32_t>  ? ImGuiDataType_S32
+                 : std::is_same_v<T, uint64_t> ? ImGuiDataType_U64
+                 : std::is_same_v<T, int64_t>  ? ImGuiDataType_S64
+                 : std::is_same_v<T, float>    ? ImGuiDataType_Float
+                                               : ImGuiDataType_Double;
+    }
+
     virtual bool showInputItem() override
     {
-        std::string    showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
-        IMGUI_DATATYPE dataType  = std::is_same_v<T, uint8_t>    ? ImGuiDataType_U8
-                                   : std::is_same_v<T, int8_t>   ? ImGuiDataType_S8
-                                   : std::is_same_v<T, uint16_t> ? ImGuiDataType_U16
-                                   : std::is_same_v<T, int16_t>  ? ImGuiDataType_S16
-                                   : std::is_same_v<T, uint32_t> ? ImGuiDataType_U32
-                                   : std::is_same_v<T, int32_t>  ? ImGuiDataType_S32
-                                   : std::is_same_v<T, uint64_t> ? ImGuiDataType_U64
-                                   : std::is_same_v<T, int64_t>  ? ImGuiDataType_S64
-                                   : std::is_same_v<T, float>    ? ImGuiDataType_Float
-                                                                 : ImGuiDataType_Double;
+        std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+
         if constexpr (sliderCount > 1)
-            return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum, mFormat,
-                                 mSliderFlags);
+            return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum,
+                                 mFormat, mSliderFlags);
         else
-            return SliderScalar(showLabel.c_str(), dataType, mValues, &mValueMinimum, &mValueMaximum, mFormat, mSliderFlags);
+            return SliderScalar(showLabel.c_str(), dataType, mValues, &mValueMinimum, &mValueMaximum, mFormat,
+                                mSliderFlags);
     }
 
 private:
-    T mValueMinimum = std::numeric_limits<T>::min();
-    T mValueMaximum = std::numeric_limits<T>::max();
-    T mValues[sliderCount];
+    IMGUI_DATATYPE dataType;
+    T              mValueMinimum = (std::numeric_limits<T>::min)();
+    T              mValueMaximum = (std::numeric_limits<T>::max)();
+    T              mValues[sliderCount];
 
     IMGUI_SLIDER_FLAGS mSliderFlags = ImGuiSliderFlags_AlwaysClamp;
     const char        *mFormat      = nullptr;
@@ -332,6 +340,82 @@ private:
 
     bool   mIsClicked[ImGuiMouseButton_COUNT] = {false};
     ImVec2 mClickedPos[ImGuiMouseButton_COUNT];
+};
+
+class ImGuiItemTable : public IImGuiItem
+{
+public:
+    ImGuiItemTable();
+    ImGuiItemTable(const std::string &label);
+
+    DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_TABLE_FLAGS, TableFlag, mTableFlags)
+
+    // there should not be two columns with the same name
+    void addColumn(const std::string &name);
+    void insertColumn(unsigned int index, const std::string &name);
+    void removeColumn(unsigned int index);
+    void removeColumn(const std::string &name);
+    void clearColumns();
+
+    // addColumn first, data in row should be in the same order as columns, otherwise it will be ignored
+    void getRow(unsigned int index, std::vector<std::string> &row);
+    void removeRow(unsigned int index);
+    void clearRows();
+
+    template <typename T>
+    void setDataOfRow(unsigned int rowIndex, unsigned int columnIndex, T &&data)
+    {
+        if (rowIndex >= mRows.size() || columnIndex >= mColumnNames.size())
+            return;
+
+        // string or char*
+        if constexpr (std::is_same_v<std::decay_t<T>, std::string>
+                      || (std::is_pointer_v<T> && std::is_same_v<std::decay_t<std::remove_pointer_t<T>>, char>))
+            mRows[rowIndex][columnIndex] = data;
+        else
+            mRows[rowIndex][columnIndex] = std::to_string(data);
+    }
+
+    void addEmptyRow();
+
+    template <typename T, typename... Args>
+    void addRow(T arg1, Args &&...args)
+    {
+        if constexpr (std::is_same_v<std::decay_t<T>, std::vector<std::string>>)
+        {
+            // Z_INFO("add Row through vector\n");
+            mRows.push_back(std::vector<std::string>(mColumnNames.size()));
+
+            for (unsigned int i = 0; i < MIN(arg1.size(), mColumnNames.size()); i++)
+            {
+                mRows.back()[i] = arg1[i];
+            }
+        }
+        else
+        {
+            addEmptyRow();
+            int index = 0;
+            setDataOfRow((unsigned int)(mRows.size() - 1), index++, std::forward<T>(arg1));
+            (setDataOfRow((unsigned int)(mRows.size() - 1), index++, std::forward<Args>(args)), ...);
+        }
+    }
+
+    void ScrollFreeze(int rows, int cols);
+    void ScrollFreezeRows(int rows);
+    void ScrollFreezeCols(int cols);
+
+protected:
+    virtual bool showItem() override;
+
+private:
+    IMGUI_TABLE_FLAGS                     mTableFlags = ImGuiTableFlags_None;
+    std::vector<std::string>              mColumnNames;
+    std::vector<std::vector<std::string>> mRows;
+    std::vector<ImVec2>                   mHeadersPosition;
+    std::vector<ImVec2>                   mHeadersSize;
+
+    int mFreezeRows = 0;
+    int mFreezeCols = 0;
 };
 
 #endif

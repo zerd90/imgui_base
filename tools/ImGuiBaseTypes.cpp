@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "ImGuiBaseTypes.h"
 
+
 #define DEFINE_FLAG_OPERATIONS(ENUM)                      \
     ENUM operator~(ENUM flag)                             \
     {                                                     \
@@ -55,15 +56,18 @@ DEFINE_FLAG_OPERATIONS(IMGUI_TREE_NODE_FLAGS)
 DEFINE_FLAG_OPERATIONS(IMGUI_VIEWPORT_FLAGS)
 DEFINE_FLAG_OPERATIONS(IMGUI_WINDOW_FLAGS);
 
-ResourceGuard::ResourceGuard(std::function<void()> func) : releaseFunction(func) {}
+ImGuiResourceGuard::ImGuiResourceGuard(std::function<void()> func) : releaseFunction(func)
+{
+    assert(func != nullptr);
+}
 
-ResourceGuard::~ResourceGuard()
+ImGuiResourceGuard::~ImGuiResourceGuard()
 {
     if (!mDismissed)
         releaseFunction();
 }
 
-void ResourceGuard::dismiss()
+void ImGuiResourceGuard::dismiss()
 {
     mDismissed = true;
 }

@@ -10,8 +10,13 @@ execute_process(
 )
 
 if("${RENDER}" STREQUAL "")
-	message(WARNING "RENDER not Set, Using Default GLFW_OPENGL3")
-	SET(RENDER GLFW_OPENGL3)
+	message(WARNING "RENDER not Set, Using Default")
+
+	if(WIN32)
+		SET(RENDER WIN32_DX11)
+	else()
+		SET(RENDER GLFW_OPENGL3)
+	endif()
 endif()
 
 if("${RENDER}" STREQUAL "GLFW_OPENGL3")
@@ -27,7 +32,9 @@ if("${RENDER}" STREQUAL "GLFW_OPENGL3")
 endif()
 
 # 指定模块对外头文件 #
-if(NOT PROJECT_IS_TOP_LEVEL)
+if( PROJECT_IS_TOP_LEVEL)
+	set(CMAKE_CXX_STANDARD 17)
+else()
 	set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
 		${PROJECT_SOURCE_DIR}/imgui-source/
 		${PROJECT_SOURCE_DIR}/backends
