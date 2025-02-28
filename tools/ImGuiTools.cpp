@@ -19,14 +19,6 @@ using std::string_view;
 using std::vector;
 using namespace ImGui;
 
-#ifndef MAX
-    #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#endif
-
-#ifndef MIN
-    #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
-
 #define MAKE_RGBA(r, g, b) (((r) << 24) | ((g) << 16) | ((b) << 8) | 0xff)
 
 map<TextColorCode, const char *> gColorStrMap = {
@@ -50,15 +42,31 @@ map<TextColorCode, const char *> gColorStrMap = {
 };
 
 static map<const string_view, TextColorCode> gStrColorMap = {
-    {"\033[0m", ColorNone},           {"\033[30m", ColorBlack},     {"\033[0;30m", ColorBlack},
-    {"\033[1;30m", ColorDarkGray},    {"\033[31m", ColorRed},       {"\033[0;31m", ColorRed},
-    {"\033[1;31m", ColorLightRed},    {"\033[32m", ColorGreen},     {"\033[0;32m", ColorGreen},
-    {"\033[1;32m", ColorLightGreen},  {"\033[33m", ColorBrown},     {"\033[0;33m", ColorBrown},
-    {"\033[1;33m", ColorYellow},      {"\033[34m", ColorBlue},      {"\033[0;34m", ColorBlue},
-    {"\033[1;34m", ColorLightBlue},   {"\033[35m", ColorPurple},    {"\033[0;35m", ColorPurple},
-    {"\033[1;35m", ColorLightPurple}, {"\033[36m", ColorCyan},      {"\033[0;36m", ColorCyan},
-    {"\033[1;36m", ColorLightCyan},   {"\033[37m", ColorLightGray}, {"\033[0;37m", ColorLightGray},
-    {"\033[1;37m", ColorWhite},
+    {   "\033[0m",        ColorNone},
+    {  "\033[30m",       ColorBlack},
+    {"\033[0;30m",       ColorBlack},
+    {"\033[1;30m",    ColorDarkGray},
+    {  "\033[31m",         ColorRed},
+    {"\033[0;31m",         ColorRed},
+    {"\033[1;31m",    ColorLightRed},
+    {  "\033[32m",       ColorGreen},
+    {"\033[0;32m",       ColorGreen},
+    {"\033[1;32m",  ColorLightGreen},
+    {  "\033[33m",       ColorBrown},
+    {"\033[0;33m",       ColorBrown},
+    {"\033[1;33m",      ColorYellow},
+    {  "\033[34m",        ColorBlue},
+    {"\033[0;34m",        ColorBlue},
+    {"\033[1;34m",   ColorLightBlue},
+    {  "\033[35m",      ColorPurple},
+    {"\033[0;35m",      ColorPurple},
+    {"\033[1;35m", ColorLightPurple},
+    {  "\033[36m",        ColorCyan},
+    {"\033[0;36m",        ColorCyan},
+    {"\033[1;36m",   ColorLightCyan},
+    {  "\033[37m",   ColorLightGray},
+    {"\033[0;37m",   ColorLightGray},
+    {"\033[1;37m",       ColorWhite},
 };
 #define MAKE_COLOR(color) 0x##color
 #define REVERSE_U32(a)                                                                                            \
@@ -66,23 +74,23 @@ static map<const string_view, TextColorCode> gStrColorMap = {
                 | (((uint64_t)(a) << 24) & 0xff000000)))
 #define REVERSE_U32_COLOR(color) REVERSE_U32(MAKE_COLOR(color))
 static map<TextColorCode, ImU32> ColorValueMap = {
-    {ColorNone, REVERSE_U32_COLOR(000000FF)},        //  #000000FF
-    {ColorBlack, REVERSE_U32_COLOR(111111FF)},       //  #111111FF
-    {ColorDarkGray, REVERSE_U32_COLOR(2B2B2BFF)},    //  #2B2B2BFF
-    {ColorRed, REVERSE_U32_COLOR(C00E0EFF)},         //  #C00E0EFF
-    {ColorLightRed, REVERSE_U32_COLOR(E73C3CFF)},    //  #E73C3CFF
-    {ColorGreen, REVERSE_U32_COLOR(0EB160FF)},       //  #0EB160FF
-    {ColorLightGreen, REVERSE_U32_COLOR(1CEB83FF)},  //  #1CEB83FF
-    {ColorBrown, REVERSE_U32_COLOR(7C7C0DFF)},       //  #7C7C0DFF
-    {ColorYellow, REVERSE_U32_COLOR(DEC018FF)},      //  #DEC018FF
-    {ColorBlue, REVERSE_U32_COLOR(0731ECFF)},        //  #0731ECFF
-    {ColorLightBlue, REVERSE_U32_COLOR(6980E6FF)},   //  #6980E6FF
-    {ColorPurple, REVERSE_U32_COLOR(7A0867FF)},      //  #7A0867FF
+    {       ColorNone, REVERSE_U32_COLOR(000000FF)}, //  #000000FF
+    {      ColorBlack, REVERSE_U32_COLOR(111111FF)}, //  #111111FF
+    {   ColorDarkGray, REVERSE_U32_COLOR(2B2B2BFF)}, //  #2B2B2BFF
+    {        ColorRed, REVERSE_U32_COLOR(C00E0EFF)}, //  #C00E0EFF
+    {   ColorLightRed, REVERSE_U32_COLOR(E73C3CFF)}, //  #E73C3CFF
+    {      ColorGreen, REVERSE_U32_COLOR(0EB160FF)}, //  #0EB160FF
+    { ColorLightGreen, REVERSE_U32_COLOR(1CEB83FF)}, //  #1CEB83FF
+    {      ColorBrown, REVERSE_U32_COLOR(7C7C0DFF)}, //  #7C7C0DFF
+    {     ColorYellow, REVERSE_U32_COLOR(DEC018FF)}, //  #DEC018FF
+    {       ColorBlue, REVERSE_U32_COLOR(0731ECFF)}, //  #0731ECFF
+    {  ColorLightBlue, REVERSE_U32_COLOR(6980E6FF)}, //  #6980E6FF
+    {     ColorPurple, REVERSE_U32_COLOR(7A0867FF)}, //  #7A0867FF
     {ColorLightPurple, REVERSE_U32_COLOR(C930AFFF)}, //  #C930AFFF
-    {ColorCyan, REVERSE_U32_COLOR(12DEECFF)},        //  #12DEECFF
-    {ColorLightCyan, REVERSE_U32_COLOR(75E8F0FF)},   //  #75E8F0FF
-    {ColorLightGray, REVERSE_U32_COLOR(797979FF)},   //  #797979FF
-    {ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)},       //  #DFDFDFFF
+    {       ColorCyan, REVERSE_U32_COLOR(12DEECFF)}, //  #12DEECFF
+    {  ColorLightCyan, REVERSE_U32_COLOR(75E8F0FF)}, //  #75E8F0FF
+    {  ColorLightGray, REVERSE_U32_COLOR(797979FF)}, //  #797979FF
+    {      ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)}, //  #DFDFDFFF
 };
 
 int getUtf8CharSize(const char *str)
@@ -577,7 +585,9 @@ const DisplayInfo &ImageWindow::getDisplayInfo()
 
 void ImageWindow::pushScale(const DisplayInfo &input)
 {
-    mScaleStack.push_back({mImageScale, {mImageShowPos.x, mImageShowPos.y}});
+    mScaleStack.push_back({
+        mImageScale, {mImageShowPos.x, mImageShowPos.y}
+    });
     mImageScale     = input.scale;
     mImageShowPos.x = input.showPos.x;
     mImageShowPos.y = input.showPos.y;
@@ -634,6 +644,12 @@ void ImageWindow::unlink()
     mLinkWith              = nullptr;
     mUnlinkCond            = []() { return false; };
 }
+
+void ImageWindow::clear()
+{
+    mTexture = mTextureWidth = mTextureHeight = 0;
+}
+
 void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir)
 {
     ImGuiDockNode *dock_node = ImGui::DockContextFindNodeByID(ImGui::GetCurrentContext(), dock);

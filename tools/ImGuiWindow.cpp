@@ -48,11 +48,25 @@ void IImGuiWindow::show()
             {
                 if (menuItem.subMenus.empty())
                 {
-                    if (MenuItem(menuItem.label.c_str(),
-                                 menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(), menuItem.selected,
-                                 menuItem.enabledCondition != nullptr ? menuItem.enabledCondition() : menuItem.enabled)
-                        && menuItem.menuCallback != nullptr)
-                        menuItem.menuCallback();
+                    if (menuItem.selectedCondition != nullptr)
+                    {
+                        if (MenuItem(
+                                menuItem.label.c_str(), menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(),
+                                menuItem.selectedCondition(),
+                                menuItem.enabledCondition != nullptr ? menuItem.enabledCondition() : menuItem.enabled))
+                        {
+                            menuItem.menuCallback();
+                        }
+                    }
+                    else
+                    {
+                        if (MenuItem(menuItem.label.c_str(),
+                                     menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(), menuItem.selected,
+                                     menuItem.enabledCondition != nullptr ? menuItem.enabledCondition()
+                                                                          : menuItem.enabled)
+                            && menuItem.menuCallback != nullptr)
+                            menuItem.menuCallback();
+                    }
                 }
                 else
                 {
@@ -96,12 +110,18 @@ void IImGuiWindow::show()
     {
         EndChild();
         Separator();
-        if(0 == mStatusStringColor )
-            mStatusStringColor = ImGui::GetColorU32(ImGui::GetStyle().Colors[ImGuiCol_Text]);
-
-        PushStyleColor(ImGuiCol_Text, mStatusStringColor);
+        if (0 != mStatusStringColor)
+        {
+            PushStyleColor(ImGuiCol_Text, mStatusStringColor);
+        }
         Text("%s", mStatusString.c_str());
-        PopStyleColor();
+        if (mStatusProgressFraction >= 0)
+        {
+            SameLine();
+            ProgressBar(mStatusProgressFraction, ImVec2(-1, 0), "");
+        }
+        if (0 != mStatusStringColor)
+            PopStyleColor();
     }
 
 _WINDOW_END_:
@@ -113,6 +133,11 @@ _WINDOW_END_:
 
     if (!mOpened)
         mJustClosed = true;
+}
+
+void IImGuiWindow::setTitle(const std::string title)
+{
+    mTitle = title;
 }
 
 void IImGuiWindow::enableStatusBar(bool on)
@@ -140,6 +165,11 @@ void IImGuiWindow::setStatus(std::string statusString, ImU32 color)
     {
         mStatusStringColor = color;
     }
+}
+
+void IImGuiWindow::setStatusProgressBar(bool on, float fraction)
+{
+    mStatusProgressFraction = on ? ROUND(0, fraction, 1) : -1;
 }
 
 void IImGuiWindow::setSize(ImVec2 size, ImGuiCond cond)
@@ -233,8 +263,7 @@ const ImVec2 &IImGuiWindow::getContentRegion()
     return mContentRegionSize;
 }
 
-void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, std::function<void()> callback, bool *selected,
-                           const char *shortcut)
+SMenuItem &IImGuiWindow::addMenuItem(const std::vector<std::string> &labelLayers)
 {
     SMenuItem *pCurrMenu = &mMenuBarItems;
     for (auto &currLabel : labelLayers)
@@ -251,10 +280,27 @@ void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, std::function<v
             pCurrMenu = &(*nextMenu);
         }
     }
-    pCurrMenu->menuCallback = callback;
-    pCurrMenu->selected     = selected;
+    return *pCurrMenu;
+}
+
+void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, std::function<void()> callback, bool *selected,
+                           const char *shortcut)
+{
+    SMenuItem &currMenu = addMenuItem(labelLayers);
+
+    currMenu.menuCallback = callback;
+    currMenu.selected     = selected;
     if (shortcut)
-        pCurrMenu->shortcut = shortcut;
+        currMenu.shortcut = shortcut;
+}
+void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, std::function<void()> callback,
+                           std::function<bool()> selectedCondition, const char *shortcut)
+{
+    SMenuItem &currMenu        = addMenuItem(labelLayers);
+    currMenu.menuCallback      = callback;
+    currMenu.selectedCondition = selectedCondition;
+    if (shortcut)
+        currMenu.shortcut = shortcut;
 }
 
 void IImGuiWindow::addMenu(std::vector<std::string> labelLayers, bool *selected, const char *shortcut)

@@ -252,15 +252,27 @@ void ImGuiInputCombo::removeSelectableItem(ComboTag tag)
         mSelects.erase(tag);
 }
 
+bool ImGuiInputCombo::selectChanged()
+{
+    return isNativeActive();
+}
+
 ComboTag ImGuiInputCombo::getSelected()
 {
     return mCurrSelect;
 }
 
+void ImGuiInputCombo::clear()
+{
+    mSelects.clear();
+}
+
 bool ImGuiInputCombo::showInputItem()
 {
     ComboTag lastSelect = mCurrSelect;
-    if (BeginCombo(mLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str()))
+
+    string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+    if (BeginCombo(showLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str()))
     {
         for (auto &item : mSelects)
         {
@@ -505,13 +517,13 @@ void ImGuiItemTable::clearColumns()
     for (auto &row : mRows)
         row.clear();
 }
-
-void ImGuiItemTable::getRow(unsigned int index, std::vector<std::string> &row)
+std::vector<std::string> ImGuiItemTable::getRow(unsigned int index)
 {
-    if (index < 0 || index >= mRows.size())
-        return;
 
-    row = mRows[index];
+    if (index < 0 || index >= mRows.size())
+        return std::vector<std::string>();
+
+    return mRows[index];
 }
 
 void ImGuiItemTable::removeRow(unsigned int index)
@@ -560,7 +572,7 @@ void ImGuiItemTable::ScrollFreezeCols(int cols)
 
 bool ImGuiItemTable::showItem()
 {
-    if (ImGui::BeginTable(mLabel.c_str(), (int)mColumnNames.size(), mTableFlags))
+    if (ImGui::BeginTable(mLabel.c_str(), (int)mColumnNames.size(), mTableFlags, mManualItemSize))
     {
         ImGui::TableSetupScrollFreeze(mFreezeCols, mFreezeRows);
 
@@ -575,10 +587,20 @@ bool ImGuiItemTable::showItem()
             headerPosition.y = ImGui::GetCursorScreenPos().y;
         ImGui::TableHeadersRow();
 
-        for (auto row : mRows)
+        ImVec2 scrollPos = {ImGui::GetScrollX(), ImGui::GetScrollY()};
+
+        // for table with too many rows, only show what can be seen; not precise but enough
+        float    cellHeight = ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2;
+        uint64_t startRow   = (uint64_t)MAX(0, (scrollPos.y / cellHeight) - 1);
+        uint64_t endRow     = startRow + (uint64_t)(mItemSize.y / cellHeight) + 1;
+        endRow              = MIN(endRow, mRows.size());
+
+        for (int row = 0; row < mRows.size(); row++)
         {
-            ImGui::TableNextRow();
-            for (auto &col : row)
+            ImGui::TableNextRow(0, cellHeight);
+            if (row >= mFreezeRows - 1 && (row < startRow || row > endRow))
+                continue;
+            for (auto &col : mRows[row])
             {
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(col.c_str());
@@ -588,4 +610,10 @@ bool ImGuiItemTable::showItem()
         ImGui::EndTable();
     }
     return false;
+}
+
+void ImGuiItemTable::clear()
+{
+    clearRows();
+    clearColumns();
 }

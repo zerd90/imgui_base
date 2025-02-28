@@ -10,17 +10,9 @@
 
 #include "ImGuiWindow.h"
 
-#ifndef IN_RANGE
-    #define IN_RANGE(lower, x, upper) ((lower) <= (x) && (x) <= (upper))
-#endif
-
-#ifndef ROUND
-    #define ROUND(lower, x, upper) MAX(lower, MIN(x, upper))
-#endif
-
-#define MOUSE_IN_WINDOW(mousePos, winPos, winSize)                                                                \
-    (((mousePos).x >= (winPos).x) && ((mousePos).x < (winPos).x + (winSize).x) && ((mousePos).y >= (winPos).y) && \
-     ((mousePos).y < (winPos).y + (winSize).y))
+#define MOUSE_IN_WINDOW(mousePos, winPos, winSize)                                                             \
+    (((mousePos).x >= (winPos).x) && ((mousePos).x < (winPos).x + (winSize).x) && ((mousePos).y >= (winPos).y) \
+     && ((mousePos).y < (winPos).y + (winSize).y))
 
 typedef enum
 {
@@ -69,11 +61,10 @@ public:
     void copyToClipBoard();
 
 private:
-    void displayTexts();
+    void         displayTexts();
     virtual void showContent() override;
 
 private:
-
     std::vector<DisplayText> mLogs;
 
     StdMutex    mLogLock;
@@ -101,7 +92,9 @@ class ImageWindow : public IImGuiWindow
 public:
     ImageWindow(std::string title, bool embed = false);
 
+    // texture must be available since show() called utill ImGui::Render() Called!!
     void               setTexture(TextureData &texture);
+    void               clear();
     const DisplayInfo &getDisplayInfo();
 
     void pushScale(const DisplayInfo &input);
@@ -132,10 +125,11 @@ private:
     bool   mMouseLeftPressed = false;
     ImVec2 mLastMousePos     = {0, 0};
 
-    ImageWindow          *mLinkWith = nullptr;
+    ImageWindow          *mLinkWith   = nullptr;
     std::function<bool()> mUnlinkCond = []() { return false; };
 };
 
-void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir);
+void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,
+               ImGuiID *outDockOppositeDir);
 
 #endif

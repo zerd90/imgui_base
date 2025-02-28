@@ -216,7 +216,9 @@ public:
 
     void     addSelectableItem(ComboTag tag, const std::string &itemDisplayStr);
     void     removeSelectableItem(ComboTag tag);
+    bool     selectChanged();
     ComboTag getSelected();
+    void     clear();
 
 protected:
     virtual bool showInputItem() override;
@@ -351,15 +353,19 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_TABLE_FLAGS, TableFlag, mTableFlags)
 
     // there should not be two columns with the same name
-    void addColumn(const std::string &name);
-    void insertColumn(unsigned int index, const std::string &name);
-    void removeColumn(unsigned int index);
-    void removeColumn(const std::string &name);
-    void clearColumns();
+    void                     addColumn(const std::string &name);
+    std::vector<std::string> getColumns() { return mColumnNames; }
+    void                     insertColumn(unsigned int index, const std::string &name);
+    void                     removeColumn(unsigned int index);
+    void                     removeColumn(const std::string &name);
+    void                     clearColumns();
 
     // addColumn first, data in row should be in the same order as columns, otherwise it will be ignored
-    void getRow(unsigned int index, std::vector<std::string> &row);
-    void removeRow(unsigned int index);
+    size_t                   getRowCount() { return mRows.size(); }
+    std::vector<std::string> getRow(unsigned int index);
+    void                     removeRow(unsigned int index);
+    void                     addEmptyRow();
+
     void clearRows();
 
     template <typename T>
@@ -375,8 +381,18 @@ public:
         else
             mRows[rowIndex][columnIndex] = std::to_string(data);
     }
+    template <typename T>
+    void setDataOfRow(unsigned int rowIndex, const std::string &colName, T &&data)
+    {
+        if (rowIndex >= mRows.size())
+            return;
 
-    void addEmptyRow();
+        auto col = std::find(mColumnNames.begin(), mColumnNames.end(), colName);
+        if (col == mColumnNames.end())
+            return;
+
+        setDataOfRow(rowIndex, col - mColumnNames.begin(), data);
+    }
 
     template <typename T, typename... Args>
     void addRow(T arg1, Args &&...args)
@@ -399,6 +415,8 @@ public:
             (setDataOfRow((unsigned int)(mRows.size() - 1), index++, std::forward<Args>(args)), ...);
         }
     }
+
+    void clear();
 
     void ScrollFreeze(int rows, int cols);
     void ScrollFreezeRows(int rows);

@@ -18,6 +18,7 @@ struct SMenuItem
 
     std::vector<SMenuItem> subMenus;
     std::function<void()>  menuCallback;
+    std::function<bool()>  selectedCondition;
     bool                  *selected = nullptr;
 };
 
@@ -29,6 +30,7 @@ public:
     virtual ~IImGuiWindow();
 
     virtual void show();
+    void         setTitle(const std::string title);
     void         enableStatusBar(bool on);
 
     void setHasCloseButton(bool hasCloseButton);
@@ -40,6 +42,7 @@ public:
 
     void setContent(std::function<void()> content);
     void setStatus(std::string statusString, ImU32 color = 0);
+    void setStatusProgressBar(bool on, float fraction = 0.0f);
     void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
 
     void setStyle(IMGUI_STYLE_VAR style, ImVec2 value);
@@ -62,9 +65,14 @@ public:
 
     const ImVec2 &getContentRegion();
 
-    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback = nullptr,
-                 bool *selected = nullptr, const char *shortcut = nullptr);
+    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback = nullptr, bool *selected = nullptr,
+                 const char *shortcut = nullptr);
+
     void addMenu(std::vector<std::string> labelLayers, bool *selected, const char *shortcut = nullptr);
+
+    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback,
+                 std::function<bool()> selectedCondition, const char *shortcut = nullptr);
+
     void setMenuEnabled(std::vector<std::string> labelLayers, bool enabled);
     void setMenuEnabledCondition(std::vector<std::string> labelLayers, std::function<bool()> condition);
 
@@ -73,6 +81,7 @@ protected:
     void         updateWindowStatus();
     void         pushStyles();
     void         popStyles();
+    SMenuItem   &addMenuItem(const std::vector<std::string> &labelLayers);
 
 protected:
     // Property
@@ -81,10 +90,11 @@ protected:
     bool                mIsChildWindow = false;
     IMGUI_CHILD_FLAGS   mChildFlags    = ImGuiChildFlags_None;
     IMGUI_HOVERED_FLAGS mHoveredFlags  = ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
-                                        | ImGuiHoveredFlags_AllowWhenBlockedByPopup;
+                                      | ImGuiHoveredFlags_AllowWhenBlockedByPopup;
     IMGUI_FOCUSED_FLAGS mFocusedFlags = ImGuiFocusedFlags_ChildWindows;
 
-    bool mHasCloseButton = true;
+    bool  mHasCloseButton         = true;
+    float mStatusProgressFraction = -1;
 
     // Status
     bool   mOpened       = false;
@@ -103,7 +113,7 @@ protected:
     ImGuiCond   mManualSizeCond   = ImGuiCond_Always;
     bool        mStatusBarEnabled = false;
     std::string mStatusString;
-    ImU32 mStatusStringColor;
+    ImU32       mStatusStringColor;
 
 private:
     SMenuItem                           mMenuBarItems;

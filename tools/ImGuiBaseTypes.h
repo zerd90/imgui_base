@@ -105,6 +105,22 @@ DECLARE_FLAG_OPERATIONS(IMGUI_WINDOW_FLAGS);
             variable = flags;                                         \
     }
 
+#ifndef MAX
+    #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef MIN
+    #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef IN_RANGE
+    #define IN_RANGE(lower, x, upper) ((lower) <= (x) && (x) <= (upper))
+#endif
+
+#ifndef ROUND
+    #define ROUND(lower, x, upper) MAX(lower, MIN(x, upper))
+#endif
+
 class ImGuiResourceGuard
 {
 public:

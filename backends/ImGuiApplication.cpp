@@ -1,10 +1,21 @@
+#include <Windows.h>
 #include <stdint.h>
 #include "ImGuiApplication.h"
+#include "imgui_impl_common.h"
 
 ImGuiApplication::ImGuiApplication()
 {
     mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
+#ifdef _WIN32
+    wchar_t cur_dir[1024] = {0};
+    GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
+    wprintf(L"current dir %s\n", cur_dir);
+    mExePath = unicodeToUtf8(cur_dir).get();
+#else
+    // TODO: MAC/LINUX
+#endif
+
     setApp(this);
 }
 

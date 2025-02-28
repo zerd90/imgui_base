@@ -126,6 +126,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     g_user_app->preset();
 
     ImGuiIO &io = ImGui::GetIO();
+
+	std::string settingPath = g_user_app->getExePath().substr(0, g_user_app->getExePath().rfind('\\') + 1) + "Settings.ini";
+    io.IniFilename = settingPath.c_str();
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
     // Create application window

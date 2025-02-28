@@ -85,6 +85,7 @@ public:
     };
     ImGuiApplication();
     virtual ~ImGuiApplication() {}
+    std::string  getExePath() { return mExePath; };
     ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
     void         preset();
     std::string  getAppName() { return mApplicationName; };
@@ -167,6 +168,7 @@ protected:
     // Set these in presetInternal
     ImGuiAppRect mWindowRect;
     std::string  mApplicationName;
+    std::string  mExePath;
 
 protected:
     std::vector<SettingValue> mAppSettings;
