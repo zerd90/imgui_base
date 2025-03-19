@@ -71,40 +71,4 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
 std::string getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string defaultExt = std::string());
 void        openDebugWindow();
 
-class RenderThread
-{
-public:
-    enum THREAD_STATE_E
-    {
-        STATE_UNSTART,
-        STATE_RUNNING,
-        STATE_FINISHED,
-    };
-
-    // renderFunction should return true if app exit
-    RenderThread(std::function<bool()> renderFunction);
-    virtual ~RenderThread();
-
-    int start();
-    int stop();
-
-    THREAD_STATE_E getState();
-    bool           isRunning();
-
-protected:
-    THREAD_STATE_E mState = STATE_UNSTART;
-
-private:
-    static void entry(void *opaque);
-
-    virtual void task();
-
-    bool mIsContinue = false;
-
-    std::function<bool()> mRenderAction = nullptr;
-
-    std::thread *mThread = nullptr;
-    std::mutex   mMutex;
-};
-
 #endif

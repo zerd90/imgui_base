@@ -1,8 +1,11 @@
-#include <Windows.h>
 #include <stdint.h>
+#include <filesystem>
 #include "ImGuiApplication.h"
 #include "imgui_impl_common.h"
-
+#ifdef ON_WINDOWS
+    #include <Windows.h>
+#endif
+namespace fs = std::filesystem;
 ImGuiApplication::ImGuiApplication()
 {
     mWindowRect      = {100, 100, 640, 480};
@@ -15,6 +18,10 @@ ImGuiApplication::ImGuiApplication()
 #else
     // TODO: MAC/LINUX
 #endif
+
+    fs::path exePath(mExePath);
+    fs::path exeDir = exePath.parent_path();
+    mConfigPath     = (exeDir / "Setting.ini").string();
 
     setApp(this);
 }

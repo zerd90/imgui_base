@@ -9,7 +9,6 @@
 #include "imgui_impl_common.h"
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
-#include "ImGuiBaseTypes.h"
 
 #include <d3d11.h>
 #include <tchar.h>
@@ -27,8 +26,6 @@ void           CleanupDeviceD3D();
 void           CreateRenderTarget();
 void           CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-StdRMutex gEventLock;
 
 bool doGUIRender()
 {
@@ -55,7 +52,6 @@ bool doGUIRender()
     }
     g_SwapChainOccluded = false;
 
-    StdRMutexUniqueLock locker(gEventLock);
     // Handle window resize (we don't resize directly in the WM_SIZE handler)
     if (g_ResizeWidth != 0 && g_ResizeHeight != 0)
     {
@@ -79,7 +75,6 @@ bool doGUIRender()
     // Rendering
     ImGui::Render();
     g_user_app->endFramePostAction();
-    locker.unlock();
 
     const float clear_color_with_alpha[4] = {clear_color.x * clear_color.w, clear_color.y * clear_color.w,
                                              clear_color.z * clear_color.w, clear_color.w};
@@ -95,7 +90,7 @@ bool doGUIRender()
     }
 
     // Present
-    HRESULT hr = g_pSwapChain->Present(1, 0); // Present with vsync
+    HRESULT hr          = g_pSwapChain->Present(1, 0); // Present with vsync
     // HRESULT hr          = g_pSwapChain->Present(0, 0); // Present without vsync
     g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 
@@ -127,8 +122,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ImGuiIO &io = ImGui::GetIO();
 
-	std::string settingPath = g_user_app->getExePath().substr(0, g_user_app->getExePath().rfind('\\') + 1) + "Settings.ini";
-    io.IniFilename = settingPath.c_str();
+    io.IniFilename = g_user_app->getConfigPath();
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
     // Create application window
@@ -137,10 +131,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       nullptr,    nullptr,    L"ImGui Example", nullptr};
     ::RegisterClassExW(&wc);
 
-    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName().c_str()).get(), WS_OVERLAPPEDWINDOW,
-                                  g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y,
-                                  g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h, nullptr, nullptr,
-                                  wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName().c_str()).get(),
+                                  WS_POPUP | WS_EX_TOOLWINDOW, 0, 0, 1, 1, nullptr, nullptr, wc.hInstance, nullptr);
 
     g_user_app->setWindowHandle(hwnd);
 
@@ -157,13 +149,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Show the window
     ::ShowWindow(hwnd, SW_SHOWDEFAULT);
     ::UpdateWindow(hwnd);
+    ::BringWindowToTop(hwnd);
+    ::SetForegroundWindow(hwnd);
+    ::SetFocus(hwnd);
 
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
     // io.ConfigViewportsNoAutoMerge = true;
-    // io.ConfigViewportsNoTaskBarIcon = true;
+    io.ConfigViewportsNoTaskBarIcon = true;
     // io.ConfigViewportsNoDefaultParent = true;
     // io.ConfigDockingAlwaysTabBar = true;
     // io.ConfigDockingTransparentPayload = true;
@@ -197,9 +192,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Main loop
 
-    RenderThread renderThread(doGUIRender);
-    renderThread.start();
-
     bool done = false;
     while (!done)
     {
@@ -216,13 +208,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (done)
             break;
 
-        if (!renderThread.isRunning())
+        if (doGUIRender())
             break;
 
         ::Sleep(10);
     }
-
-    renderThread.stop();
 
     g_user_app->exit();
 
@@ -267,15 +257,15 @@ bool CreateDeviceD3D(HWND hWnd)
         D3D_FEATURE_LEVEL_11_0,
         D3D_FEATURE_LEVEL_10_0,
     };
-    HRESULT res =
-        D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2,
-                                      D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+                                                featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain,
+                                                &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (res == DXGI_ERROR_UNSUPPORTED) // Try high-performance WARP software driver if hardware is
                                        // not available.
     {
-        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2,
-                                            D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel,
-                                            &g_pd3dDeviceContext);
+        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags,
+                                            featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice,
+                                            &featureLevel, &g_pd3dDeviceContext);
     }
     if (res != S_OK)
     {
@@ -340,16 +330,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 // inputs to dear imgui, and hide them from your application based on those two flags.
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    StdRMutexUniqueLock locker(gEventLock);
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
         return true;
-    locker.unlock();
 
     switch (msg)
     {
         case WM_SIZE:
         {
-            locker.lock();
             if (wParam == SIZE_MINIMIZED)
                 return 0;
             g_ResizeWidth  = (UINT)LOWORD(lParam); // Queue resize
@@ -374,8 +361,8 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 // printf("WM_DPICHANGED to %d (%.0f%%)\n", dpi, (float)dpi / 96.0f * 100.0f);
                 const RECT *suggested_rect = (RECT *)lParam;
                 ::SetWindowPos(hWnd, nullptr, suggested_rect->left, suggested_rect->top,
-                               suggested_rect->right - suggested_rect->left, suggested_rect->bottom - suggested_rect->top,
-                               SWP_NOZORDER | SWP_NOACTIVATE);
+                               suggested_rect->right - suggested_rect->left,
+                               suggested_rect->bottom - suggested_rect->top, SWP_NOZORDER | SWP_NOACTIVATE);
             }
             break;
         case WM_DROPFILES:

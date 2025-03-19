@@ -86,6 +86,11 @@ public:
     ImGuiApplication();
     virtual ~ImGuiApplication() {}
     std::string  getExePath() { return mExePath; };
+    const char  *getConfigPath() { 
+        char *path = new char[mConfigPath.length()+1];
+        strcpy(path, mConfigPath.c_str());
+        return path;
+     };
     ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
     void         preset();
     std::string  getAppName() { return mApplicationName; };
@@ -169,6 +174,7 @@ protected:
     ImGuiAppRect mWindowRect;
     std::string  mApplicationName;
     std::string  mExePath;
+    std::string  mConfigPath;
 
 protected:
     std::vector<SettingValue> mAppSettings;

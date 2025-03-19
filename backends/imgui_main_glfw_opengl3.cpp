@@ -117,7 +117,8 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w,
+                 clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -194,15 +195,16 @@ int main(int argc, char **argv)
     // Our state
     g_user_app->preset();
 
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO &io    = ImGui::GetIO();
+    io.IniFilename = g_user_app->getConfigPath();
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
-
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h,
-                                          g_user_app->getAppName().c_str(), nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(1, 1, g_user_app->getAppName().c_str(), nullptr, nullptr);
     if (window == nullptr)
         return 1;
-    glfwSetWindowPos(window, g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y);
+    glfwSetWindowPos(window, 0, 0);
 
     ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
     glfwSetDropCallback(window, dropFileCallback);
@@ -213,7 +215,7 @@ int main(int argc, char **argv)
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
     // io.ConfigViewportsNoAutoMerge = true;
-    // io.ConfigViewportsNoTaskBarIcon = true;
+    io.ConfigViewportsNoTaskBarIcon = true;
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular
     // ones.
@@ -240,11 +242,6 @@ int main(int argc, char **argv)
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
 
-#if defined(ON_WINDOWS)
-    RenderThread renderThread([window, glsl_version]() -> bool { return doGUIRender(glsl_version, window); });
-    renderThread.start();
-#endif
-
     // Main loop
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the
@@ -265,20 +262,11 @@ int main(int argc, char **argv)
         // hide them from your application based on those two flags.
         glfwPollEvents();
 
-#if defined(ON_WINDOWS)
-        if (!renderThread.isRunning())
-            break;
-#else
         if (doGUIRender(glsl_version, window))
             break;
-#endif
     }
 #ifdef __EMSCRIPTEN__
     EMSCRIPTEN_MAINLOOP_END;
-#endif
-
-#if defined(ON_WINDOWS)
-    renderThread.stop();
 #endif
 
     g_user_app->exit();

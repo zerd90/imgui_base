@@ -253,7 +253,7 @@ void LoggerWindow::showContent()
                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
 
     BeginChild("Log Text Content", ImVec2(mWordWrap ? 0 : mMaxLineWidth, mTotalLines), ImGuiChildFlags_None,
-               ImGuiWindowFlags_NoMove);
+               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
 
     displayTexts();
 
@@ -414,8 +414,8 @@ void LoggerWindow::copyToClipBoard()
 }
 
 #define SCALE_SPEED (1.2f)
-#define SCALE_MAX (20.f)
-#define SCALE_MIN (0.2f)
+#define SCALE_MAX   (20.f)
+#define SCALE_MIN   (0.2f)
 
 void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
 {
