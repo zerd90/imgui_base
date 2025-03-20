@@ -1,3 +1,6 @@
+
+
+#include <memory>
 #include "imgui_impl_common.h"
 
 using std::string;
@@ -14,25 +17,24 @@ void setApp(ImGuiApplication *app)
     #include <Shlobj.h>
     #include <Windows.h>
     #include <shlwapi.h>
-    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                                 \
-        do                                                                                                \
-        {                                                                                                 \
-            size_t filterLength = inFilters.size();                                                       \
-            if (filterLength > 0)                                                                         \
-            {                                                                                             \
-                COMDLG_FILTERSPEC                      *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
-                std::vector<std::shared_ptr<wchar_t[]>> filterStrings;                                    \
-                std::vector<std::shared_ptr<wchar_t[]>> descStrings;                                      \
-                for (size_t i = 0; i < filterLength; i++)                                                 \
-                {                                                                                         \
-                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter.c_str()));                  \
-                    descStrings.push_back(utf8ToUnicode(inFilters[i].description.c_str()));               \
-                    tmpFilters[i].pszSpec = filterStrings.back().get();                                   \
-                    tmpFilters[i].pszName = descStrings.back().get();                                     \
-                }                                                                                         \
-                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);                               \
-                delete[] tmpFilters;                                                                      \
-            }                                                                                             \
+    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                                  \
+        do                                                                                                 \
+        {                                                                                                  \
+            size_t filterLength = inFilters.size();                                                        \
+            if (filterLength > 0)                                                                          \
+            {                                                                                              \
+                auto tmpFilters = std::unique_ptr<COMDLG_FILTERSPEC>(new COMDLG_FILTERSPEC[filterLength]); \
+                std::vector<std::shared_ptr<wchar_t[]>> filterStrings;                                     \
+                std::vector<std::shared_ptr<wchar_t[]>> descStrings;                                       \
+                for (size_t i = 0; i < filterLength; i++)                                                  \
+                {                                                                                          \
+                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter.c_str()));                   \
+                    descStrings.push_back(utf8ToUnicode(inFilters[i].description.c_str()));                \
+                    tmpFilters.get()[i].pszSpec = filterStrings.back().get();                              \
+                    tmpFilters.get()[i].pszName = descStrings.back().get();                                \
+                }                                                                                          \
+                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters.get());                          \
+            }                                                                                              \
         } while (0)
 #endif
 
@@ -115,6 +117,22 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
     CoTaskMemFree(pszFilePath);
 
     result = unicodeToUtf8(filePath.c_str()).get();
+    if (!typeFilters.empty())
+    {
+        UINT fileTypeIndex;
+        hr = pfd->GetFileTypeIndex(&fileTypeIndex);
+        if (FAILED(hr))
+            goto _RELEASE_RESULT_;
+        string extension = typeFilters[fileTypeIndex].filter;
+        if (extension.find(';') != string::npos) // get the first extension
+            extension = extension.substr(0, extension.find(';'));
+
+        if (extension.find('*') != string::npos) // remove the '*'
+            extension = extension.substr(extension.find('*') + 1);
+
+        if (result.find(extension) != result.length() - extension.length())
+            result += extension;
+    }
 
 _RELEASE_RESULT_:
     pSelResult->Release();
@@ -129,7 +147,7 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
 {
     std::vector<std::string> results;
     IFileOpenDialog         *pfd = NULL;
-    HRESULT                  hr  = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
     if (FAILED(hr))
         return results;
 
@@ -142,7 +160,8 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
     if (!defaultPath.empty())
     {
         IShellItem *folder;
-        HRESULT     result = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath.c_str()).get(), NULL, IID_PPV_ARGS(&folder));
+        HRESULT     result =
+            SHCreateItemFromParsingName(utf8ToUnicode(defaultPath.c_str()).get(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
             pfd->SetDefaultFolder(folder);

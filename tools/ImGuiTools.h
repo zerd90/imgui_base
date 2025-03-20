@@ -54,7 +54,6 @@ public:
     void setWordWrap(bool wordWrap);
 
     void appendString(const char *fmt, ...);
-    void appendString(const char *fmt, va_list vl);
     void appendString(const std::string &str);
     void clear();
 

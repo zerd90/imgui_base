@@ -287,16 +287,6 @@ void LoggerWindow::appendString(const char *fmt, ...)
     appendString(log);
 }
 
-void LoggerWindow::appendString(const char *fmt, va_list vl)
-{
-    char buf[1024];
-    vsnprintf(buf, sizeof(buf), fmt, vl);
-
-    string log(buf);
-
-    appendString(log);
-}
-
 // return the position of the splitString
 size_t splitString(const string &str, size_t start, const vector<string> &splitStrings, int &outSpiltIdx)
 {
