@@ -127,12 +127,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
-    WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc,          0L,     0L, GetModuleHandle(nullptr), nullptr, nullptr,
-                      nullptr,    nullptr,    L"ImGui Example", nullptr};
+    WNDCLASSEXW wc = {sizeof(wc),
+                      CS_OWNDC | CS_VREDRAW | CS_HREDRAW,
+                      WndProc,
+                      0L,
+                      0L,
+                      GetModuleHandle(nullptr),
+                      nullptr,
+                      nullptr,
+                      nullptr,
+                      nullptr,
+                      L"ImGui Example",
+                      nullptr};
     ::RegisterClassExW(&wc);
 
-    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName().c_str()).get(),
-                                  WS_POPUP | WS_EX_TOOLWINDOW, 0, 0, 1, 1, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName()).c_str(),
+                                  WS_POPUP, g_user_app->getWindowInitialRect().x,
+                                  g_user_app->getWindowInitialRect().y, g_user_app->getWindowInitialRect().w,
+                                  g_user_app->getWindowInitialRect().h, nullptr, nullptr, wc.hInstance, nullptr);
 
     g_user_app->setWindowHandle(hwnd);
 
@@ -379,7 +391,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if (DragQueryFileW(hDrop, i, filename, MAX_PATH))
                 {
                     auto tmpStr = unicodeToUtf8(filename);
-                    files.push_back(tmpStr.get());
+                    files.push_back(tmpStr);
                 }
             }
             g_user_app->dropFile(files);

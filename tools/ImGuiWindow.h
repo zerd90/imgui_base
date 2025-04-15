@@ -6,6 +6,7 @@
 #include <map>
 #include "imgui.h"
 #include "ImGuiBaseTypes.h"
+#include "ImGuiItem.h"
 
 struct SMenuItem
 {
@@ -26,11 +27,11 @@ struct SMenuItem
 class IImGuiWindow
 {
 public:
-    IImGuiWindow(std::string title);
+    IImGuiWindow(const std::string &title);
     virtual ~IImGuiWindow();
 
     virtual void show();
-    void         setTitle(const std::string title);
+    void         setTitle(const std::string &title);
     void         enableStatusBar(bool on);
 
     void setHasCloseButton(bool hasCloseButton);
@@ -65,8 +66,8 @@ public:
 
     const ImVec2 &getContentRegion();
 
-    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback = nullptr, bool *selected = nullptr,
-                 const char *shortcut = nullptr);
+    void addMenu(std::vector<std::string> labelLayers, std::function<void()> callback = nullptr,
+                 bool *selected = nullptr, const char *shortcut = nullptr);
 
     void addMenu(std::vector<std::string> labelLayers, bool *selected, const char *shortcut = nullptr);
 
@@ -115,7 +116,6 @@ protected:
     std::string mStatusString;
     ImU32       mStatusStringColor;
 
-private:
     SMenuItem                           mMenuBarItems;
     std::function<void()>               mContentCallback;
     std::map<IMGUI_STYLE_VAR, ImVec2>   mStylesVec2;
@@ -123,10 +123,29 @@ private:
     std::map<IMGUI_COLOR_STYLE, ImVec4> mStylesColor;
 };
 
+class ImGuiMainWindow : public IImGuiWindow
+{
+public:
+    ImGuiMainWindow();
+    ImGuiMainWindow(const std::string &title);
+
+    virtual void show() override;
+
+protected:
+    ImVec2 mNormalPos;
+    ImVec2 mNormalSize;
+    ImVec2 mLastWinSize;
+    ImVec2 mLastWinPos;
+    bool   mMaximized = false;
+    ImVec2 mStartMoveMousePos;
+    ImVec2 mStartMoveWinPos;
+    bool   mStartMove = false;
+};
+
 class IImGuiChildWindow : public IImGuiWindow
 {
 public:
-    IImGuiChildWindow(std::string title) : IImGuiWindow(title)
+    IImGuiChildWindow(const std::string &title) : IImGuiWindow(title)
     {
         mIsChildWindow = true;
         mOpened        = true;
@@ -136,7 +155,7 @@ public:
 class ImGuiPopup : public IImGuiWindow
 {
 public:
-    ImGuiPopup(std::string _title);
+    ImGuiPopup(const std::string &title);
     virtual void show() override;
     void         open();
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_POPUP_FLAGS, PopupFlag, mPopupFlags)

@@ -60,15 +60,24 @@ extern ImGuiApplication *g_user_app;
 
 #if defined(ON_WINDOWS)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
-std::shared_ptr<char[]>                    unicodeToUtf8(const wchar_t *wStr);
-std::shared_ptr<wchar_t[]>                 utf8ToUnicode(const char *str);
+
+std::string  unicodeToUtf8(const std::wstring &wStr);
+std::wstring utf8ToUnicode(const std::string &str);
+std::string  utf8ToLocal(const std::string &str);
+std::string  localToUtf8(const std::string &str);
+
 #endif
 
 // for Platform
-std::string selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string initDirPath = std::string());
+std::string              selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
+                                    std::string             initDirPath = std::string());
 std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
                                              std::string             initDirPath = std::string());
-std::string getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(), std::string defaultExt = std::string());
-void        openDebugWindow();
+std::string              getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
+                                     std::string defaultExt = std::string(), std::string defaultPath = std::string());
+void                     openDebugWindow();
+
+ImVec2 GetDisplayWorkArea();
+void   minimizedApplication();
 
 #endif

@@ -5,6 +5,7 @@
 
 using std::string;
 using std::vector;
+using std::wstring;
 
 ImGuiApplication *g_user_app = nullptr;
 
@@ -24,14 +25,14 @@ void setApp(ImGuiApplication *app)
             if (filterLength > 0)                                                                          \
             {                                                                                              \
                 auto tmpFilters = std::unique_ptr<COMDLG_FILTERSPEC>(new COMDLG_FILTERSPEC[filterLength]); \
-                std::vector<std::shared_ptr<wchar_t[]>> filterStrings;                                     \
-                std::vector<std::shared_ptr<wchar_t[]>> descStrings;                                       \
+                std::vector<wstring> filterStrings;                                                        \
+                std::vector<wstring> descStrings;                                                          \
                 for (size_t i = 0; i < filterLength; i++)                                                  \
                 {                                                                                          \
-                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter.c_str()));                   \
-                    descStrings.push_back(utf8ToUnicode(inFilters[i].description.c_str()));                \
-                    tmpFilters.get()[i].pszSpec = filterStrings.back().get();                              \
-                    tmpFilters.get()[i].pszName = descStrings.back().get();                                \
+                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter));                           \
+                    descStrings.push_back(utf8ToUnicode(inFilters[i].description));                        \
+                    tmpFilters.get()[i].pszSpec = filterStrings.back().c_str();                            \
+                    tmpFilters.get()[i].pszName = descStrings.back().c_str();                              \
                 }                                                                                          \
                 dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters.get());                          \
             }                                                                                              \
@@ -60,28 +61,75 @@ std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc)
     return argv;
 }
 
-std::shared_ptr<wchar_t[]> utf8ToUnicode(const char *str)
+wstring utf8ToUnicode(const string &str)
 {
-    std::shared_ptr<wchar_t[]> result;
-    int                        textLen;
+    wstring result;
+    int     textLen;
 
-    textLen = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
-    result  = arrayMakeSharedPtr<wchar_t>(textLen + 1, 0);
-    MultiByteToWideChar(CP_UTF8, 0, str, -1, result.get(), textLen);
-    return result;
-}
-std::shared_ptr<char[]> unicodeToUtf8(const wchar_t *wStr)
-{
-    std::shared_ptr<char[]> result;
-    int                     textLen;
-
-    textLen = WideCharToMultiByte(CP_UTF8, 0, wStr, -1, NULL, 0, NULL, NULL);
-    result  = arrayMakeSharedPtr<char>(textLen + 1, 0);
-    WideCharToMultiByte(CP_UTF8, 0, wStr, -1, result.get(), textLen, NULL, NULL);
+    textLen = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+    result.resize(textLen + 1);
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, result.data(), textLen);
     return result;
 }
 
-std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string defaultExt)
+string utf8ToLocal(const string &str)
+{
+    std::string result;
+    WCHAR      *strSrc;
+    LPSTR       szRes;
+
+    // 获得临时变量的大小
+    int i  = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
+    strSrc = new WCHAR[i + 1];
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, strSrc, i);
+
+    // 获得临时变量的大小
+    i     = WideCharToMultiByte(CP_ACP, 0, strSrc, -1, NULL, 0, NULL, NULL);
+    szRes = new CHAR[i + 1];
+    WideCharToMultiByte(CP_ACP, 0, strSrc, -1, szRes, i, NULL, NULL);
+
+    result = szRes;
+    delete[] strSrc;
+    delete[] szRes;
+
+    return result;
+}
+
+string localToUtf8(const string &str)
+{
+    std::string result;
+    WCHAR      *strSrc;
+    LPSTR       szRes;
+
+    // 获得临时变量的大小
+    int i  = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
+    strSrc = new WCHAR[i + 1];
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, strSrc, i);
+
+    // 获得临时变量的大小
+    i     = WideCharToMultiByte(CP_UTF8, 0, strSrc, -1, NULL, 0, NULL, NULL);
+    szRes = new CHAR[i + 1];
+    WideCharToMultiByte(CP_UTF8, 0, strSrc, -1, szRes, i, NULL, NULL);
+
+    result = szRes;
+    delete[] strSrc;
+    delete[] szRes;
+
+    return result;
+}
+
+string unicodeToUtf8(const wstring &wStr)
+{
+    string result;
+    int    textLen;
+
+    textLen = WideCharToMultiByte(CP_UTF8, 0, wStr.c_str(), -1, NULL, 0, NULL, NULL);
+    result.resize(textLen + 1);
+    WideCharToMultiByte(CP_UTF8, 0, wStr.c_str(), -1, result.data(), textLen, NULL, NULL);
+    return result;
+}
+
+std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string defaultExt, std::string defaultPath)
 {
     std::string      result;
     IFileSaveDialog *pfd = NULL;
@@ -98,9 +146,19 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
 
     if (!defaultExt.empty())
     {
-        pfd->SetDefaultExtension(utf8ToUnicode(defaultExt.c_str()).get());
+        pfd->SetDefaultExtension(utf8ToUnicode(defaultExt).c_str());
     }
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
+    if (!defaultPath.empty())
+    {
+        IShellItem *folder = nullptr;
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        if (SUCCEEDED(hr))
+        {
+            pfd->SetDefaultFolder(folder);
+            folder->Release();
+        }
+    }
     hr = pfd->Show(NULL);
     if (FAILED(hr))
         goto _OVER_;
@@ -116,13 +174,14 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
     filePath = pszFilePath;
     CoTaskMemFree(pszFilePath);
 
-    result = unicodeToUtf8(filePath.c_str()).get();
+    result = unicodeToUtf8(filePath);
     if (!typeFilters.empty())
     {
         UINT fileTypeIndex;
         hr = pfd->GetFileTypeIndex(&fileTypeIndex);
         if (FAILED(hr))
             goto _RELEASE_RESULT_;
+        fileTypeIndex--;
         string extension = typeFilters[fileTypeIndex].filter;
         if (extension.find(';') != string::npos) // get the first extension
             extension = extension.substr(0, extension.find(';'));
@@ -160,8 +219,7 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
     if (!defaultPath.empty())
     {
         IShellItem *folder;
-        HRESULT     result =
-            SHCreateItemFromParsingName(utf8ToUnicode(defaultPath.c_str()).get(), NULL, IID_PPV_ARGS(&folder));
+        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
             pfd->SetDefaultFolder(folder);
@@ -187,7 +245,7 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
         if (SUCCEEDED(hr))
         {
             hr = pSelOneItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
-            results.push_back(unicodeToUtf8(pszFilePath).get());
+            results.push_back(unicodeToUtf8(pszFilePath));
             if (SUCCEEDED(hr))
             {
                 CoTaskMemFree(pszFilePath);
@@ -231,7 +289,7 @@ std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultP
     hr = pSelResult->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
     if (SUCCEEDED(hr))
     {
-        result = unicodeToUtf8(pszFilePath).get();
+        result = unicodeToUtf8(pszFilePath);
         CoTaskMemFree(pszFilePath);
     }
 
@@ -254,6 +312,30 @@ void openDebugWindow()
     freopen("conout$", "w", stdout);
     freopen("conout$", "w", stderr);
     consoleOpened = true;
+}
+
+ImVec2 GetDisplayWorkArea()
+{
+    RECT rect;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
+    int cx = rect.right - rect.left;
+    int cy = rect.bottom - rect.top;
+    return ImVec2((float)cx, (float)cy);
+}
+
+void minimizedApplication()
+{
+    HWND hwnd = GetForegroundWindow();
+    while (hwnd)
+    {
+        HWND hParent = ::GetParent(hwnd);
+        if (!hParent)
+        {
+            break;
+        }
+        hwnd = hParent;
+    }
+    ShowWindow(hwnd, SW_MINIMIZE);
 }
 
 #elif defined(__linux)
@@ -431,7 +513,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
 
     return res;
 }
-string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt)
+string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::string defaultPath)
 {
     gtk_init();
 

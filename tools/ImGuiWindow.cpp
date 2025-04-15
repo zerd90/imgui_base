@@ -2,12 +2,13 @@
 #include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
+#include "imgui_impl_common.h"
 #include "ImGuiWindow.h"
 
 using namespace ImGui;
 using std::string;
 
-IImGuiWindow::IImGuiWindow(std::string title)
+IImGuiWindow::IImGuiWindow(const string &title)
 {
     mTitle = title;
 }
@@ -135,7 +136,7 @@ _WINDOW_END_:
         mJustClosed = true;
 }
 
-void IImGuiWindow::setTitle(const std::string title)
+void IImGuiWindow::setTitle(const std::string &title)
 {
     mTitle = title;
 }
@@ -164,6 +165,10 @@ void IImGuiWindow::setStatus(std::string statusString, ImU32 color)
     if (color > 0)
     {
         mStatusStringColor = color;
+    }
+    else
+    {
+        mStatusStringColor = 0;
     }
 }
 
@@ -361,7 +366,7 @@ void IImGuiWindow::popStyles()
     PopStyleColor((int)(mStylesColor.size()));
 }
 
-ImGuiPopup::ImGuiPopup(std::string title) : IImGuiWindow(title) {}
+ImGuiPopup::ImGuiPopup(const std::string &title) : IImGuiWindow(title) {}
 
 void ImGuiPopup::show()
 {
@@ -390,4 +395,319 @@ void ImGuiPopup::show()
 void ImGuiPopup::open()
 {
     mShouldOpen = true;
+}
+ImGuiMainWindow::ImGuiMainWindow() : IImGuiWindow("##App Main Window")
+{
+    mOpened      = true;
+    mWindowFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+}
+
+ImGuiMainWindow::ImGuiMainWindow(const std::string &title) : ImGuiMainWindow()
+{
+    setTitle(title);
+}
+
+// return if clicked
+bool drawButtonBg(const ImRect &buttonRect)
+{
+    if (IsMouseHoveringRect(buttonRect.Min, buttonRect.Max))
+    {
+        if (IsMouseDown(ImGuiMouseButton_Left))
+        {
+            GetWindowDrawList()->AddRectFilled(buttonRect.Min, buttonRect.Max, GetColorU32(ImGuiCol_ButtonActive));
+        }
+        else
+        {
+            GetWindowDrawList()->AddRectFilled(buttonRect.Min, buttonRect.Max, GetColorU32(ImGuiCol_ButtonHovered));
+        }
+        if (IsMouseReleased(ImGuiMouseButton_Left))
+            return true;
+    }
+
+    return false;
+}
+// return if clicked
+bool drawMinimizeButton(const ImRect &buttonRect)
+{
+    bool clicked = drawButtonBg(buttonRect);
+
+    // Draw the minimize button icon
+    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 2),
+                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 2),
+                                 GetColorU32(ImGuiCol_Text));
+
+    return clicked;
+}
+bool drawMaximizeButton(const ImRect &buttonRect, bool maximized)
+{
+    bool clicked = drawButtonBg(buttonRect);
+
+    // Draw the maximize button icon
+    if (maximized)
+    {
+        GetWindowDrawList()->AddRect(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 5, buttonRect.GetHeight() * 2 / 5),
+                                     buttonRect.Max - ImVec2(buttonRect.GetWidth() * 2 / 5, buttonRect.GetHeight() / 5),
+                                     GetColorU32(ImGuiCol_Text));
+        GetWindowDrawList()->AddRect(buttonRect.Min + ImVec2(buttonRect.GetWidth() * 2 / 5, buttonRect.GetHeight() / 5),
+                                     buttonRect.Max - ImVec2(buttonRect.GetWidth() / 5, buttonRect.GetHeight() * 2 / 5),
+                                     GetColorU32(ImGuiCol_Text));
+    }
+    else
+    {
+        GetWindowDrawList()->AddRect(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                     buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                     GetColorU32(ImGuiCol_Text));
+    }
+    return clicked;
+}
+
+bool drawCloseButton(const ImRect &buttonRect)
+{
+    bool clicked = drawButtonBg(buttonRect);
+    // Draw the close button icon
+    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                 GetColorU32(ImGuiCol_Text));
+
+    // Draw the close button icon
+    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
+                                 GetColorU32(ImGuiCol_Text));
+    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() * 3 / 4),
+                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() * 3 / 4),
+                                 GetColorU32(ImGuiCol_Text));
+    return clicked;
+}
+
+void ImGuiMainWindow::show()
+{
+    if (!mOpened)
+    {
+        mJustClosed = false;
+        return;
+    }
+
+#define BASE_BUTTON_SIZE (20)
+    ImVec2 titleBarSize;
+    titleBarSize.y   = MAX(BASE_BUTTON_SIZE, GetTextLineHeightWithSpacing());
+    float buttonSize = titleBarSize.y;
+
+    SetNextWindowSizeConstraints({buttonSize * 3 + 20, titleBarSize.y + 20}, {FLT_MAX, FLT_MAX});
+    if (0 == mManualSize.x && 0 == mManualSize.y)
+        SetNextWindowSize({640, 480}, ImGuiCond_FirstUseEver);
+
+    if (!mMaximized && mManualSize.x > 0 && mManualSize.y > 0)
+        SetNextWindowSize(mManualSize, mManualSizeCond);
+    auto &style = GetStyle();
+    pushStyles();
+
+    mWindowFlags |= ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar
+                  | ImGuiWindowFlags_NoCollapse;
+    mFocusedFlags |= ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_DockHierarchy;
+
+    auto  mainViewPort = GetMainViewport();
+    auto &platformIO   = GetPlatformIO();
+    SetNextWindowViewport(mainViewPort->ID);
+    SetNextWindowPos(mainViewPort->WorkPos); // Use work area to avoid visible taskbar on Windows
+    SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Once);
+
+    PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    Begin("##App Main Window", &mOpened, mWindowFlags);
+    PopStyleVar();
+
+    updateWindowStatus();
+    if (mLastWinSize.x > 0 && mLastWinSize.y > 0 && mLastWinSize != mWinSize)
+    {
+        platformIO.Platform_SetWindowSize(mainViewPort, mWinSize);
+    }
+    if (mLastWinPos != mWinPos)
+    {
+        platformIO.Platform_SetWindowPos(mainViewPort, mWinPos);
+    }
+
+    mLastWinSize = mWinSize;
+    mLastWinPos  = mWinPos;
+
+    titleBarSize.x = mWinSize.x;
+    auto cursorPos = GetCursorScreenPos();
+
+    float titleSpace = titleBarSize.x - buttonSize * 3 - style.ItemSpacing.x * 2;
+
+    ImU32  titleBarColor;
+    ImVec4 tmpColor = ColorConvertU32ToFloat4(GetColorU32(ImGuiCol_TitleBgActive));
+    if (!mFocused)
+    {
+        tmpColor.x /= 2;
+        tmpColor.y /= 2;
+        tmpColor.z /= 2;
+    }
+    titleBarColor = ColorConvertFloat4ToU32(tmpColor);
+
+    ImRect titleBarRect(mWinPos, mWinPos + titleBarSize);
+    ImGui::GetWindowDrawList()->AddRectFilled(mWinPos, mWinPos + titleBarSize, titleBarColor);
+
+    SetCursorScreenPos(mWinPos + style.ItemSpacing);
+    string title = mTitle;
+    if (CalcTextSize(title.c_str()).x > titleSpace)
+    {
+        title = title.substr(0, title.length() - 3);
+        while (1)
+        {
+            if (CalcTextSize((title + "...").c_str()).x <= titleSpace || title.empty())
+                break;
+            title = title.substr(0, title.size() - 1);
+        }
+        title += "...";
+    }
+
+    Text("%s", title.c_str());
+
+    if (drawCloseButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize, 0}, mWinPos + ImVec2{mWinSize.x, buttonSize})))
+    {
+        mOpened = false;
+    }
+
+    if (mMaximized && mWinPos != ImVec2(0, 0)) // manually moved
+    {
+        printf("manual moved\n");
+        mMaximized = false;
+        SetWindowSize(mNormalSize, ImGuiCond_Always);
+    }
+
+    if (drawMaximizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 2, 0},
+                                  mWinPos + ImVec2{mWinSize.x - buttonSize, buttonSize}),
+                           mMaximized)
+        || (IsMouseHoveringRect(titleBarRect.Min, titleBarRect.Max) && IsMouseDoubleClicked(ImGuiMouseButton_Left)))
+    {
+        // SetWindowSize();
+        mMaximized = !mMaximized;
+        if (mMaximized)
+        {
+            auto maximumSize = GetDisplayWorkArea();
+            printf("maximumSize: %f, %f\n", maximumSize.x, maximumSize.y);
+            mNormalPos  = mWinPos;
+            mNormalSize = mWinSize;
+            SetWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+            SetWindowSize(maximumSize, ImGuiCond_Always);
+        }
+        else
+        {
+            printf("set window pos: %f, %f\n", mNormalPos.x, mNormalPos.y);
+            SetWindowPos(mNormalPos, ImGuiCond_Always);
+            SetWindowSize(mNormalSize, ImGuiCond_Always);
+        }
+    }
+
+    if (drawMinimizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 3, 0},
+                                  mWinPos + ImVec2{mWinSize.x - buttonSize * 2, buttonSize})))
+        minimizedApplication();
+
+    if (mStartMove)
+    {
+        if (IsMouseReleased(ImGuiMouseButton_Left))
+        {
+            mStartMove = false;
+        }
+        else if (IsMouseDragging(ImGuiMouseButton_Left)) // mouse moved, update window position. otherwise, do nothing.
+        {
+            platformIO.Platform_SetWindowPos(mainViewPort, mStartMoveWinPos + GetMousePos() - mStartMoveMousePos);
+        }
+    }
+    else
+    {
+        if (IsMouseHoveringRect(mWinPos,
+                                mWinPos + ImVec2(titleBarRect.GetWidth() - buttonSize, titleBarRect.GetHeight()))
+            && IsMouseDown(ImGuiMouseButton_Left) && GetMouseCursor() == ImGuiMouseCursor_Arrow)
+        {
+
+            mStartMoveMousePos = GetMousePos();
+            mStartMoveWinPos   = platformIO.Platform_GetWindowPos(mainViewPort);
+            mStartMove         = true;
+        }
+    }
+
+    SetCursorPos(ImVec2(0, titleBarSize.y));
+    ImVec2 tmpWinSize = GetContentRegionAvail();
+    tmpWinSize.y -= 8;
+    if (mStatusBarEnabled)
+    {
+        tmpWinSize.y -= (GetTextLineHeightWithSpacing() + style.DockingSeparatorSize + style.ItemSpacing.y);
+    }
+    BeginChild("##Main Window Content", tmpWinSize, 0, ImGuiWindowFlags_MenuBar);
+
+    if (!mMenuBarItems.subMenus.empty())
+    {
+        printf("avail %f,%f\n", tmpWinSize.x, tmpWinSize.y);
+        if (BeginMenuBar())
+        {
+            std::function<void(SMenuItem)> showMenuItem = [&showMenuItem](SMenuItem menuItem)
+            {
+                if (menuItem.subMenus.empty())
+                {
+                    if (menuItem.selectedCondition != nullptr)
+                    {
+                        if (MenuItem(
+                                menuItem.label.c_str(), menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(),
+                                menuItem.selectedCondition(),
+                                menuItem.enabledCondition != nullptr ? menuItem.enabledCondition() : menuItem.enabled))
+                        {
+                            menuItem.menuCallback();
+                        }
+                    }
+                    else
+                    {
+                        if (MenuItem(menuItem.label.c_str(),
+                                     menuItem.shortcut.empty() ? nullptr : menuItem.shortcut.c_str(), menuItem.selected,
+                                     menuItem.enabledCondition != nullptr ? menuItem.enabledCondition()
+                                                                          : menuItem.enabled)
+                            && menuItem.menuCallback != nullptr)
+                            menuItem.menuCallback();
+                    }
+                }
+                else
+                {
+                    if (BeginMenu(menuItem.label.c_str(), menuItem.enabledCondition != nullptr
+                                                              ? menuItem.enabledCondition()
+                                                              : menuItem.enabled))
+                    {
+                        for (auto &subMenu : menuItem.subMenus)
+                            showMenuItem(subMenu);
+                        EndMenu();
+                    }
+                }
+            };
+
+            for (auto &menuItem : mMenuBarItems.subMenus)
+                showMenuItem(menuItem);
+
+            EndMenuBar();
+        }
+    }
+    SetCursorPos(GetCursorPos() + ImVec2(8, 0));
+    showContent();
+
+    EndChild();
+
+    if (mStatusBarEnabled)
+    {
+        Separator();
+        if (0 != mStatusStringColor)
+            PushStyleColor(ImGuiCol_Text, mStatusStringColor);
+        SetCursorPos(GetCursorPos() + ImVec2(8, 0));
+        Text("%s", mStatusString.c_str());
+        if (mStatusProgressFraction >= 0)
+        {
+            SameLine();
+            ProgressBar(mStatusProgressFraction, ImVec2(-1, 0), "");
+        }
+        if (0 != mStatusStringColor)
+            PopStyleColor();
+    }
+
+    End();
+
+    popStyles();
+
+    if (!mOpened)
+        mJustClosed = true;
 }

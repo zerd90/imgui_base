@@ -14,7 +14,7 @@ ImGuiApplication::ImGuiApplication()
     wchar_t cur_dir[1024] = {0};
     GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
     wprintf(L"current dir %s\n", cur_dir);
-    mExePath = unicodeToUtf8(cur_dir).get();
+    mExePath = unicodeToUtf8(cur_dir);
 #else
     // TODO: MAC/LINUX
 #endif

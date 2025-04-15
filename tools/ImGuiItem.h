@@ -373,10 +373,11 @@ public:
     {
         if (rowIndex >= mRows.size() || columnIndex >= mColumnNames.size())
             return;
-
         // string or char*
-        if constexpr (std::is_same_v<std::decay_t<T>, std::string>
-                      || (std::is_pointer_v<T> && std::is_same_v<std::decay_t<std::remove_pointer_t<T>>, char>))
+        using NonRefrenceT = std::remove_reference_t<T>;
+        if constexpr (std::is_same_v<std::decay_t<NonRefrenceT>, std::string>
+                      || (std::is_pointer_v<NonRefrenceT>
+                          && std::is_same_v<std::decay_t<std::remove_pointer_t<NonRefrenceT>>, char>))
             mRows[rowIndex][columnIndex] = data;
         else
             mRows[rowIndex][columnIndex] = std::to_string(data);

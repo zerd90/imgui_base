@@ -40,7 +40,7 @@ vector<string> selectMultipleFiles(vector<FilterSpec> typeFilters, string initDi
     }
     return selectFiles;
 }
-string getSavePath(vector<FilterSpec> typeFilters, string defaultExt)
+string getSavePath(vector<FilterSpec> typeFilters, string defaultExt, string initDirPath)
 {
      NSSavePanel *savePanel = [NSSavePanel savePanel];
     // [savePanel setAllowedContentTypes:[NSImage imageFileTypes]];//设置文件的默认类型
