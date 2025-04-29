@@ -90,8 +90,11 @@ bool doGUIRender()
     }
 
     // Present
-    HRESULT hr          = g_pSwapChain->Present(1, 0); // Present with vsync
-    // HRESULT hr          = g_pSwapChain->Present(0, 0); // Present without vsync
+    HRESULT hr = S_OK;
+    if (g_user_app->VSyncEnabled())
+        hr = g_pSwapChain->Present(1, 0); // Present with vsync
+    else
+        hr = g_pSwapChain->Present(0, 0); // Present without vsync
     g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 
     return false;
@@ -141,10 +144,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       nullptr};
     ::RegisterClassExW(&wc);
 
-    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName()).c_str(),
-                                  WS_POPUP, g_user_app->getWindowInitialRect().x,
-                                  g_user_app->getWindowInitialRect().y, g_user_app->getWindowInitialRect().w,
-                                  g_user_app->getWindowInitialRect().h, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName()).c_str(), WS_POPUP,
+                                  g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y,
+                                  g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h, nullptr,
+                                  nullptr, wc.hInstance, nullptr);
 
     g_user_app->setWindowHandle(hwnd);
 
@@ -222,8 +225,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
         if (doGUIRender())
             break;
-
-        ::Sleep(10);
     }
 
     g_user_app->exit();

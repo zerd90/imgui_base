@@ -6,7 +6,6 @@
 #include <map>
 #include "imgui.h"
 #include "ImGuiBaseTypes.h"
-#include "ImGuiItem.h"
 
 struct SMenuItem
 {
@@ -31,8 +30,9 @@ public:
     virtual ~IImGuiWindow();
 
     virtual void show();
-    void         setTitle(const std::string &title);
-    void         enableStatusBar(bool on);
+
+    void setTitle(const std::string &title);
+    void enableStatusBar(bool on);
 
     void setHasCloseButton(bool hasCloseButton);
 
@@ -77,6 +77,8 @@ public:
     void setMenuEnabled(std::vector<std::string> labelLayers, bool enabled);
     void setMenuEnabledCondition(std::vector<std::string> labelLayers, std::function<bool()> condition);
 
+    std::string getError();
+
 protected:
     virtual void showContent();
     void         updateWindowStatus();
@@ -108,6 +110,8 @@ protected:
     ImVec2 mWinPos;
     ImVec2 mContentRegionSize; // considering scroll
     ImVec2 mDisplayRegionSize; // excluding scroll
+
+    std::list<std::string> mErrors;
 
 protected:
     ImVec2      mManualSize;

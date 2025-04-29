@@ -103,6 +103,7 @@
 //  io.MouseDrawCursor is set.
 
 #include "imgui.h"
+#include "imgui_impl_common.h"
 #ifndef IMGUI_DISABLE
     #include "imgui_impl_win32.h"
     #ifndef WIN32_LEAN_AND_MEAN
@@ -193,6 +194,12 @@ static bool ImGui_ImplWin32_InitEx(void *hwnd, bool platform_has_own_dc)
     IMGUI_CHECKVERSION();
     IM_ASSERT(io.BackendPlatformUserData == nullptr && "Already initialized a platform backend!");
 
+    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    if(FAILED(hr))
+    {
+        IM_ASSERT(0 && "Failed to initialize COM");
+    }
+
     INT64 perf_frequency, perf_counter;
     if (!::QueryPerformanceFrequency((LARGE_INTEGER *)&perf_frequency))
         return false;
@@ -278,6 +285,7 @@ void ImGui_ImplWin32_Shutdown()
     io.BackendFlags &= ~(ImGuiBackendFlags_HasMouseCursors | ImGuiBackendFlags_HasSetMousePos | ImGuiBackendFlags_HasGamepad
                          | ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_HasMouseHoveredViewport);
     IM_DELETE(bd);
+    CoUninitialize();
 }
 
 static bool ImGui_ImplWin32_UpdateMouseCursor()
@@ -1686,6 +1694,37 @@ static void ImGui_ImplWin32_ShutdownMultiViewportSupport()
     ImGui::DestroyPlatformWindows();
 }
 
+
+ImVec2 GetDisplayWorkArea()
+{
+    RECT rect;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
+    int cx = rect.right - rect.left;
+    int cy = rect.bottom - rect.top;
+    return ImVec2((float)cx, (float)cy);
+}
+
+void minimizedApplication()
+{
+    HWND hwnd = GetForegroundWindow();
+    while (hwnd)
+    {
+        HWND hParent = ::GetParent(hwnd);
+        if (!hParent)
+        {
+            break;
+        }
+        hwnd = hParent;
+    }
+    ShowWindow(hwnd, SW_MINIMIZE);
+}
+
+void setApplicationTitle(const std::string &title)
+{
+    ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;
+    IM_ASSERT(vd->Hwnd!= 0);
+    ::SetWindowTextA(vd->Hwnd, utf8ToLocal(title).c_str());
+}
 //---------------------------------------------------------------------------------------------------------
 
     #if defined(__GNUC__)

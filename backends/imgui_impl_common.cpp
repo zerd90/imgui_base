@@ -1,6 +1,7 @@
 
 
 #include <memory>
+#include <sstream>
 #include "imgui_impl_common.h"
 
 using std::string;
@@ -8,6 +9,26 @@ using std::vector;
 using std::wstring;
 
 ImGuiApplication *g_user_app = nullptr;
+
+// TODO: MAC and linux
+string gLastError;
+
+string getLastError()
+{
+    string res = gLastError;
+    gLastError.clear();
+    return res;
+}
+std::string getSystemError()
+{
+#ifdef _WIN32
+    char errBuf[1024];
+    strerror_s(errBuf, errno);
+    return localToUtf8(errBuf);
+#else
+    return strerror(errno);
+#endif
+}
 
 void setApp(ImGuiApplication *app)
 {
@@ -17,29 +38,31 @@ void setApp(ImGuiApplication *app)
 #if defined(ON_WINDOWS)
     #include <Shlobj.h>
     #include <Windows.h>
+    #include <Winerror.h>
     #include <shlwapi.h>
-    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                                  \
-        do                                                                                                 \
-        {                                                                                                  \
-            size_t filterLength = inFilters.size();                                                        \
-            if (filterLength > 0)                                                                          \
-            {                                                                                              \
-                auto tmpFilters = std::unique_ptr<COMDLG_FILTERSPEC>(new COMDLG_FILTERSPEC[filterLength]); \
-                std::vector<wstring> filterStrings;                                                        \
-                std::vector<wstring> descStrings;                                                          \
-                for (size_t i = 0; i < filterLength; i++)                                                  \
-                {                                                                                          \
-                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter));                           \
-                    descStrings.push_back(utf8ToUnicode(inFilters[i].description));                        \
-                    tmpFilters.get()[i].pszSpec = filterStrings.back().c_str();                            \
-                    tmpFilters.get()[i].pszName = descStrings.back().c_str();                              \
-                }                                                                                          \
-                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters.get());                          \
-            }                                                                                              \
+    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                              \
+        do                                                                             \
+        {                                                                              \
+            size_t filterLength = inFilters.size();                                    \
+            if (filterLength > 0)                                                      \
+            {                                                                          \
+                COMDLG_FILTERSPEC   *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
+                std::vector<wstring> filterStrings(filterLength);                      \
+                std::vector<wstring> descStrings(filterLength);                        \
+                for (size_t i = 0; i < filterLength; i++)                              \
+                {                                                                      \
+                    filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);        \
+                    descStrings[i]        = utf8ToUnicode(inFilters[i].description);   \
+                    tmpFilters[i].pszSpec = filterStrings[i].c_str();                  \
+                    tmpFilters[i].pszName = descStrings[i].c_str();                    \
+                }                                                                      \
+                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);            \
+                delete[] tmpFilters;                                                   \
+            }                                                                          \
         } while (0)
-#endif
 
-#if defined(ON_WINDOWS)
+    #define HR_CANCELED (0x800704C7L)
+
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc)
 {
     wchar_t **wArgv;
@@ -118,6 +141,33 @@ string localToUtf8(const string &str)
     return result;
 }
 
+string HResultToStr(HRESULT hr)
+{
+    LPTSTR lpBuffer = NULL;
+    DWORD  dwSize   = 0;
+    string res;
+
+    if (hr == HR_CANCELED)
+        return "";
+
+    dwSize = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, NULL, hr,
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpBuffer, 0, NULL);
+
+    if (dwSize > 0)
+    {
+        res = lpBuffer;
+
+        // 释放缓冲区
+        LocalFree(lpBuffer);
+    }
+    res = localToUtf8(res);
+    while (res.back() == '\n' || res.back() == '\r')
+        res.pop_back();
+    res += " (0x" + (std::stringstream() << std::hex << hr).str() + ")";
+
+    return res;
+}
+
 string unicodeToUtf8(const wstring &wStr)
 {
     string result;
@@ -155,21 +205,30 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
         hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
-            pfd->SetDefaultFolder(folder);
+            pfd->SetFolder(folder);
             folder->Release();
         }
     }
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pfd->GetResult(&pSelResult);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResult->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _RELEASE_RESULT_;
+    }
 
     filePath = pszFilePath;
     CoTaskMemFree(pszFilePath);
@@ -180,7 +239,10 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
         UINT fileTypeIndex;
         hr = pfd->GetFileTypeIndex(&fileTypeIndex);
         if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
             goto _RELEASE_RESULT_;
+        }
         fileTypeIndex--;
         string extension = typeFilters[fileTypeIndex].filter;
         if (extension.find(';') != string::npos) // get the first extension
@@ -222,18 +284,24 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
         HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
-            pfd->SetDefaultFolder(folder);
+            pfd->SetFolder(folder);
             folder->Release();
         }
     }
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     IShellItemArray *pSelResultArray;
     hr = pfd->GetResults(&pSelResultArray);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResultArray->GetCount(&dwNumItems); // get number of selected items
     for (DWORD i = 0; i < dwNumItems; i++)
@@ -278,19 +346,40 @@ std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultP
     hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
+    if (!defaultPath.empty())
+    {
+        IShellItem *folder = nullptr;
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        if (SUCCEEDED(hr))
+        {
+            pfd->SetFolder(folder);
+            folder->Release();
+        }
+    }
+
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pfd->GetResult(&pSelResult);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResult->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
     if (SUCCEEDED(hr))
     {
         result = unicodeToUtf8(pszFilePath);
         CoTaskMemFree(pszFilePath);
+    }
+    else
+    {
+        gLastError = HResultToStr(hr);
     }
 
     pSelResult->Release();
@@ -314,30 +403,6 @@ void openDebugWindow()
     consoleOpened = true;
 }
 
-ImVec2 GetDisplayWorkArea()
-{
-    RECT rect;
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
-    int cx = rect.right - rect.left;
-    int cy = rect.bottom - rect.top;
-    return ImVec2((float)cx, (float)cy);
-}
-
-void minimizedApplication()
-{
-    HWND hwnd = GetForegroundWindow();
-    while (hwnd)
-    {
-        HWND hParent = ::GetParent(hwnd);
-        if (!hParent)
-        {
-            break;
-        }
-        hwnd = hParent;
-    }
-    ShowWindow(hwnd, SW_MINIMIZE);
-}
-
 #elif defined(__linux)
     // using gtk
     #include <gtk/gtk.h>
@@ -349,6 +414,16 @@ typedef struct
     bool  done   = false;
     void *result = nullptr;
 } GtkCallbackData;
+
+string utf8ToLocal(const string &str)
+{
+    return str;
+}
+
+string localToUtf8(const string &str)
+{
+    return str;
+}
 
 void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFilters)
 {
@@ -567,4 +642,14 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
 void openDebugWindow() {}
 #elif defined(__APPLE__)
 // in imgui_impl_common.mm
+string utf8ToLocal(const string &str)
+{
+    return str;
+}
+
+string localToUtf8(const string &str)
+{
+    return str;
+}
+
 #endif

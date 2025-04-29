@@ -69,8 +69,12 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     if (!io)
     {
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(1); // Enable vsync
-                             // Setup Platform/Renderer backends
+        if (g_user_app->VSyncEnabled())
+            glfwSwapInterval(1);
+        else
+            glfwSwapInterval(0);
+
+        // Setup Platform/Renderer backends
 #ifdef __EMSCRIPTEN__
         ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
 #endif

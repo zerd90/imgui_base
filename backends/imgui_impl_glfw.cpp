@@ -1724,6 +1724,21 @@ static LRESULT CALLBACK ImGui_ImplGlfw_WndProc(HWND hWnd, UINT msg, WPARAM wPara
 
     #endif // #ifdef _WIN32
 
+ImVec2 GetDisplayWorkArea()
+{
+    // TODO
+}
+
+void minimizedApplication()
+{
+    // TODO
+}
+
+void setApplicationTitle(const std::string &title)
+{
+    // TODO
+}
+
 //-----------------------------------------------------------------------------
 
     #if defined(__clang__)

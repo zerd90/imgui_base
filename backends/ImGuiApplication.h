@@ -86,11 +86,7 @@ public:
     ImGuiApplication();
     virtual ~ImGuiApplication() {}
     std::string  getExePath() { return mExePath; };
-    const char  *getConfigPath() { 
-        char *path = new char[mConfigPath.length()+1];
-        strcpy(path, mConfigPath.c_str());
-        return path;
-     };
+    const char  *getConfigPath() { return mConfigPath.c_str(); };
     ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
     void         preset();
     std::string  getAppName() { return mApplicationName; };
@@ -119,6 +115,7 @@ public:
     virtual void endFramePostAction() {}
     // anything ned to be done before program exit, such as waiting thread exit
     virtual void exit() {}
+    virtual bool VSyncEnabled() { return true; }
 
     static void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
     static void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,

@@ -1,10 +1,13 @@
-#define IMGUI_DEFINE_MATH_OPERATORS
+
 #include <algorithm>
+
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
 #include "ImGuiItem.h"
 
 using namespace ImGui;
 using std::string;
+using std::vector;
 
 IImGuiItem::IImGuiItem(const std::string &label)
 {
@@ -53,7 +56,7 @@ void IImGuiItem::showDisabled(bool disabled, bool newLine)
     EndDisabled();
 }
 
-void IImGuiItem::addActionCallback(ImGuiItemAction action, std::function<void()> callbackFunc)
+void IImGuiItem::addActionCallback(ImGuiItemAction action, const std::function<void()> &callbackFunc)
 {
     if (action < ImGuiItemNativeActive || action >= ImGuiItemActionButt)
         return;
@@ -469,16 +472,12 @@ ImGuiItemTable::ImGuiItemTable() : IImGuiItem() {}
 
 ImGuiItemTable::ImGuiItemTable(const std::string &label) : IImGuiItem(label) {}
 
-void ImGuiItemTable::addColumn(const std::string &name)
+ImGuiItemTable &ImGuiItemTable::addColumn(const std::string &name)
 {
     if (std::find(mColumnNames.begin(), mColumnNames.end(), name) != mColumnNames.end())
-        return;
+        return *this;
     mColumnNames.push_back(name);
-    for (auto &row : mRows)
-    {
-        // empty data
-        row.push_back("");
-    }
+    return *this;
 }
 
 void ImGuiItemTable::insertColumn(unsigned int index, const std::string &name)
@@ -493,10 +492,6 @@ void ImGuiItemTable::insertColumn(unsigned int index, const std::string &name)
     }
 
     mColumnNames.insert(mColumnNames.begin() + index, name);
-    for (auto &row : mRows)
-    {
-        row.insert(row.begin() + index, "");
-    }
 }
 
 void ImGuiItemTable::removeColumn(const std::string &name)
@@ -514,43 +509,27 @@ void ImGuiItemTable::removeColumn(const std::string &name)
 void ImGuiItemTable::clearColumns()
 {
     mColumnNames.clear();
-    for (auto &row : mRows)
-        row.clear();
 }
-std::vector<std::string> ImGuiItemTable::getRow(unsigned int index)
+vector<string> ImGuiItemTable::getRow(unsigned int index)
 {
+    vector<string> res;
+    if (!mGetRowCountCallback)
+        return res;
+    if (!mGetCellCallback)
+        return res;
+    size_t rowCount = mGetRowCountCallback();
+    if (index >= rowCount)
+        return res;
 
-    if (index < 0 || index >= mRows.size())
-        return std::vector<std::string>();
-
-    return mRows[index];
-}
-
-void ImGuiItemTable::removeRow(unsigned int index)
-{
-    if (index < 0 || index >= mRows.size())
-        return;
-
-    mRows.erase(mRows.begin() + index);
-}
-
-void ImGuiItemTable::clearRows()
-{
-    mRows.clear();
-}
-
-void ImGuiItemTable::addEmptyRow()
-{
-    mRows.push_back(std::vector<std::string>(mColumnNames.size()));
+    for (unsigned int colIdx = 0; colIdx < mColumnNames.size(); colIdx++)
+    {
+        res.push_back(mGetCellCallback(index, colIdx));
+    }
+    return res;
 }
 
 void ImGuiItemTable::removeColumn(unsigned int index)
 {
-    for (auto &row : mRows)
-    {
-        if (index < row.size())
-            row.erase(row.begin() + index);
-    }
     mColumnNames.erase(mColumnNames.begin() + index);
 }
 
@@ -572,6 +551,13 @@ void ImGuiItemTable::ScrollFreezeCols(int cols)
 
 bool ImGuiItemTable::showItem()
 {
+
+    size_t rowCount = 0;
+
+    if (mGetRowCountCallback)
+        rowCount = mGetRowCountCallback();
+
+    PushStyleColor(ImGuiCol_TableRowBgAlt, (ImU32)ImColor(255, 0, 0));
     if (ImGui::BeginTable(mLabel.c_str(), (int)mColumnNames.size(), mTableFlags, mManualItemSize))
     {
         ImGui::TableSetupScrollFreeze(mFreezeCols, mFreezeRows);
@@ -593,27 +579,63 @@ bool ImGuiItemTable::showItem()
         float    cellHeight = ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2;
         uint64_t startRow   = (uint64_t)MAX(0, (scrollPos.y / cellHeight) - 1);
         uint64_t endRow     = startRow + (uint64_t)(mItemSize.y / cellHeight) + 1;
-        endRow              = MIN(endRow, mRows.size());
+        endRow              = MIN(endRow, rowCount);
 
-        for (int row = 0; row < mRows.size(); row++)
+        ImGuiTable *curTable = ImGui::GetCurrentContext()->CurrentTable;
+        for (size_t row = 0; row < rowCount; row++)
         {
             ImGui::TableNextRow(0, cellHeight);
-            if (row >= mFreezeRows - 1 && (row < startRow || row > endRow))
+            if ((0 == mFreezeRows || row >= mFreezeRows - 1) && (row < startRow || row > endRow))
                 continue;
-            for (auto &col : mRows[row])
+            for (size_t col = 0; col < mColumnNames.size(); col++)
             {
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted(col.c_str());
+
+                ImRect rect = TableGetCellBgRect(curTable, (int)col);
+                if (mCellClickableCallback && mCellClickableCallback(row, col))
+                {
+                    if (IsMouseHoveringRect(rect.Min, rect.Max))
+                    {
+                        if (IsMouseClicked(ImGuiMouseButton_Left))
+                        {
+                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max,
+                                                                      GetColorU32(ImGuiCol_ButtonActive));
+                            if (mCellClickedCallback)
+                                mCellClickedCallback(row, col);
+                        }
+                        else
+                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max,
+                                                                      GetColorU32(ImGuiCol_ButtonHovered));
+                    }
+                }
+
+                ImGui::TextUnformatted(mGetCellCallback(row, col).c_str());
             }
         }
 
         ImGui::EndTable();
     }
+    PopStyleColor();
     return false;
 }
 
 void ImGuiItemTable::clear()
 {
-    clearRows();
     clearColumns();
+}
+size_t ImGuiItemTable::getRowCount()
+{
+    if (mGetRowCountCallback)
+        return mGetRowCountCallback();
+    return 0;
+}
+void ImGuiItemTable::setDataCallbacks(const std::function<size_t()>                           &getRowCountCallback,
+                                      const std::function<std::string(size_t, size_t)>        &getCellCallback,
+                                      const std::function<bool(size_t rowIdx, size_t colIdx)> &cellClickableCallback,
+                                      const std::function<void(size_t rowIdx, size_t colIdx)> &cellClickedCallback)
+{
+    mGetRowCountCallback   = getRowCountCallback;
+    mGetCellCallback       = getCellCallback;
+    mCellClickableCallback = cellClickableCallback;
+    mCellClickedCallback   = cellClickedCallback;
 }
