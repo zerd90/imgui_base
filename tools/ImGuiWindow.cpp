@@ -521,7 +521,7 @@ void ImGuiMainWindow::show()
     auto &platformIO   = GetPlatformIO();
     SetNextWindowViewport(mainViewPort->ID);
     SetNextWindowPos(mainViewPort->WorkPos); // Use work area to avoid visible taskbar on Windows
-    SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Once);
+    SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Always);
 
     PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     if (mMaximized)
@@ -597,9 +597,6 @@ void ImGuiMainWindow::show()
             ImRect maximumRect = maximizeMainWindow();
             mNormalPos         = mWinPos;
             mNormalSize        = mWinSize;
-
-            SetWindowPos(maximumRect.GetTL(), ImGuiCond_Always);
-            SetWindowSize(maximumRect.GetSize(), ImGuiCond_Always);
         }
         else
         {
@@ -615,8 +612,6 @@ void ImGuiMainWindow::show()
                 mStartMoveWinPos   = mNormalPos;
             }
             normalizeApplication(ImRect(mNormalPos, mNormalPos + mNormalSize));
-            SetWindowPos(mNormalPos, ImGuiCond_Always);
-            SetWindowSize(mNormalSize, ImGuiCond_Always);
         }
     }
 
