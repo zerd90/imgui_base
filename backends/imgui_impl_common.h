@@ -106,10 +106,12 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
 std::string              getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
                                      std::string defaultExt = std::string(), std::string defaultPath = std::string());
 void                     openDebugWindow();
-//TODO: Linux and Mac
+// TODO: Linux and Mac
 void                     setApplicationTitle(const std::string &title);
 
-ImRect GetDisplayWorkArea();
-void   minimizedApplication();
+ImRect getDisplayWorkArea();
+ImRect maximizeMainWindow();
+void   normalizeApplication(const ImRect &winRect);
+void   minimizeMainWindow();
 
 #endif

@@ -144,6 +144,7 @@ protected:
     ImVec2 mStartMoveMousePos;
     ImVec2 mStartMoveWinPos;
     bool   mStartMove = false;
+    bool   mTitleBarMouseDown = false;
 };
 
 class IImGuiChildWindow : public IImGuiWindow

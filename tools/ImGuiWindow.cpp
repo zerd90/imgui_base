@@ -517,7 +517,7 @@ void ImGuiMainWindow::show()
                   | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
     mFocusedFlags |= ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_DockHierarchy;
 
-    auto  mainViewPort = GetMainViewport();
+    auto *mainViewPort = GetMainViewport();
     auto &platformIO   = GetPlatformIO();
     SetNextWindowViewport(mainViewPort->ID);
     SetNextWindowPos(mainViewPort->WorkPos); // Use work area to avoid visible taskbar on Windows
@@ -556,6 +556,7 @@ void ImGuiMainWindow::show()
     titleBarColor = ColorConvertFloat4ToU32(tmpColor);
 
     ImRect titleBarRect(mWinPos, mWinPos + titleBarSize);
+    ImRect titleBarMovableRect(mWinPos, mWinPos + titleBarSize - ImVec2{buttonSize * 3, 0});
     ImGui::GetWindowDrawList()->AddRectFilled(mWinPos, mWinPos + titleBarSize, titleBarColor);
 
     SetCursorScreenPos(mWinPos + style.ItemSpacing);
@@ -580,32 +581,37 @@ void ImGuiMainWindow::show()
         mOpened = false;
     }
 
-    if (mMaximized && mWinPos != ImVec2(0, 0)) // manually moved
-    {
-        // printf("manual moved %f, %f\n", mWinPos.x, mWinPos.y);
-        mMaximized = false;
-        SetWindowSize(mNormalSize, ImGuiCond_Always);
-    }
-
     if (drawMaximizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 2, 0},
                                   mWinPos + ImVec2{mWinSize.x - buttonSize, buttonSize}),
                            mMaximized, (mHovered && GetMouseCursor() == ImGuiMouseCursor_Arrow))
-        || (IsMouseHoveringRect(titleBarRect.Min, titleBarRect.Max) && IsMouseDoubleClicked(ImGuiMouseButton_Left)))
+        || (IsMouseHoveringRect(titleBarRect.Min, titleBarRect.Max) && IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        || (mMaximized && mStartMove))
     {
         // SetWindowSize();
         mMaximized = !mMaximized;
         if (mMaximized)
         {
-            auto maximumRect = GetDisplayWorkArea();
-            mNormalPos       = mWinPos;
-            mNormalSize      = mWinSize;
-            platformIO.Platform_SetWindowPos(mainViewPort, {0, 0});
+            ImRect maximumRect = maximizeMainWindow();
+            mNormalPos         = mWinPos;
+            mNormalSize        = mWinSize;
+
             SetWindowPos(maximumRect.GetTL(), ImGuiCond_Always);
             SetWindowSize(maximumRect.GetSize(), ImGuiCond_Always);
         }
         else
         {
-            platformIO.Platform_SetWindowPos(mainViewPort, mNormalPos);
+            if (mStartMove) // if moved by user,set window pos according to the mouse pos
+            {
+                ImVec2 mousePos = GetMousePos();
+                ImVec2 tmpPos   = mousePos - mWinPos;
+
+                mNormalPos.x = mousePos.x - mNormalSize.x * tmpPos.x / mWinSize.x;
+                mNormalPos.y = mWinPos.y;
+
+                mStartMoveMousePos = mousePos;
+                mStartMoveWinPos   = mNormalPos;
+            }
+            normalizeApplication(ImRect(mNormalPos, mNormalPos + mNormalSize));
             SetWindowPos(mNormalPos, ImGuiCond_Always);
             SetWindowSize(mNormalSize, ImGuiCond_Always);
         }
@@ -614,13 +620,14 @@ void ImGuiMainWindow::show()
     if (drawMinimizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 3, 0},
                                   mWinPos + ImVec2{mWinSize.x - buttonSize * 2, buttonSize}),
                            (mHovered && GetMouseCursor() == ImGuiMouseCursor_Arrow)))
-        minimizedApplication();
+        minimizeMainWindow();
 
     if (mStartMove)
     {
         if (IsMouseReleased(ImGuiMouseButton_Left))
         {
-            mStartMove = false;
+            mStartMove         = false;
+            mTitleBarMouseDown = false;
         }
         else if (GetMousePos() != mStartMoveMousePos)
         {
@@ -629,15 +636,27 @@ void ImGuiMainWindow::show()
     }
     else
     {
-        if (mHovered
-            && IsMouseHoveringRect(mWinPos,
-                                   mWinPos + ImVec2(titleBarRect.GetWidth() - buttonSize, titleBarRect.GetHeight()))
+        if (mHovered && IsMouseHoveringRect(titleBarMovableRect.Min, titleBarMovableRect.Max)
             && IsMouseDown(ImGuiMouseButton_Left) && GetMouseCursor() == ImGuiMouseCursor_Arrow)
         {
+            if (!mTitleBarMouseDown)
+            {
+                mTitleBarMouseDown = true;
+                mStartMoveMousePos = GetMousePos();
+            }
+        }
 
-            mStartMoveMousePos = GetMousePos();
-            mStartMoveWinPos   = platformIO.Platform_GetWindowPos(mainViewPort);
-            mStartMove         = true;
+        if (mTitleBarMouseDown)
+        {
+            if (GetMousePos() != mStartMoveMousePos)
+            {
+                mStartMoveWinPos = platformIO.Platform_GetWindowPos(mainViewPort);
+                mStartMove       = true;
+            }
+            else if (IsMouseReleased(ImGuiMouseButton_Left))
+            {
+                mTitleBarMouseDown = false;
+            }
         }
     }
 

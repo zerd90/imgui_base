@@ -1695,17 +1695,16 @@ static void ImGui_ImplWin32_ShutdownMultiViewportSupport()
 }
 
 
-ImRect GetDisplayWorkArea()
+ImRect getDisplayWorkArea()
 {
     RECT rect;
     SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
     int cx = rect.right - rect.left;
     int cy = rect.bottom - rect.top;
-    printf("GetDisplayWorkArea: %d %d\n", cx, cy);
+    printf("getDisplayWorkArea: %d %d\n", cx, cy);
     return ImRect((float)rect.left, (float)rect.top, (float)cx, (float)cy);
 }
-
-void minimizedApplication()
+HWND getMainWindow()
 {
     HWND hwnd = GetForegroundWindow();
     while (hwnd)
@@ -1717,6 +1716,24 @@ void minimizedApplication()
         }
         hwnd = hParent;
     }
+    return hwnd;
+}
+ImRect maximizeMainWindow()
+{
+    HWND hwnd = getMainWindow();
+    ImRect wordArea = getDisplayWorkArea();
+    MoveWindow(hwnd, wordArea.GetTL().x, wordArea.GetTL().y, wordArea.GetSize().x, wordArea.GetSize().y, false);
+    return wordArea;
+}
+void normalizeApplication(const ImRect &winRect)
+{
+    HWND hwnd = getMainWindow();
+    MoveWindow(hwnd, winRect.GetTL().x, winRect.GetTL().y, winRect.GetSize().x, winRect.GetSize().y, false);
+}
+
+void minimizeMainWindow()
+{
+    HWND hwnd = getMainWindow();
     ShowWindow(hwnd, SW_MINIMIZE);
 }
 

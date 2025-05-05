@@ -1724,12 +1724,12 @@ static LRESULT CALLBACK ImGui_ImplGlfw_WndProc(HWND hWnd, UINT msg, WPARAM wPara
 
     #endif // #ifdef _WIN32
 
-ImVec2 GetDisplayWorkArea()
+ImVec2 getDisplayWorkArea()
 {
     // TODO
 }
 
-void minimizedApplication()
+void minimizeMainWindow()
 {
     // TODO
 }

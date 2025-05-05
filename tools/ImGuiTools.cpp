@@ -1,4 +1,5 @@
 
+#include <iomanip>
 #include <map>
 #include <string_view>
 
@@ -708,7 +709,7 @@ void ImGuiBinaryViewer::showContent()
                 for (ImS64 i = 0; i < size; i++)
                 {
                     uint8_t data = mGetDataCallback(i, mUserData);
-                    copyTextStream << "0x" << std::hex << (int)data;
+                    copyTextStream << "0x" << std::hex << std::setw(2) << std::setfill('0') << (int)data;
                     if (i < size - 1)
                         copyTextStream << ", ";
                 }
