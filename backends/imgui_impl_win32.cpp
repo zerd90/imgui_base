@@ -1695,13 +1695,14 @@ static void ImGui_ImplWin32_ShutdownMultiViewportSupport()
 }
 
 
-ImVec2 GetDisplayWorkArea()
+ImRect GetDisplayWorkArea()
 {
     RECT rect;
     SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
     int cx = rect.right - rect.left;
     int cy = rect.bottom - rect.top;
-    return ImVec2((float)cx, (float)cy);
+    printf("GetDisplayWorkArea: %d %d\n", cx, cy);
+    return ImRect((float)rect.left, (float)rect.top, (float)cx, (float)cy);
 }
 
 void minimizedApplication()
@@ -1722,7 +1723,7 @@ void minimizedApplication()
 void setApplicationTitle(const std::string &title)
 {
     ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;
-    IM_ASSERT(vd->Hwnd!= 0);
+    IM_ASSERT(vd->Hwnd != 0);
     ::SetWindowTextA(vd->Hwnd, utf8ToLocal(title).c_str());
 }
 //---------------------------------------------------------------------------------------------------------

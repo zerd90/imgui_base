@@ -109,7 +109,7 @@ void                     openDebugWindow();
 //TODO: Linux and Mac
 void                     setApplicationTitle(const std::string &title);
 
-ImVec2 GetDisplayWorkArea();
+ImRect GetDisplayWorkArea();
 void   minimizedApplication();
 
 #endif

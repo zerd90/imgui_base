@@ -596,12 +596,12 @@ void ImGuiMainWindow::show()
         mMaximized = !mMaximized;
         if (mMaximized)
         {
-            auto maximumSize = GetDisplayWorkArea();
+            auto maximumRect = GetDisplayWorkArea();
             mNormalPos       = mWinPos;
             mNormalSize      = mWinSize;
             platformIO.Platform_SetWindowPos(mainViewPort, {0, 0});
-            SetWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-            SetWindowSize(maximumSize, ImGuiCond_Always);
+            SetWindowPos(maximumRect.GetTL(), ImGuiCond_Always);
+            SetWindowSize(maximumRect.GetSize(), ImGuiCond_Always);
         }
         else
         {
