@@ -1706,18 +1706,11 @@ ImRect getDisplayWorkArea()
 }
 HWND getMainWindow()
 {
-    HWND hwnd = GetForegroundWindow();
-    while (hwnd)
-    {
-        HWND hParent = ::GetParent(hwnd);
-        if (!hParent)
-        {
-            break;
-        }
-        hwnd = hParent;
-    }
-    return hwnd;
+    auto bd = ImGui_ImplWin32_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->hWnd != 0);
+    return bd->hWnd;
 }
+
 ImRect maximizeMainWindow()
 {
     HWND hwnd = getMainWindow();
