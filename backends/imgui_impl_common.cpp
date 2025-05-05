@@ -1,7 +1,4 @@
 
-
-#include <memory>
-#include <sstream>
 #include "imgui_impl_common.h"
 
 using std::string;
@@ -10,7 +7,7 @@ using std::wstring;
 
 ImGuiApplication *g_user_app = nullptr;
 
-// TODO: MAC and linux
+// TODO: MAC
 string gLastError;
 
 string getLastError()
@@ -409,7 +406,7 @@ void openDebugWindow()
     #ifndef dbg
         #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
     #endif
-typedef struct
+typedef struct GtkCallbackData
 {
     bool  done   = false;
     void *result = nullptr;
@@ -473,6 +470,7 @@ string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
             if (error)
             {
                 dbg("Error: %s\n", error->message);
+                gLastError = error->message;
                 g_error_free(error);
             }
             else
@@ -530,6 +528,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
                 if (error)
                 {
                     dbg("Error: %s\n", error->message);
+                    gLastError = error->message;
                     g_error_free(error);
                     break;
                 }
@@ -607,6 +606,7 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
             if (error)
             {
                 dbg("Error: %s\n", error->message);
+                gLastError = error->message;
                 g_error_free(error);
             }
             else

@@ -87,6 +87,7 @@
 //  2017-08-25: Inputs: MousePos set to -FLT_MAX,-FLT_MAX when mouse is unavailable/missing (instead of -1,-1).
 //  2016-10-15: Misc: Added a void* user_data parameter to Clipboard function handlers.
 
+#include <set>
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
     #include "imgui_impl_glfw.h"
@@ -202,6 +203,8 @@ struct ImGui_ImplGlfw_Data
 
     ImGui_ImplGlfw_Data() { memset((void *)this, 0, sizeof(*this)); }
 };
+
+std::set<GLFWwindow *> gWindows;
 
 // Backend data stored in io.BackendPlatformUserData to allow support for multiple Dear ImGui contexts
 // It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple
@@ -1385,8 +1388,9 @@ static void ImGui_ImplGlfw_CreateWindow(ImGuiViewport *viewport)
     glfwWindowHint(GLFW_FLOATING, (viewport->Flags & ImGuiViewportFlags_TopMost) ? true : false);
     #endif
     GLFWwindow *share_window = (bd->ClientApi == GlfwClientApi_OpenGL) ? bd->Window : nullptr;
-    vd->Window      = glfwCreateWindow((int)viewport->Size.x, (int)viewport->Size.y, "No Title Yet", nullptr, share_window);
-    vd->WindowOwned = true;
+    vd->Window = glfwCreateWindow((int)viewport->Size.x, (int)viewport->Size.y, "No Title Yet", nullptr, share_window);
+    gWindows.insert(vd->Window);
+    vd->WindowOwned          = true;
     viewport->PlatformHandle = (void *)vd->Window;
     #ifdef _WIN32
     viewport->PlatformHandleRaw = glfwGetWin32Window(vd->Window);
@@ -1435,6 +1439,7 @@ static void ImGui_ImplGlfw_DestroyWindow(ImGuiViewport *viewport)
 
             glfwDestroyWindow(vd->Window);
         }
+        gWindows.erase(vd->Window);
         vd->Window = nullptr;
         IM_DELETE(vd);
     }
@@ -1492,6 +1497,10 @@ static void ImGui_ImplGlfw_SetWindowPos(ImGuiViewport *viewport, ImVec2 pos)
     ImGui_ImplGlfw_ViewportData *vd = (ImGui_ImplGlfw_ViewportData *)viewport->PlatformUserData;
     vd->IgnoreWindowPosEventFrame   = ImGui::GetFrameCount();
     glfwSetWindowPos(vd->Window, (int)pos.x, (int)pos.y);
+
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    if(bd->Window == vd->Window && gWindowRectChangeNotify)
+        gWindowRectChangeNotify((int)pos.x, (int)pos.y, -1, -1);
 }
 
 static ImVec2 ImGui_ImplGlfw_GetWindowSize(ImGuiViewport *viewport)
@@ -1517,6 +1526,10 @@ static void ImGui_ImplGlfw_SetWindowSize(ImGuiViewport *viewport, ImVec2 size)
     #endif
     vd->IgnoreWindowSizeEventFrame = ImGui::GetFrameCount();
     glfwSetWindowSize(vd->Window, (int)size.x, (int)size.y);
+
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    if(bd->Window == vd->Window && gWindowRectChangeNotify)
+        gWindowRectChangeNotify(-1, -1, (int)size.x, (int)size.y);
 }
 
 static void ImGui_ImplGlfw_SetWindowTitle(ImGuiViewport *viewport, const char *title)
@@ -1600,8 +1613,8 @@ enum VkResult
         #endif // VULKAN_H_
 extern "C"
 {
-    extern GLFWAPI VkResult glfwCreateWindowSurface(VkInstance instance, GLFWwindow *window,
-                                                    const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface);
+extern GLFWAPI VkResult glfwCreateWindowSurface(VkInstance instance, GLFWwindow *window,
+                                                const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface);
 }
 static int ImGui_ImplGlfw_CreateVkSurface(ImGuiViewport *viewport, ImU64 vk_instance, const void *vk_allocator,
                                           ImU64 *out_vk_surface)
@@ -1610,8 +1623,8 @@ static int ImGui_ImplGlfw_CreateVkSurface(ImGuiViewport *viewport, ImU64 vk_inst
     ImGui_ImplGlfw_ViewportData *vd = (ImGui_ImplGlfw_ViewportData *)viewport->PlatformUserData;
     IM_UNUSED(bd);
     IM_ASSERT(bd->ClientApi == GlfwClientApi_Vulkan);
-    VkResult err = glfwCreateWindowSurface((VkInstance)vk_instance, vd->Window, (const VkAllocationCallbacks *)vk_allocator,
-                                           (VkSurfaceKHR *)out_vk_surface);
+    VkResult err = glfwCreateWindowSurface((VkInstance)vk_instance, vd->Window,
+                                           (const VkAllocationCallbacks *)vk_allocator, (VkSurfaceKHR *)out_vk_surface);
     return (int)err;
 }
     #endif // GLFW_HAS_VULKAN
@@ -1724,19 +1737,57 @@ static LRESULT CALLBACK ImGui_ImplGlfw_WndProc(HWND hWnd, UINT msg, WPARAM wPara
 
     #endif // #ifdef _WIN32
 
-ImVec2 getDisplayWorkArea()
+
+ImRect GetDisplayWorkArea()
 {
-    // TODO
+    auto monitor = glfwGetPrimaryMonitor();
+    if (monitor == nullptr)
+        return ImRect(0, 0, 640, 360);
+    int x, y, w, h;
+    glfwGetMonitorWorkarea(monitor, &x, &y, &w, &h);
+    return ImRect(x, y, x + w, y + h);
+}
+
+ImRect maximizeMainWindow()
+{
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwMaximizeWindow(bd->Window);
+    glfwSwapBuffers(bd->Window);
+
+    int x, y, w, h;
+    glfwGetWindowPos(bd->Window, &x, &y);
+    glfwGetWindowSize(bd->Window, &w, &h);
+
+    return ImRect(x, y, x + w, y + h);
+}
+
+void normalizeApplication(const ImRect &winRect){
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwRestoreWindow(bd->Window);
+    glfwSetWindowPos(bd->Window, (int)winRect.Min.x, (int)winRect.Min.y);
+    glfwSetWindowSize(bd->Window, (int)winRect.GetWidth(), (int)winRect.GetHeight());
 }
 
 void minimizeMainWindow()
 {
-    // TODO
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwIconifyWindow(bd->Window);
+    for (auto &window : gWindows)
+    {
+        if (window == bd->Window)
+            continue;
+        glfwIconifyWindow(window);
+    }
 }
 
 void setApplicationTitle(const std::string &title)
 {
-    // TODO
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwSetWindowTitle(bd->Window, title.c_str());
 }
 
 //-----------------------------------------------------------------------------

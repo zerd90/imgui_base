@@ -1,6 +1,7 @@
 #ifndef _IMGUI_WINDOW_H_
 #define _IMGUI_WINDOW_H_
 
+#include <list>
 #include <string>
 #include <functional>
 #include <map>

@@ -2,12 +2,12 @@
 #include <iomanip>
 #include <map>
 #include <string_view>
+#include <functional>
 
 #if defined(ON_WINDOWS)
     #include <windows.h>
 #endif
 
-#include <functional>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
@@ -869,7 +869,7 @@ void ImGuiBinaryViewer::showContent()
     }
 
     // show Texts
-    Text("%08zx", mSelectOffset);
+    Text("%08llx" , mSelectOffset);
     for (int i = 0; i < showBytes; i++)
     {
         SameLine();

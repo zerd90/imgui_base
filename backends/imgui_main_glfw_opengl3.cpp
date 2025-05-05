@@ -12,7 +12,6 @@
 #include "imgui_impl_common.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "ImGuiBaseTypes.h"
 
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
@@ -66,10 +65,11 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 {
     static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io          = nullptr;
+    static bool vSync = g_user_app->VSyncEnabled();
     if (!io)
     {
         glfwMakeContextCurrent(window);
-        if (g_user_app->VSyncEnabled())
+        if (vSync)
             glfwSwapInterval(1);
         else
             glfwSwapInterval(0);
@@ -83,6 +83,15 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
         g_user_app->loadResources();
 
         io = &ImGui::GetIO();
+    }
+
+    if(g_user_app->VSyncEnabled() != vSync)
+    {
+        vSync = g_user_app->VSyncEnabled();
+        if (vSync)
+            glfwSwapInterval(1);
+        else
+            glfwSwapInterval(0);
     }
 
 #if defined(ON_WINDOWS)
@@ -201,14 +210,15 @@ int main(int argc, char **argv)
 
     ImGuiIO &io    = ImGui::GetIO();
     io.IniFilename = g_user_app->getConfigPath();
+    printf("ini file: %s\n", io.IniFilename);
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(1, 1, g_user_app->getAppName().c_str(), nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h,
+                                          g_user_app->getAppName().c_str(), nullptr, nullptr);
     if (window == nullptr)
         return 1;
-    glfwSetWindowPos(window, 0, 0);
+    glfwSetWindowPos(window, g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y);
 
     ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
     glfwSetDropCallback(window, dropFileCallback);

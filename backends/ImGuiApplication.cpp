@@ -1,7 +1,9 @@
 #include <stdint.h>
 #include <filesystem>
+#ifdef __linux
+    #include <unistd.h>
+#endif
 #include "ImGuiApplication.h"
-#include "imgui_impl_common.h"
 #ifdef ON_WINDOWS
     #include <Windows.h>
 #endif
@@ -15,8 +17,13 @@ ImGuiApplication::ImGuiApplication()
     GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
     wprintf(L"current dir %s\n", cur_dir);
     mExePath = unicodeToUtf8(cur_dir);
-#else
-    // TODO: MAC/LINUX
+#elif defined(__linux)
+    char exePathStr[1024] = {0};
+    readlink("/proc/self/exe", exePathStr, sizeof(exePathStr));
+    mExePath = exePathStr;
+    printf("current dir %s\n", exePathStr);
+#elif defined(__APPLE__)
+    // TODO: MAC
 #endif
 
     fs::path exePath(mExePath);
