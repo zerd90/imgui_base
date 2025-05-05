@@ -524,7 +524,10 @@ void ImGuiMainWindow::show()
     SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Once);
 
     PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    Begin("##App Main Window", &mOpened, mWindowFlags);
+    if (mMaximized)
+        Begin("##App Main Window", &mOpened, mWindowFlags | ImGuiWindowFlags_NoResize);
+    else
+        Begin("##App Main Window", &mOpened, mWindowFlags);
     PopStyleVar();
 
     updateWindowStatus();
