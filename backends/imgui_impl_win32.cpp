@@ -1715,13 +1715,15 @@ ImRect maximizeMainWindow()
 {
     HWND hwnd = getMainWindow();
     ImRect wordArea = getDisplayWorkArea();
-    MoveWindow(hwnd, wordArea.GetTL().x, wordArea.GetTL().y, wordArea.GetSize().x, wordArea.GetSize().y, false);
+    MoveWindow(hwnd, (int)wordArea.GetTL().x, (int)wordArea.GetTL().y, (int)wordArea.GetSize().x,
+               (int)wordArea.GetSize().y, false);
     return wordArea;
 }
 void normalizeApplication(const ImRect &winRect)
 {
     HWND hwnd = getMainWindow();
-    MoveWindow(hwnd, winRect.GetTL().x, winRect.GetTL().y, winRect.GetSize().x, winRect.GetSize().y, false);
+    MoveWindow(hwnd, (int)winRect.GetTL().x, (int)winRect.GetTL().y, (int)winRect.GetSize().x, (int)winRect.GetSize().y,
+               false);
 }
 
 void minimizeMainWindow()

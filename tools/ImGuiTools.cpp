@@ -4,11 +4,6 @@
 #include <string_view>
 #include <functional>
 
-#if defined(ON_WINDOWS)
-    #include <windows.h>
-#endif
-
-
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
 #include "ImGuiTools.h"

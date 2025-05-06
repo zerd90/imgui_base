@@ -10,10 +10,6 @@
 
 #include "ImGuiApplication.h"
 
-#if defined(WIN32) || defined(_WIN32)
-    #define ON_WINDOWS
-#endif
-
 // for Renderer
 
 struct TextureData;
@@ -56,12 +52,13 @@ static inline auto arrayMakeSharedPtr(size_t length, _T defaultValue)
 
 extern ImGuiApplication *g_user_app;
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
 
 std::string  unicodeToUtf8(const std::wstring &wStr);
 std::wstring utf8ToUnicode(const std::string &str);
 #endif
+
 std::string utf8ToLocal(const std::string &str);
 std::string localToUtf8(const std::string &str);
 

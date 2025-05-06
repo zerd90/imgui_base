@@ -228,7 +228,7 @@ static void ImGui_ImplGlfw_InitMultiViewportSupport();
 static void ImGui_ImplGlfw_ShutdownMultiViewportSupport();
 
     // Functions
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
 StdRMutex  gEventLock;
 StdRMutex &glfwGetEventLock()
 {
@@ -511,7 +511,7 @@ static bool ImGui_ImplGlfw_ShouldChainCallback(GLFWwindow *window)
 
 void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -527,7 +527,7 @@ void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int acti
 
 void ImGui_ImplGlfw_ScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -595,7 +595,7 @@ static int ImGui_ImplGlfw_TranslateUntranslatedKey(int key, int scancode)
 
 void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, int action, int mods)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -620,7 +620,7 @@ void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, i
 
 void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -633,7 +633,7 @@ void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 
 void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -656,7 +656,7 @@ void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 // so we back it up and restore on Leave/Enter (see https://github.com/ocornut/imgui/issues/4984)
 void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
 
@@ -680,7 +680,7 @@ void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 
 void ImGui_ImplGlfw_CharCallback(GLFWwindow *window, unsigned int c)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();

@@ -20,7 +20,7 @@
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     #include <wtypes.h>
 #endif
 
@@ -50,7 +50,7 @@ void windowResizeCallback(int x, int y, int width, int height)
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
 {
     IM_UNUSED(window);
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     StdRMutexUniqueLock locker(glfwGetEventLock());
 #endif
     std::vector<std::string> wFiles;
@@ -94,7 +94,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
             glfwSwapInterval(0);
     }
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     glfwPollEvents();
 #endif
 
@@ -108,7 +108,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     StdRMutexUniqueLock locker(glfwGetEventLock());
 #endif
 
@@ -123,7 +123,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     ImGui::Render();
     g_user_app->endFramePostAction();
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     locker.unlock();
 #endif
 
@@ -152,13 +152,13 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 }
 
 // Main code
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 #else
 int main(int argc, char **argv)
 #endif
 {
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     IM_UNUSED(hInstance);
     IM_UNUSED(hPrevInstance);
     IM_UNUSED(lpCmdLine);
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     int  argc;
     auto argv = CommandLineToArgvA(&argc);
 #endif
@@ -244,7 +244,7 @@ int main(int argc, char **argv)
         std::vector<std::string> tmpArgs;
         for (int i = 0; i < argc; i++)
         {
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
             tmpArgs.push_back(argv[i].get());
 #else
 

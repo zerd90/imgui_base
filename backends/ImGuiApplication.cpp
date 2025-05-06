@@ -3,11 +3,16 @@
 #ifdef __linux
     #include <unistd.h>
 #endif
+
 #include "ImGuiApplication.h"
-#ifdef ON_WINDOWS
+
+#ifdef _WIN32
+    #include "imgui_impl_common.h"
     #include <Windows.h>
 #endif
+
 namespace fs = std::filesystem;
+
 ImGuiApplication::ImGuiApplication()
 {
     mWindowRect      = {100, 100, 640, 480};

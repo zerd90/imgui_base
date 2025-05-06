@@ -32,7 +32,7 @@ void setApp(ImGuiApplication *app)
     g_user_app = app;
 }
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     #include <Shlobj.h>
     #include <Windows.h>
     #include <Winerror.h>
