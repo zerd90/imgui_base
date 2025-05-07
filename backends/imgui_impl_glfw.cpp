@@ -120,16 +120,6 @@
         #include <unistd.h> // for usleep()
     #endif
 
-    #ifdef __EMSCRIPTEN__
-        #include <emscripten.h>
-        #include <emscripten/html5.h>
-        #ifdef EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3
-            #include <GLFW/emscripten_glfw3.h>
-        #else
-            #define EMSCRIPTEN_USE_EMBEDDED_GLFW3
-        #endif
-    #endif
-
     #include "ImGuiBaseTypes.h"
 
     // We gather version tests as define in order to easily see which features are version-dependent.
@@ -138,7 +128,7 @@
     #define GLFW_HAS_WINDOW_HOVERED (GLFW_VERSION_COMBINED >= 3300)  // 3.3+ GLFW_HOVERED
     #define GLFW_HAS_WINDOW_ALPHA (GLFW_VERSION_COMBINED >= 3300)    // 3.3+ glfwSetWindowOpacity
     #define GLFW_HAS_PER_MONITOR_DPI (GLFW_VERSION_COMBINED >= 3300) // 3.3+ glfwGetMonitorContentScale
-    #if defined(__EMSCRIPTEN__) || defined(__SWITCH__) // no Vulkan support in GLFW for Emscripten or homebrew Nintendo Switch
+    #if defined(__SWITCH__) // no Vulkan support in GLFW for Emscripten or homebrew Nintendo Switch
         #define GLFW_HAS_VULKAN (0)
     #else
         #define GLFW_HAS_VULKAN (GLFW_VERSION_COMBINED >= 3200) // 3.2+ glfwCreateWindowSurface
@@ -781,22 +771,6 @@ void ImGui_ImplGlfw_SetCallbacksChainForAllWindows(bool chain_for_all_windows)
     bd->CallbacksChainForAllWindows = chain_for_all_windows;
 }
 
-    #ifdef __EMSCRIPTEN__
-        #if EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3 >= 34020240817
-void ImGui_ImplGlfw_EmscriptenOpenURL(const char *url)
-{
-    if (url)
-        emscripten::glfw3::OpenURL(url);
-}
-        #else
-EM_JS(void, ImGui_ImplGlfw_EmscriptenOpenURL, (const char *url), {
-    url = url ? UTF8ToString(url) : null;
-    if (url)
-        window.open(url, '_blank');
-});
-        #endif
-    #endif
-
 static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, GlfwClientApi client_api)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -811,9 +785,7 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     io.BackendPlatformName     = "imgui_impl_glfw";
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
     io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;  // We can honor io.WantSetMousePos requests (optional, rarely used)
-    #ifndef __EMSCRIPTEN__
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
-    #endif
     #if GLFW_HAS_MOUSE_PASSTHROUGH || GLFW_HAS_WINDOW_HOVERED
     io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with correct
                                                                   // data (optional)
@@ -826,13 +798,6 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     ImGuiPlatformIO &platform_io            = ImGui::GetPlatformIO();
     platform_io.Platform_SetClipboardTextFn = [](ImGuiContext *, const char *text) { glfwSetClipboardString(NULL, text); };
     platform_io.Platform_GetClipboardTextFn = [](ImGuiContext *) { return glfwGetClipboardString(NULL); };
-    #ifdef __EMSCRIPTEN__
-    platform_io.Platform_OpenInShellFn = [](ImGuiContext *, const char *url)
-    {
-        ImGui_ImplGlfw_EmscriptenOpenURL(url);
-        return true;
-    };
-    #endif
 
     // Create mouse cursors
     // (By design, on X11 cursors are user configurable and some cursors may be missing. When a cursor doesn't exist,
@@ -856,7 +821,7 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
     #endif
     glfwSetErrorCallback(prev_error_callback);
-    #if GLFW_HAS_GETERROR && !defined(__EMSCRIPTEN__) // Eat errors (see #5908)
+    #if GLFW_HAS_GETERROR // Eat errors (see #5908)
     (void)glfwGetError(nullptr);
     #endif
 
@@ -886,24 +851,6 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     bd->PrevWndProc = (WNDPROC)::GetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC);
     IM_ASSERT(bd->PrevWndProc != nullptr);
     ::SetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC, (LONG_PTR)ImGui_ImplGlfw_WndProc);
-    #endif
-
-    // Emscripten: the same application can run on various platforms, so we detect the Apple platform at runtime
-    // to override io.ConfigMacOSXBehaviors from its default (which is always false in Emscripten).
-    #ifdef __EMSCRIPTEN__
-        #if EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3 >= 34020240817
-    if (emscripten::glfw3::IsRuntimePlatformApple())
-    {
-        ImGui::GetIO().ConfigMacOSXBehaviors = true;
-
-        // Due to how the browser (poorly) handles the Meta Key, this line essentially disables repeats when used.
-        // This means that Meta + V only registers a single key-press, even if the keys are held.
-        // This is a compromise for dealing with this issue in ImGui since ImGui implements key repeat itself.
-        // See
-        // https://github.com/pongasoft/emscripten-glfw/blob/v3.4.0.20240817/docs/Usage.md#the-problem-of-the-super-key
-        emscripten::glfw3::SetSuperPlusKeyTimeouts(10, 10);
-    }
-        #endif
     #endif
 
     bd->ClientApi = client_api;

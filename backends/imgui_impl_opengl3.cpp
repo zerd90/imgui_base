@@ -148,12 +148,6 @@
         #else
             #include <GLES2/gl2.h> // Use GL ES 2
         #endif
-        #if defined(__EMSCRIPTEN__)
-            #ifndef GL_GLEXT_PROTOTYPES
-                #define GL_GLEXT_PROTOTYPES
-            #endif
-            #include <GLES2/gl2ext.h>
-        #endif
     #elif defined(IMGUI_IMPL_OPENGL_ES3)
         #if (defined(__APPLE__) && (TARGET_OS_IOS || TARGET_OS_TV))
             #include <OpenGLES/ES3/gl.h> // Use GL ES 3
@@ -179,12 +173,6 @@
     // Vertex arrays are not supported on ES2/WebGL1 unless Emscripten which uses an extension
     #ifndef IMGUI_IMPL_OPENGL_ES2
         #define IMGUI_IMPL_OPENGL_USE_VERTEX_ARRAY
-    #elif defined(__EMSCRIPTEN__)
-        #define IMGUI_IMPL_OPENGL_USE_VERTEX_ARRAY
-        #define glBindVertexArray glBindVertexArrayOES
-        #define glGenVertexArrays glGenVertexArraysOES
-        #define glDeleteVertexArrays glDeleteVertexArraysOES
-        #define GL_VERTEX_ARRAY_BINDING GL_VERTEX_ARRAY_BINDING_OES
     #endif
 
     // Desktop GL 2.0+ has extension and glPolygonMode() which GL ES and WebGL don't have..
@@ -304,9 +292,10 @@ bool ImGui_ImplOpenGL3_Init(const char *glsl_version)
 
     // Initialize our loader
     #if !defined(IMGUI_IMPL_OPENGL_ES2) && !defined(IMGUI_IMPL_OPENGL_ES3) && !defined(IMGUI_IMPL_OPENGL_LOADER_CUSTOM)
-    if (imgl3wInit() != 0)
+    int ret = imgl3wInit();
+    if (ret != 0)
     {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        fprintf(stderr, "Failed to initialize OpenGL loader(%d)!\n", ret);
         return false;
     }
     #endif

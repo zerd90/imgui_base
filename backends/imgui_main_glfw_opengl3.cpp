@@ -32,11 +32,6 @@
     #pragma comment(lib, "legacy_stdio_definitions")
 #endif
 
-// This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
-#ifdef __EMSCRIPTEN__
-    #include "../libs/emscripten/emscripten_mainloop_stub.h"
-#endif
-
 static void glfw_error_callback(int error, const char *description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -75,9 +70,6 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
             glfwSwapInterval(0);
 
         // Setup Platform/Renderer backends
-#ifdef __EMSCRIPTEN__
-        ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
-#endif
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         g_user_app->loadResources();
@@ -257,14 +249,7 @@ int main(int argc, char **argv)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
 
     // Main loop
-#ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the
-    // imgui.ini file. You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
-    io.IniFilename = nullptr;
-    EMSCRIPTEN_MAINLOOP_BEGIN
-#else
     while (!glfwWindowShouldClose(window))
-#endif
     {
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your
@@ -279,9 +264,6 @@ int main(int argc, char **argv)
         if (doGUIRender(glsl_version, window))
             break;
     }
-#ifdef __EMSCRIPTEN__
-    EMSCRIPTEN_MAINLOOP_END;
-#endif
 
     g_user_app->exit();
 

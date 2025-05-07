@@ -75,7 +75,7 @@ std::string getLastError();
 // from errno
 std::string getSystemError();
 
-// for Platform
+// Platform Relative
 
 #if defined(WIN32) || defined(_WIN32)
     #define fseek64 _fseeki64
@@ -105,6 +105,7 @@ std::string              getSavePath(const std::vector<FilterSpec> &typeFilters 
                                      const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
 void                     openDebugWindow();
 
+// Backend Relative
 void setApplicationTitle(const std::string &title);
 
 ImRect getDisplayWorkArea();
