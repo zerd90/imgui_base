@@ -128,6 +128,32 @@ private:
     std::function<bool()> mUnlinkCond = []() { return false; };
 };
 
+class ImGuiBinaryViewer : public IImGuiWindow
+{
+public:
+    ImGuiBinaryViewer(std::string title, bool embed = false);
+    virtual ~ImGuiBinaryViewer();
+
+    void setDataCallbacks(std::function<ImS64(void *userData)>                             getDataSizeCallback,
+                          std::function<uint8_t(ImS64 offset, void *userData)>             getDataCallback,
+                          std::function<void(const std::string &savePath, void *userData)> saveDataCallback);
+    void setUserData(void *userData);
+
+protected:
+    void showContent() override;
+
+private:
+    std::function<ImS64(void *)>                     mGetDataSizeCallback;
+    std::function<uint8_t(ImS64, void *)>            mGetDataCallback;
+    std::function<void(const std::string &, void *)> mSaveDataCallback;
+
+    std::string mLastSaveDir;
+    void       *mUserData;
+
+    ImS64 mSelectOffset = 0;
+    ImS64 mScrollPos    = 0;
+};
+
 void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,
                ImGuiID *outDockOppositeDir);
 

@@ -12,7 +12,6 @@
 #include "imgui_impl_common.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "ImGuiBaseTypes.h"
 
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
@@ -21,7 +20,7 @@
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     #include <wtypes.h>
 #endif
 
@@ -31,11 +30,6 @@
 // likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
 #if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
     #pragma comment(lib, "legacy_stdio_definitions")
-#endif
-
-// This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
-#ifdef __EMSCRIPTEN__
-    #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
 static void glfw_error_callback(int error, const char *description)
@@ -51,7 +45,7 @@ void windowResizeCallback(int x, int y, int width, int height)
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
 {
     IM_UNUSED(window);
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     StdRMutexUniqueLock locker(glfwGetEventLock());
 #endif
     std::vector<std::string> wFiles;
@@ -66,14 +60,16 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 {
     static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io          = nullptr;
+    static bool vSync = g_user_app->VSyncEnabled();
     if (!io)
     {
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(1); // Enable vsync
-                             // Setup Platform/Renderer backends
-#ifdef __EMSCRIPTEN__
-        ImGui_ImplGlfw_InstallEmscriptenCallbacks(window, "#canvas");
-#endif
+        if (vSync)
+            glfwSwapInterval(1);
+        else
+            glfwSwapInterval(0);
+
+        // Setup Platform/Renderer backends
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         g_user_app->loadResources();
@@ -81,7 +77,16 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
         io = &ImGui::GetIO();
     }
 
-#if defined(ON_WINDOWS)
+    if(g_user_app->VSyncEnabled() != vSync)
+    {
+        vSync = g_user_app->VSyncEnabled();
+        if (vSync)
+            glfwSwapInterval(1);
+        else
+            glfwSwapInterval(0);
+    }
+
+#if defined(_WIN32)
     glfwPollEvents();
 #endif
 
@@ -95,7 +100,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     StdRMutexUniqueLock locker(glfwGetEventLock());
 #endif
 
@@ -110,7 +115,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     ImGui::Render();
     g_user_app->endFramePostAction();
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     locker.unlock();
 #endif
 
@@ -139,13 +144,13 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 }
 
 // Main code
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 #else
 int main(int argc, char **argv)
 #endif
 {
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     IM_UNUSED(hInstance);
     IM_UNUSED(hPrevInstance);
     IM_UNUSED(lpCmdLine);
@@ -158,7 +163,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     int  argc;
     auto argv = CommandLineToArgvA(&argc);
 #endif
@@ -197,14 +202,15 @@ int main(int argc, char **argv)
 
     ImGuiIO &io    = ImGui::GetIO();
     io.IniFilename = g_user_app->getConfigPath();
+    printf("ini file: %s\n", io.IniFilename);
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(1, 1, g_user_app->getAppName().c_str(), nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h,
+                                          g_user_app->getAppName().c_str(), nullptr, nullptr);
     if (window == nullptr)
         return 1;
-    glfwSetWindowPos(window, 0, 0);
+    glfwSetWindowPos(window, g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y);
 
     ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
     glfwSetDropCallback(window, dropFileCallback);
@@ -230,7 +236,7 @@ int main(int argc, char **argv)
         std::vector<std::string> tmpArgs;
         for (int i = 0; i < argc; i++)
         {
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
             tmpArgs.push_back(argv[i].get());
 #else
 
@@ -243,14 +249,7 @@ int main(int argc, char **argv)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
 
     // Main loop
-#ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the
-    // imgui.ini file. You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
-    io.IniFilename = nullptr;
-    EMSCRIPTEN_MAINLOOP_BEGIN
-#else
     while (!glfwWindowShouldClose(window))
-#endif
     {
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your
@@ -265,9 +264,6 @@ int main(int argc, char **argv)
         if (doGUIRender(glsl_version, window))
             break;
     }
-#ifdef __EMSCRIPTEN__
-    EMSCRIPTEN_MAINLOOP_END;
-#endif
 
     g_user_app->exit();
 

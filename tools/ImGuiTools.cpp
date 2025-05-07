@@ -1,11 +1,8 @@
 
+#include <iomanip>
 #include <map>
 #include <string_view>
-
-#if defined(ON_WINDOWS)
-    #include <windows.h>
-#endif
-
+#include <filesystem>
 #include <functional>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -16,57 +13,60 @@
 using std::map;
 using std::string;
 using std::string_view;
+using std::stringstream;
 using std::vector;
+
 using namespace ImGui;
+namespace fs = std::filesystem;
 
 #define MAKE_RGBA(r, g, b) (((r) << 24) | ((g) << 16) | ((b) << 8) | 0xff)
 
 map<TextColorCode, const char *> gColorStrMap = {
-    {       ColorNone,    "\033[0m"},
-    {      ColorBlack, "\033[0;30m"},
-    {   ColorDarkGray, "\033[1;30m"},
-    {        ColorRed, "\033[0;31m"},
-    {   ColorLightRed, "\033[1;31m"},
-    {      ColorGreen, "\033[0;32m"},
-    { ColorLightGreen, "\033[1;32m"},
-    {      ColorBrown, "\033[0;33m"},
-    {     ColorYellow, "\033[1;33m"},
-    {       ColorBlue, "\033[0;34m"},
-    {  ColorLightBlue, "\033[1;34m"},
-    {     ColorPurple, "\033[0;35m"},
+    {ColorNone,        "\033[0m"   },
+    {ColorBlack,       "\033[0;30m"},
+    {ColorDarkGray,    "\033[1;30m"},
+    {ColorRed,         "\033[0;31m"},
+    {ColorLightRed,    "\033[1;31m"},
+    {ColorGreen,       "\033[0;32m"},
+    {ColorLightGreen,  "\033[1;32m"},
+    {ColorBrown,       "\033[0;33m"},
+    {ColorYellow,      "\033[1;33m"},
+    {ColorBlue,        "\033[0;34m"},
+    {ColorLightBlue,   "\033[1;34m"},
+    {ColorPurple,      "\033[0;35m"},
     {ColorLightPurple, "\033[1;35m"},
-    {       ColorCyan, "\033[0;36m"},
-    {  ColorLightCyan, "\033[1;36m"},
-    {  ColorLightGray, "\033[0;37m"},
-    {      ColorWhite, "\033[1;37m"},
+    {ColorCyan,        "\033[0;36m"},
+    {ColorLightCyan,   "\033[1;36m"},
+    {ColorLightGray,   "\033[0;37m"},
+    {ColorWhite,       "\033[1;37m"},
 };
 
 static map<const string_view, TextColorCode> gStrColorMap = {
-    {   "\033[0m",        ColorNone},
-    {  "\033[30m",       ColorBlack},
-    {"\033[0;30m",       ColorBlack},
-    {"\033[1;30m",    ColorDarkGray},
-    {  "\033[31m",         ColorRed},
-    {"\033[0;31m",         ColorRed},
-    {"\033[1;31m",    ColorLightRed},
-    {  "\033[32m",       ColorGreen},
-    {"\033[0;32m",       ColorGreen},
-    {"\033[1;32m",  ColorLightGreen},
-    {  "\033[33m",       ColorBrown},
-    {"\033[0;33m",       ColorBrown},
-    {"\033[1;33m",      ColorYellow},
-    {  "\033[34m",        ColorBlue},
-    {"\033[0;34m",        ColorBlue},
-    {"\033[1;34m",   ColorLightBlue},
-    {  "\033[35m",      ColorPurple},
-    {"\033[0;35m",      ColorPurple},
+    {"\033[0m",    ColorNone       },
+    {"\033[30m",   ColorBlack      },
+    {"\033[0;30m", ColorBlack      },
+    {"\033[1;30m", ColorDarkGray   },
+    {"\033[31m",   ColorRed        },
+    {"\033[0;31m", ColorRed        },
+    {"\033[1;31m", ColorLightRed   },
+    {"\033[32m",   ColorGreen      },
+    {"\033[0;32m", ColorGreen      },
+    {"\033[1;32m", ColorLightGreen },
+    {"\033[33m",   ColorBrown      },
+    {"\033[0;33m", ColorBrown      },
+    {"\033[1;33m", ColorYellow     },
+    {"\033[34m",   ColorBlue       },
+    {"\033[0;34m", ColorBlue       },
+    {"\033[1;34m", ColorLightBlue  },
+    {"\033[35m",   ColorPurple     },
+    {"\033[0;35m", ColorPurple     },
     {"\033[1;35m", ColorLightPurple},
-    {  "\033[36m",        ColorCyan},
-    {"\033[0;36m",        ColorCyan},
-    {"\033[1;36m",   ColorLightCyan},
-    {  "\033[37m",   ColorLightGray},
-    {"\033[0;37m",   ColorLightGray},
-    {"\033[1;37m",       ColorWhite},
+    {"\033[36m",   ColorCyan       },
+    {"\033[0;36m", ColorCyan       },
+    {"\033[1;36m", ColorLightCyan  },
+    {"\033[37m",   ColorLightGray  },
+    {"\033[0;37m", ColorLightGray  },
+    {"\033[1;37m", ColorWhite      },
 };
 #define MAKE_COLOR(color) 0x##color
 #define REVERSE_U32(a)                                                                                            \
@@ -74,23 +74,23 @@ static map<const string_view, TextColorCode> gStrColorMap = {
                 | (((uint64_t)(a) << 24) & 0xff000000)))
 #define REVERSE_U32_COLOR(color) REVERSE_U32(MAKE_COLOR(color))
 static map<TextColorCode, ImU32> ColorValueMap = {
-    {       ColorNone, REVERSE_U32_COLOR(000000FF)}, //  #000000FF
-    {      ColorBlack, REVERSE_U32_COLOR(111111FF)}, //  #111111FF
-    {   ColorDarkGray, REVERSE_U32_COLOR(2B2B2BFF)}, //  #2B2B2BFF
-    {        ColorRed, REVERSE_U32_COLOR(C00E0EFF)}, //  #C00E0EFF
-    {   ColorLightRed, REVERSE_U32_COLOR(E73C3CFF)}, //  #E73C3CFF
-    {      ColorGreen, REVERSE_U32_COLOR(0EB160FF)}, //  #0EB160FF
-    { ColorLightGreen, REVERSE_U32_COLOR(1CEB83FF)}, //  #1CEB83FF
-    {      ColorBrown, REVERSE_U32_COLOR(7C7C0DFF)}, //  #7C7C0DFF
-    {     ColorYellow, REVERSE_U32_COLOR(DEC018FF)}, //  #DEC018FF
-    {       ColorBlue, REVERSE_U32_COLOR(0731ECFF)}, //  #0731ECFF
-    {  ColorLightBlue, REVERSE_U32_COLOR(6980E6FF)}, //  #6980E6FF
-    {     ColorPurple, REVERSE_U32_COLOR(7A0867FF)}, //  #7A0867FF
+    {ColorNone,        REVERSE_U32_COLOR(000000FF)}, //  #000000FF
+    {ColorBlack,       REVERSE_U32_COLOR(111111FF)}, //  #111111FF
+    {ColorDarkGray,    REVERSE_U32_COLOR(2B2B2BFF)}, //  #2B2B2BFF
+    {ColorRed,         REVERSE_U32_COLOR(C00E0EFF)}, //  #C00E0EFF
+    {ColorLightRed,    REVERSE_U32_COLOR(E73C3CFF)}, //  #E73C3CFF
+    {ColorGreen,       REVERSE_U32_COLOR(0EB160FF)}, //  #0EB160FF
+    {ColorLightGreen,  REVERSE_U32_COLOR(1CEB83FF)}, //  #1CEB83FF
+    {ColorBrown,       REVERSE_U32_COLOR(7C7C0DFF)}, //  #7C7C0DFF
+    {ColorYellow,      REVERSE_U32_COLOR(DEC018FF)}, //  #DEC018FF
+    {ColorBlue,        REVERSE_U32_COLOR(0731ECFF)}, //  #0731ECFF
+    {ColorLightBlue,   REVERSE_U32_COLOR(6980E6FF)}, //  #6980E6FF
+    {ColorPurple,      REVERSE_U32_COLOR(7A0867FF)}, //  #7A0867FF
     {ColorLightPurple, REVERSE_U32_COLOR(C930AFFF)}, //  #C930AFFF
-    {       ColorCyan, REVERSE_U32_COLOR(12DEECFF)}, //  #12DEECFF
-    {  ColorLightCyan, REVERSE_U32_COLOR(75E8F0FF)}, //  #75E8F0FF
-    {  ColorLightGray, REVERSE_U32_COLOR(797979FF)}, //  #797979FF
-    {      ColorWhite, REVERSE_U32_COLOR(DFDFDFFF)}, //  #DFDFDFFF
+    {ColorCyan,        REVERSE_U32_COLOR(12DEECFF)}, //  #12DEECFF
+    {ColorLightCyan,   REVERSE_U32_COLOR(75E8F0FF)}, //  #75E8F0FF
+    {ColorLightGray,   REVERSE_U32_COLOR(797979FF)}, //  #797979FF
+    {ColorWhite,       REVERSE_U32_COLOR(DFDFDFFF)}, //  #DFDFDFFF
 };
 
 int getUtf8CharSize(const char *str)
@@ -145,6 +145,7 @@ void LoggerWindow::displayTexts()
                 PushStyleColor(ImGuiCol_Text, ColorValueMap[log.color]);
                 colorSet = true;
             }
+            curColor = log.color;
         }
 
         if (!newLine)
@@ -653,4 +654,308 @@ void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioDir, ImGuiID *out
     {
         ImGui::DockBuilderSplitNode(dock, splitDir, sizeRatioDir, outDockDir, outDockOppositeDir);
     }
+}
+ImGuiBinaryViewer::ImGuiBinaryViewer(std::string title, bool embed) : IImGuiWindow(title)
+{
+    mIsChildWindow = embed;
+    if (embed)
+    {
+        mChildFlags |= ImGuiChildFlags_Borders;
+        mOpened = true;
+    }
+}
+
+ImGuiBinaryViewer::~ImGuiBinaryViewer() {}
+#define TEXT_GAP 20
+void ImGuiBinaryViewer::showContent()
+{
+    bool hasButtons = false;
+    if (mSaveDataCallback)
+    {
+        hasButtons = true;
+        if (Button("Save"))
+        {
+            string dstFilePath = getSavePath({}, {}, mLastSaveDir);
+            if (dstFilePath.empty())
+            {
+                string err = getLastError();
+                if (!err.empty())
+                {
+                    err = "Get Save Path Fail: " + err;
+                    mErrors.push_back(err);
+                }
+            }
+
+            if (!dstFilePath.empty())
+            {
+                mSaveDataCallback(dstFilePath, mUserData);
+                mLastSaveDir = fs::path(dstFilePath).parent_path().string();
+            }
+        }
+    }
+    if (mGetDataSizeCallback && mGetDataCallback)
+    {
+        if (hasButtons)
+            SameLine();
+        else
+            hasButtons = true;
+        if (Button("Copy"))
+        {
+            stringstream copyTextStream;
+            ImS64        size = mGetDataSizeCallback(mUserData);
+            if (size > 0)
+            {
+                for (ImS64 i = 0; i < size; i++)
+                {
+                    uint8_t data = mGetDataCallback(i, mUserData);
+                    copyTextStream << "0x" << std::hex << std::setw(2) << std::setfill('0') << (int)data;
+                    if (i < size - 1)
+                        copyTextStream << ", ";
+                }
+                SetClipboardText(copyTextStream.str().c_str());
+            }
+        }
+    }
+
+    BeginChild("Show Binary##Real", ImVec2(0, 0), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoNavInputs);
+
+    float  indexLength = CalcTextSize("00000000").x;
+    float  byteLength  = CalcTextSize("00").x;
+    float  letterWidth = CalcTextSize("T").x;
+    ImVec2 spaceSize   = GetStyle().ItemSpacing;
+    float  spaceLength = spaceSize.x;
+
+    ImVec2 regionSize = GetContentRegionAvail();
+    regionSize.y += GetStyle().ScrollbarSize + spaceSize.y;
+
+    float showRegionLength = regionSize.x;
+    int   showBytes        = 0;
+    if (showRegionLength > indexLength)
+        showBytes = (int)((showRegionLength - indexLength - TEXT_GAP) / (byteLength + spaceLength + letterWidth));
+
+    if (showBytes >= 32)
+        showBytes = 32;
+    else if (showBytes >= 16)
+        showBytes = 16;
+    else if (showBytes >= 8)
+        showBytes = 8;
+    else if (showBytes >= 4)
+        showBytes = 4;
+    else if (showBytes >= 2)
+        showBytes = 2;
+    else
+        showBytes = 1;
+
+    ImS64 dataSize = 0;
+    if (mGetDataSizeCallback)
+        dataSize = mGetDataSizeCallback(mUserData);
+
+    // printf("region %f, index l %f, byte l %f, space l %f, showBytes: %d\n", showRegionLength, indexLength,
+    // byteLength, spaceLength, showBytes);
+    ImS64 lines = dataSize / showBytes;
+    if (dataSize % showBytes)
+        lines++;
+    ImColor bgColor = GetStyle().Colors[ImGuiCol_WindowBg];
+    ImColor headerColor;
+    ImColor headerHighlightColor;
+    ImColor oddLineColor;
+
+    if (bgColor.Value.x > 0.5f)
+    {
+        headerColor.Value.x = bgColor.Value.x * 0.8f;
+        headerColor.Value.y = bgColor.Value.y * 0.8f;
+        headerColor.Value.z = bgColor.Value.z * 0.8f;
+        headerColor.Value.w = 1;
+
+        headerHighlightColor.Value.x = bgColor.Value.x * 0.7f;
+        headerHighlightColor.Value.y = bgColor.Value.y * 0.7f;
+        headerHighlightColor.Value.z = bgColor.Value.z * 0.7f;
+        headerHighlightColor.Value.w = 1;
+
+        oddLineColor.Value.x = bgColor.Value.x * 0.9f;
+        oddLineColor.Value.y = bgColor.Value.y * 0.9f;
+        oddLineColor.Value.z = bgColor.Value.z * 0.9f;
+        oddLineColor.Value.w = 1;
+    }
+    else
+    {
+        headerColor.Value.x = 1.f - (1.f - bgColor.Value.x) * 0.8f;
+        headerColor.Value.y = 1.f - (1.f - bgColor.Value.y) * 0.8f;
+        headerColor.Value.z = 1.f - (1.f - bgColor.Value.z) * 0.8f;
+        headerColor.Value.w = 1;
+
+        headerHighlightColor.Value.x = 1.f - (1.f - bgColor.Value.x) * 0.7f;
+        headerHighlightColor.Value.y = 1.f - (1.f - bgColor.Value.y) * 0.7f;
+        headerHighlightColor.Value.z = 1.f - (1.f - bgColor.Value.z) * 0.7f;
+        headerHighlightColor.Value.w = 1;
+
+        oddLineColor.Value.x = 1.f - (1.f - bgColor.Value.x) * 0.9f;
+        oddLineColor.Value.y = 1.f - (1.f - bgColor.Value.y) * 0.9f;
+        oddLineColor.Value.z = 1.f - (1.f - bgColor.Value.z) * 0.9f;
+        oddLineColor.Value.w = 1;
+    }
+
+    ImS64 showLineCount =
+        (int)((regionSize.y - (GetTextLineHeight() + spaceSize.y / 2)) / (GetTextLineHeight() + spaceSize.y)) - 1;
+    if (showLineCount > lines)
+        showLineCount = lines;
+
+    ImS64 scrollMax = lines - showLineCount;
+    if (scrollMax > 0)
+    {
+        // make parent window not scroll through mouse wheel
+        if (mIsChildWindow && mHovered)
+            SetKeyOwner(ImGuiKey_MouseWheelY, GetCurrentWindow()->ID);
+
+        float scrollbar_size                 = ImGui::GetStyle().ScrollbarSize;
+        GetCurrentWindow()->ScrollbarSizes.x = scrollbar_size; // Hack to use GetWindowScrollbarRect()
+        ImRect  scrollbar_rect               = ImGui::GetWindowScrollbarRect(GetCurrentWindow(), ImGuiAxis_Y);
+        ImGuiID scrollbar_id                 = ImGui::GetWindowScrollbarID(GetCurrentWindow(), ImGuiAxis_Y);
+        ImS64   scroll_visible_size          = (ImS64)regionSize.y;
+
+        scrollMax *= 1000;
+        mScrollPos *= 1000;
+        ImGui::ScrollbarEx(scrollbar_rect, scrollbar_id, (ImGuiAxis)ImGuiAxis_Y, &mScrollPos, scroll_visible_size,
+                           scrollMax, ImDrawFlags_RoundCornersAll);
+        mScrollPos /= 1000;
+    }
+
+    // draw header color
+    ImVec2 pos      = GetCursorScreenPos();
+    ImVec2 startPos = pos + ImVec2(indexLength + spaceLength / 2, 0);
+    ImVec2 endPos   = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
+    GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
+
+    startPos = pos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    endPos   = startPos + ImVec2(indexLength + spaceLength, showLineCount * (GetTextLineHeight() + spaceSize.y));
+    GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
+
+    // draw odd line color
+    for (int j = 1; j < showBytes; j += 2)
+    {
+        startPos = pos
+                 + ImVec2(indexLength + j * (byteLength + spaceLength) + spaceLength / 2,
+                          GetTextLineHeight() + spaceSize.y / 2);
+        endPos = startPos + ImVec2(byteLength + spaceLength, (GetTextLineHeight() + spaceSize.y) * showLineCount);
+        GetWindowDrawList()->AddRectFilled(startPos, endPos, oddLineColor);
+    }
+
+    // draw highlight color
+    ImS64 offsetLine = mSelectOffset / showBytes;
+    if (offsetLine >= lines)
+        offsetLine = lines - 1;
+    int offsetByte = mSelectOffset % showBytes;
+
+    if (offsetLine >= mScrollPos && offsetLine < mScrollPos + showLineCount)
+    {
+        startPos = pos + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte, 0);
+        endPos   = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y / 2);
+        GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
+
+        ImS64 offLine = offsetLine - mScrollPos;
+
+        startPos = pos
+                 + ImVec2(-spaceLength / 2,
+                          GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
+        endPos = startPos + ImVec2(indexLength + spaceLength, GetTextLineHeight() + spaceSize.y);
+        GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
+
+        startPos = pos
+                 + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte,
+                          GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
+        endPos = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y);
+        GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
+    }
+
+    // show Texts
+    Text("%08llx" , mSelectOffset);
+    for (int i = 0; i < showBytes; i++)
+    {
+        SameLine();
+        Text("%02X", i);
+    }
+
+    // not showing all for big amount of data
+    for (ImS64 i = mScrollPos; i < mScrollPos + showLineCount; i++)
+    {
+        Text("%08llx", i * showBytes);
+
+        string showText;
+        for (ImS64 j = 0; j < showBytes; j++)
+        {
+            if (i * showBytes + j >= dataSize)
+                break;
+            SameLine();
+            uint8_t data = mGetDataCallback(i * showBytes + j, mUserData);
+            Text("%02X", data);
+            if (isalpha(data) || isdigit(data) || ispunct(data) || data == ' ')
+            {
+                showText.push_back(data);
+            }
+            else
+            {
+                showText.push_back('.');
+            }
+        }
+        SameLine(0, 0);
+        auto curPos = GetCursorScreenPos();
+        SetCursorScreenPos(curPos + ImVec2(TEXT_GAP, 0));
+        if(i == offsetLine)
+        {
+            string preText = showText.substr(0, offsetByte);
+            startPos       = curPos + ImVec2(TEXT_GAP + CalcTextSize(preText.c_str()).x, 0);
+            string tmpText;
+            tmpText += showText[offsetByte];
+
+            endPos = startPos + ImVec2(CalcTextSize(tmpText.c_str()).x, GetTextLineHeight());
+            GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
+        }
+        Text("%s", showText.c_str());
+    }
+
+    pos += ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+
+    if (IsWindowHovered())
+    {
+        if (IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            ImVec2 mousePos = GetMousePos();
+            mousePos.y += GetScrollY();
+
+            ImVec2 offset = mousePos - pos;
+
+            if (offset.x >= 0 && offset.x < showBytes * (byteLength + spaceLength) && offset.y >= 0
+                && offset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            {
+                mSelectOffset = ((int)(offset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
+                              + (int)(offset.x / (byteLength + spaceLength));
+            }
+        }
+
+        if (IsKeyDown(ImGuiKey_MouseWheelY))
+        {
+            mScrollPos -= (ImS64)GetIO().MouseWheel;
+            if (mScrollPos < 0)
+                mScrollPos = 0;
+            if (mScrollPos > lines - showLineCount)
+                mScrollPos = lines - showLineCount;
+        }
+    }
+
+    EndChild();
+    mWindowFlags |= ImGuiWindowFlags_NoDocking;
+}
+
+void ImGuiBinaryViewer::setDataCallbacks(std::function<ImS64(void *)>                     getDataSizeCallback,
+                                         std::function<uint8_t(ImS64, void *)>            getDataCallback,
+                                         std::function<void(const std::string &, void *)> saveCallback)
+{
+    mGetDataSizeCallback = getDataSizeCallback;
+    mGetDataCallback     = getDataCallback;
+    mSaveDataCallback    = saveCallback;
+}
+
+void ImGuiBinaryViewer::setUserData(void *userData)
+{
+    mUserData = userData;
 }

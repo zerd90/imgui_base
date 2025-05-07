@@ -9,30 +9,31 @@ execute_process(
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-if("${RENDER}" STREQUAL "")
-	message(WARNING "RENDER not Set, Using Default")
-
-	if(WIN32)
+if(RENDER MATCHES "")
+	if(CMAKE_SYSTEM_NAME MATCHES Windows)
 		SET(RENDER WIN32_DX11)
 	else()
 		SET(RENDER GLFW_OPENGL3)
 	endif()
+
+	message(STATUS "RENDER not Set, Using Default ${RENDER}")
 endif()
 
-if("${RENDER}" STREQUAL "GLFW_OPENGL3")
+if(RENDER MATCHES GLFW_OPENGL3)
 	find_package(glfw3 QUIET)
 
 	if(glfw3_FOUND)
-		message(STATUS "glfw3 found ${glfw3_DIR} ${glfw3_INCLUDE_DIRS} ${glfw3_LIBS}")
+		message(STATUS "glfw3 found ${glfw3_DIR}")
 		set(LINK_GLFW_LIBRARY glfw)
+		set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES} glfw)
 	else()
 		message(WARNING "Can't find glfw, set the include_directories and link_directories")
 		set(LINK_GLFW_LIBRARY glfw3)
-		endif()
+	endif()
 endif()
 
 # 指定模块对外头文件 #
-if( PROJECT_IS_TOP_LEVEL)
+if(PROJECT_IS_TOP_LEVEL)
 	set(CMAKE_CXX_STANDARD 17)
 else()
 	set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
@@ -42,19 +43,21 @@ else()
 		PARENT_SCOPE
 	)
 endif()
-if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} MATCHES GNU)
-set(USING_MINGW ON)
+
+if(CMAKE_SYSTEM_NAME MATCHES Windows AND ${CMAKE_CXX_COMPILER_ID} MATCHES GNU)
+	set(USING_MINGW ON)
 else()
-set(USING_MINGW OFF)
+	set(USING_MINGW OFF)
 endif()
+
 message(STATUS USING_MINGW=${USING_MINGW})
+
 if(USING_MINGW)
 	set(PARENT_LINK_LIBRARIES mingw32)
 endif()
 
-
-if("${RENDER}" STREQUAL "WIN32_DX11")
-	if(NOT PROJECT_IS_TOP_LEVEL)
+if(NOT PROJECT_IS_TOP_LEVEL)
+	if(RENDER MATCHES WIN32_DX11)
 		set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
 			${PROJECT_NAME} d3d11
 		)
@@ -67,39 +70,33 @@ if("${RENDER}" STREQUAL "WIN32_DX11")
 
 		set(PLATFORM "WIN32" PARENT_SCOPE)
 		set(RENDER_API "D3D11" PARENT_SCOPE)
-	endif()
-elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
-	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-		if(NOT PROJECT_IS_TOP_LEVEL)
+	elseif(RENDER MATCHES GLFW_OPENGL3)
+		if(${CMAKE_SYSTEM_NAME} MATCHES Windows)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
 				${PROJECT_NAME} opengl32
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
-		endif()
-	elseif(${CMAKE_SYSTEM_NAME} MATCHES "LINUX")
-		if(NOT PROJECT_IS_TOP_LEVEL)
+		elseif(${CMAKE_SYSTEM_NAME} MATCHES Linux)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} glfw3
+				${PROJECT_NAME} ${LINK_GLFW_LIBRARY} GL
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
-		endif()
-	elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-		if(NOT PROJECT_IS_TOP_LEVEL)
+		elseif(${CMAKE_SYSTEM_NAME} MATCHES Darwin)
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} glfw3
+				${PROJECT_NAME}
+				"-framework OpenGL"
+				"-framework Cocoa"
+				"-framework UniformTypeIdentifiers"
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
 		endif()
 	endif()
-
-	set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES}
-		${LINK_GLFW_LIBRARY})
 endif()
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if(${CMAKE_SYSTEM_NAME} MATCHES Linux)
 	# find gtk for file dialog
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(GTK4 REQUIRED gtk4)
@@ -130,15 +127,15 @@ set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 	${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.cpp
 )
 
-if(APPLE)
+if(CMAKE_SYSTEM_NAME MATCHES Darwin)
 	set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 		${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.mm
 	)
 endif()
 
-if("${RENDER}" STREQUAL "WIN32_DX11")
+if(RENDER MATCHES WIN32_DX11)
 	file(GLOB SRC_RENDER "backends/imgui_impl_dx11.cpp" "backends/imgui_impl_win32.cpp" "backends/imgui_main_win32_dx11.cpp")
-elseif("${RENDER}" STREQUAL "GLFW_OPENGL3")
+elseif(RENDER MATCHES GLFW_OPENGL3)
 	file(GLOB SRC_RENDER "backends/imgui_impl_opengl3.cpp" "backends/imgui_impl_glfw.cpp" "backends/imgui_main_glfw_opengl3.cpp")
 else()
 	message(FATAL_ERROR "RENDER not Available, Available Options:\n\

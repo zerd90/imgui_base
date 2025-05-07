@@ -1,11 +1,21 @@
 #include <stdint.h>
 #include <filesystem>
+#ifdef __linux
+    #include <unistd.h>
+#endif
+
 #include "ImGuiApplication.h"
-#include "imgui_impl_common.h"
-#ifdef ON_WINDOWS
+
+#if defined(_WIN32) || defined(__APPLE__)
+    #include "imgui_impl_common.h"
+#endif
+
+#ifdef _WIN32
     #include <Windows.h>
 #endif
+
 namespace fs = std::filesystem;
+
 ImGuiApplication::ImGuiApplication()
 {
     mWindowRect      = {100, 100, 640, 480};
@@ -15,8 +25,14 @@ ImGuiApplication::ImGuiApplication()
     GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
     wprintf(L"current dir %s\n", cur_dir);
     mExePath = unicodeToUtf8(cur_dir);
-#else
-    // TODO: MAC/LINUX
+#elif defined(__linux)
+    char exePathStr[1024] = {0};
+    readlink("/proc/self/exe", exePathStr, sizeof(exePathStr));
+    mExePath = exePathStr;
+    printf("current dir %s\n", exePathStr);
+#elif defined(__APPLE__)
+    mExePath = getApplicationPath();
+    printf("current dir %s\n", mExePath.c_str());
 #endif
 
     fs::path exePath(mExePath);

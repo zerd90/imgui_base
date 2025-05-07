@@ -41,6 +41,15 @@ void IImGuiWindow::show()
         needShowContent = Begin(mTitle.c_str(), mHasCloseButton ? &mOpened : nullptr, mWindowFlags);
 
     updateWindowStatus();
+    if (mWinSize.x < 200 || mWinSize.y < 200)
+    {
+        if (mWinSize.x < 200)
+            mWinSize.x = 200;
+        if (mWinSize.y < 200)
+            mWinSize.y = 200;
+        SetWindowSize(mWinSize, ImGuiCond_Always);
+    }
+
     if (!mMenuBarItems.subMenus.empty())
     {
         if (BeginMenuBar())
@@ -119,7 +128,7 @@ void IImGuiWindow::show()
         if (mStatusProgressFraction >= 0)
         {
             SameLine();
-            ProgressBar(mStatusProgressFraction, ImVec2(-1, 0), "");
+            ProgressBar(mStatusProgressFraction, ImVec2(MIN(GetContentRegionAvail().x - 50, 200), 0), "");
         }
         if (0 != mStatusStringColor)
             PopStyleColor();
@@ -134,6 +143,8 @@ _WINDOW_END_:
 
     if (!mOpened)
         mJustClosed = true;
+    else
+        mJustClosed = false;
 }
 
 void IImGuiWindow::setTitle(const std::string &title)
@@ -408,9 +419,9 @@ ImGuiMainWindow::ImGuiMainWindow(const std::string &title) : ImGuiMainWindow()
 }
 
 // return if clicked
-bool drawButtonBg(const ImRect &buttonRect)
+bool drawButtonBg(const ImRect &buttonRect, bool buttonEnabled)
 {
-    if (IsMouseHoveringRect(buttonRect.Min, buttonRect.Max))
+    if (buttonEnabled && IsMouseHoveringRect(buttonRect.Min, buttonRect.Max))
     {
         if (IsMouseDown(ImGuiMouseButton_Left))
         {
@@ -420,6 +431,7 @@ bool drawButtonBg(const ImRect &buttonRect)
         {
             GetWindowDrawList()->AddRectFilled(buttonRect.Min, buttonRect.Max, GetColorU32(ImGuiCol_ButtonHovered));
         }
+
         if (IsMouseReleased(ImGuiMouseButton_Left))
             return true;
     }
@@ -427,9 +439,9 @@ bool drawButtonBg(const ImRect &buttonRect)
     return false;
 }
 // return if clicked
-bool drawMinimizeButton(const ImRect &buttonRect)
+bool drawMinimizeButton(const ImRect &buttonRect, bool buttonEnabled)
 {
-    bool clicked = drawButtonBg(buttonRect);
+    bool clicked = drawButtonBg(buttonRect, buttonEnabled);
 
     // Draw the minimize button icon
     GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 2),
@@ -438,9 +450,9 @@ bool drawMinimizeButton(const ImRect &buttonRect)
 
     return clicked;
 }
-bool drawMaximizeButton(const ImRect &buttonRect, bool maximized)
+bool drawMaximizeButton(const ImRect &buttonRect, bool maximized, bool buttonEnabled)
 {
-    bool clicked = drawButtonBg(buttonRect);
+    bool clicked = drawButtonBg(buttonRect, buttonEnabled);
 
     // Draw the maximize button icon
     if (maximized)
@@ -461,9 +473,9 @@ bool drawMaximizeButton(const ImRect &buttonRect, bool maximized)
     return clicked;
 }
 
-bool drawCloseButton(const ImRect &buttonRect)
+bool drawCloseButton(const ImRect &buttonRect, bool buttonEnabled)
 {
-    bool clicked = drawButtonBg(buttonRect);
+    bool clicked = drawButtonBg(buttonRect, buttonEnabled);
     // Draw the close button icon
     GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
                                  buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
@@ -502,17 +514,20 @@ void ImGuiMainWindow::show()
     pushStyles();
 
     mWindowFlags |= ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar
-                  | ImGuiWindowFlags_NoCollapse;
+                  | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus;
     mFocusedFlags |= ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_DockHierarchy;
 
-    auto  mainViewPort = GetMainViewport();
+    auto *mainViewPort = GetMainViewport();
     auto &platformIO   = GetPlatformIO();
     SetNextWindowViewport(mainViewPort->ID);
     SetNextWindowPos(mainViewPort->WorkPos); // Use work area to avoid visible taskbar on Windows
-    SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Once);
+    SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Always);
 
     PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    Begin("##App Main Window", &mOpened, mWindowFlags);
+    if (mMaximized)
+        Begin("##App Main Window", &mOpened, mWindowFlags | ImGuiWindowFlags_NoResize);
+    else
+        Begin("##App Main Window", &mOpened, mWindowFlags);
     PopStyleVar();
 
     updateWindowStatus();
@@ -537,13 +552,14 @@ void ImGuiMainWindow::show()
     ImVec4 tmpColor = ColorConvertU32ToFloat4(GetColorU32(ImGuiCol_TitleBgActive));
     if (!mFocused)
     {
-        tmpColor.x /= 2;
-        tmpColor.y /= 2;
-        tmpColor.z /= 2;
+        tmpColor.x = 1.f - (1.f - tmpColor.x) / 2.f;
+        tmpColor.y = 1.f - (1.f - tmpColor.y) / 2.f;
+        tmpColor.z = 1.f - (1.f - tmpColor.z) / 2.f;
     }
     titleBarColor = ColorConvertFloat4ToU32(tmpColor);
 
     ImRect titleBarRect(mWinPos, mWinPos + titleBarSize);
+    ImRect titleBarMovableRect(mWinPos, mWinPos + titleBarSize - ImVec2{buttonSize * 3, 0});
     ImGui::GetWindowDrawList()->AddRectFilled(mWinPos, mWinPos + titleBarSize, titleBarColor);
 
     SetCursorScreenPos(mWinPos + style.ItemSpacing);
@@ -562,67 +578,83 @@ void ImGuiMainWindow::show()
 
     Text("%s", title.c_str());
 
-    if (drawCloseButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize, 0}, mWinPos + ImVec2{mWinSize.x, buttonSize})))
+    if (drawCloseButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize, 0}, mWinPos + ImVec2{mWinSize.x, buttonSize}),
+                        (mHovered && GetMouseCursor() == ImGuiMouseCursor_Arrow)))
     {
         mOpened = false;
     }
 
-    if (mMaximized && mWinPos != ImVec2(0, 0)) // manually moved
-    {
-        printf("manual moved\n");
-        mMaximized = false;
-        SetWindowSize(mNormalSize, ImGuiCond_Always);
-    }
-
     if (drawMaximizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 2, 0},
                                   mWinPos + ImVec2{mWinSize.x - buttonSize, buttonSize}),
-                           mMaximized)
-        || (IsMouseHoveringRect(titleBarRect.Min, titleBarRect.Max) && IsMouseDoubleClicked(ImGuiMouseButton_Left)))
+                           mMaximized, (mHovered && GetMouseCursor() == ImGuiMouseCursor_Arrow))
+        || (IsMouseHoveringRect(titleBarRect.Min, titleBarRect.Max) && IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        || (mMaximized && mStartMove))
     {
         // SetWindowSize();
         mMaximized = !mMaximized;
         if (mMaximized)
         {
-            auto maximumSize = GetDisplayWorkArea();
-            printf("maximumSize: %f, %f\n", maximumSize.x, maximumSize.y);
-            mNormalPos  = mWinPos;
-            mNormalSize = mWinSize;
-            SetWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-            SetWindowSize(maximumSize, ImGuiCond_Always);
+            ImRect maximumRect = maximizeMainWindow();
+            mNormalPos         = mWinPos;
+            mNormalSize        = mWinSize;
         }
         else
         {
-            printf("set window pos: %f, %f\n", mNormalPos.x, mNormalPos.y);
-            SetWindowPos(mNormalPos, ImGuiCond_Always);
-            SetWindowSize(mNormalSize, ImGuiCond_Always);
+            if (mStartMove) // if moved by user,set window pos according to the mouse pos
+            {
+                ImVec2 mousePos = GetMousePos();
+                ImVec2 tmpPos   = mousePos - mWinPos;
+
+                mNormalPos.x = mousePos.x - mNormalSize.x * tmpPos.x / mWinSize.x;
+                mNormalPos.y = mWinPos.y;
+
+                mStartMoveMousePos = mousePos;
+                mStartMoveWinPos   = mNormalPos;
+            }
+            normalizeApplication(ImRect(mNormalPos, mNormalPos + mNormalSize));
         }
     }
 
     if (drawMinimizeButton(ImRect(mWinPos + ImVec2{mWinSize.x - buttonSize * 3, 0},
-                                  mWinPos + ImVec2{mWinSize.x - buttonSize * 2, buttonSize})))
-        minimizedApplication();
+                                  mWinPos + ImVec2{mWinSize.x - buttonSize * 2, buttonSize}),
+                           (mHovered && GetMouseCursor() == ImGuiMouseCursor_Arrow)))
+        minimizeMainWindow();
 
     if (mStartMove)
     {
         if (IsMouseReleased(ImGuiMouseButton_Left))
         {
-            mStartMove = false;
+            mStartMove         = false;
+            mTitleBarMouseDown = false;
         }
-        else if (IsMouseDragging(ImGuiMouseButton_Left)) // mouse moved, update window position. otherwise, do nothing.
+        else if (GetMousePos() != mStartMoveMousePos)
         {
             platformIO.Platform_SetWindowPos(mainViewPort, mStartMoveWinPos + GetMousePos() - mStartMoveMousePos);
         }
     }
     else
     {
-        if (IsMouseHoveringRect(mWinPos,
-                                mWinPos + ImVec2(titleBarRect.GetWidth() - buttonSize, titleBarRect.GetHeight()))
+        if (mHovered && IsMouseHoveringRect(titleBarMovableRect.Min, titleBarMovableRect.Max)
             && IsMouseDown(ImGuiMouseButton_Left) && GetMouseCursor() == ImGuiMouseCursor_Arrow)
         {
+            if (!mTitleBarMouseDown)
+            {
+                mTitleBarMouseDown = true;
+                mStartMoveMousePos = GetMousePos();
+            }
+        }
 
-            mStartMoveMousePos = GetMousePos();
-            mStartMoveWinPos   = platformIO.Platform_GetWindowPos(mainViewPort);
-            mStartMove         = true;
+        if (mTitleBarMouseDown)
+        {
+            if (GetMousePos() != mStartMoveMousePos)
+            {
+                mStartMoveWinPos = platformIO.Platform_GetWindowPos(mainViewPort);
+                mStartMove       = true;
+            }
+            else if (IsMouseReleased(ImGuiMouseButton_Left))
+            {
+                mTitleBarMouseDown = false;
+            }
         }
     }
 
@@ -637,7 +669,6 @@ void ImGuiMainWindow::show()
 
     if (!mMenuBarItems.subMenus.empty())
     {
-        printf("avail %f,%f\n", tmpWinSize.x, tmpWinSize.y);
         if (BeginMenuBar())
         {
             std::function<void(SMenuItem)> showMenuItem = [&showMenuItem](SMenuItem menuItem)
@@ -698,7 +729,7 @@ void ImGuiMainWindow::show()
         if (mStatusProgressFraction >= 0)
         {
             SameLine();
-            ProgressBar(mStatusProgressFraction, ImVec2(-1, 0), "");
+            ProgressBar(mStatusProgressFraction, ImVec2(MIN(GetContentRegionAvail().x - 50, 200), 0), "");
         }
         if (0 != mStatusStringColor)
             PopStyleColor();
@@ -710,4 +741,12 @@ void ImGuiMainWindow::show()
 
     if (!mOpened)
         mJustClosed = true;
+}
+std::string IImGuiWindow::getError()
+{
+    if (mErrors.empty())
+        return "";
+    string err = mErrors.front();
+    mErrors.pop_front();
+    return err;
 }

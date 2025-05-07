@@ -5,16 +5,10 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <thread>
-#include <mutex>
-#include <functional>
+#include <sstream>
 #include "imgui.h"
 
 #include "ImGuiApplication.h"
-
-#if defined(WIN32) || defined(_WIN32)
-    #define ON_WINDOWS
-#endif
 
 // for Renderer
 
@@ -58,26 +52,65 @@ static inline auto arrayMakeSharedPtr(size_t length, _T defaultValue)
 
 extern ImGuiApplication *g_user_app;
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
 
 std::string  unicodeToUtf8(const std::wstring &wStr);
 std::wstring utf8ToUnicode(const std::string &str);
-std::string  utf8ToLocal(const std::string &str);
-std::string  localToUtf8(const std::string &str);
-
 #endif
 
-// for Platform
-std::string              selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                    std::string             initDirPath = std::string());
-std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                             std::string             initDirPath = std::string());
-std::string              getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                     std::string defaultExt = std::string(), std::string defaultPath = std::string());
+std::string utf8ToLocal(const std::string &str);
+std::string localToUtf8(const std::string &str);
+
+template <typename... Args>
+std::string combineString(Args... args)
+{
+    std::stringstream ss;
+    (ss << ... << args); // C++17 fold expression
+    return ss.str();
+}
+
+std::string getLastError();
+
+// from errno
+std::string getSystemError();
+
+// Platform Relative
+
+#if defined(WIN32) || defined(_WIN32)
+    #define fseek64 _fseeki64
+    #define ftell64 _ftelli64
+using file_stat64_t = struct _stat64;
+    #define stat64 _stat64
+
+#elif defined(__linux)
+    #define fseek64 fseeko64
+    #define ftell64 ftello64
+using file_stat64_t = struct stat64;
+
+#else // MacOS
+    #define fseek64 fseek
+    #define ftell64 ftell
+    #define stat64  stat
+using file_stat64_t = struct stat;
+
+std::string getApplicationPath();
+#endif
+
+std::string              selectFile(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                    const std::string             &initDirPath = std::string());
+std::vector<std::string> selectMultipleFiles(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                             const std::string             &initDirPath = std::string());
+std::string              getSavePath(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                     const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
 void                     openDebugWindow();
 
-ImVec2 GetDisplayWorkArea();
-void   minimizedApplication();
+// Backend Relative
+void setApplicationTitle(const std::string &title);
+
+ImRect getDisplayWorkArea();
+ImRect maximizeMainWindow();
+void   normalizeApplication(const ImRect &winRect);
+void   minimizeMainWindow();
 
 #endif

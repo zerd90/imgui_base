@@ -87,6 +87,7 @@
 //  2017-08-25: Inputs: MousePos set to -FLT_MAX,-FLT_MAX when mouse is unavailable/missing (instead of -1,-1).
 //  2016-10-15: Misc: Added a void* user_data parameter to Clipboard function handlers.
 
+#include <set>
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
     #include "imgui_impl_glfw.h"
@@ -119,16 +120,6 @@
         #include <unistd.h> // for usleep()
     #endif
 
-    #ifdef __EMSCRIPTEN__
-        #include <emscripten.h>
-        #include <emscripten/html5.h>
-        #ifdef EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3
-            #include <GLFW/emscripten_glfw3.h>
-        #else
-            #define EMSCRIPTEN_USE_EMBEDDED_GLFW3
-        #endif
-    #endif
-
     #include "ImGuiBaseTypes.h"
 
     // We gather version tests as define in order to easily see which features are version-dependent.
@@ -137,7 +128,7 @@
     #define GLFW_HAS_WINDOW_HOVERED (GLFW_VERSION_COMBINED >= 3300)  // 3.3+ GLFW_HOVERED
     #define GLFW_HAS_WINDOW_ALPHA (GLFW_VERSION_COMBINED >= 3300)    // 3.3+ glfwSetWindowOpacity
     #define GLFW_HAS_PER_MONITOR_DPI (GLFW_VERSION_COMBINED >= 3300) // 3.3+ glfwGetMonitorContentScale
-    #if defined(__EMSCRIPTEN__) || defined(__SWITCH__) // no Vulkan support in GLFW for Emscripten or homebrew Nintendo Switch
+    #if defined(__SWITCH__) // no Vulkan support in GLFW for Emscripten or homebrew Nintendo Switch
         #define GLFW_HAS_VULKAN (0)
     #else
         #define GLFW_HAS_VULKAN (GLFW_VERSION_COMBINED >= 3200) // 3.2+ glfwCreateWindowSurface
@@ -203,6 +194,8 @@ struct ImGui_ImplGlfw_Data
     ImGui_ImplGlfw_Data() { memset((void *)this, 0, sizeof(*this)); }
 };
 
+std::set<GLFWwindow *> gWindows;
+
 // Backend data stored in io.BackendPlatformUserData to allow support for multiple Dear ImGui contexts
 // It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple
 // windows) instead of multiple Dear ImGui contexts.
@@ -225,7 +218,7 @@ static void ImGui_ImplGlfw_InitMultiViewportSupport();
 static void ImGui_ImplGlfw_ShutdownMultiViewportSupport();
 
     // Functions
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
 StdRMutex  gEventLock;
 StdRMutex &glfwGetEventLock()
 {
@@ -508,7 +501,7 @@ static bool ImGui_ImplGlfw_ShouldChainCallback(GLFWwindow *window)
 
 void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -524,7 +517,7 @@ void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int acti
 
 void ImGui_ImplGlfw_ScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -592,7 +585,7 @@ static int ImGui_ImplGlfw_TranslateUntranslatedKey(int key, int scancode)
 
 void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, int action, int mods)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -617,7 +610,7 @@ void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, i
 
 void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -630,7 +623,7 @@ void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 
 void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -653,7 +646,7 @@ void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 // so we back it up and restore on Leave/Enter (see https://github.com/ocornut/imgui/issues/4984)
 void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
 
@@ -677,7 +670,7 @@ void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 
 void ImGui_ImplGlfw_CharCallback(GLFWwindow *window, unsigned int c)
 {
-    #if defined(ON_WINDOWS)
+    #if defined(_WIN32)
     StdRMutexUniqueLock locker(gEventLock);
     #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
@@ -778,22 +771,6 @@ void ImGui_ImplGlfw_SetCallbacksChainForAllWindows(bool chain_for_all_windows)
     bd->CallbacksChainForAllWindows = chain_for_all_windows;
 }
 
-    #ifdef __EMSCRIPTEN__
-        #if EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3 >= 34020240817
-void ImGui_ImplGlfw_EmscriptenOpenURL(const char *url)
-{
-    if (url)
-        emscripten::glfw3::OpenURL(url);
-}
-        #else
-EM_JS(void, ImGui_ImplGlfw_EmscriptenOpenURL, (const char *url), {
-    url = url ? UTF8ToString(url) : null;
-    if (url)
-        window.open(url, '_blank');
-});
-        #endif
-    #endif
-
 static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, GlfwClientApi client_api)
 {
     ImGuiIO &io = ImGui::GetIO();
@@ -808,9 +785,7 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     io.BackendPlatformName     = "imgui_impl_glfw";
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
     io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;  // We can honor io.WantSetMousePos requests (optional, rarely used)
-    #ifndef __EMSCRIPTEN__
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
-    #endif
     #if GLFW_HAS_MOUSE_PASSTHROUGH || GLFW_HAS_WINDOW_HOVERED
     io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with correct
                                                                   // data (optional)
@@ -823,13 +798,6 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     ImGuiPlatformIO &platform_io            = ImGui::GetPlatformIO();
     platform_io.Platform_SetClipboardTextFn = [](ImGuiContext *, const char *text) { glfwSetClipboardString(NULL, text); };
     platform_io.Platform_GetClipboardTextFn = [](ImGuiContext *) { return glfwGetClipboardString(NULL); };
-    #ifdef __EMSCRIPTEN__
-    platform_io.Platform_OpenInShellFn = [](ImGuiContext *, const char *url)
-    {
-        ImGui_ImplGlfw_EmscriptenOpenURL(url);
-        return true;
-    };
-    #endif
 
     // Create mouse cursors
     // (By design, on X11 cursors are user configurable and some cursors may be missing. When a cursor doesn't exist,
@@ -853,7 +821,7 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
     #endif
     glfwSetErrorCallback(prev_error_callback);
-    #if GLFW_HAS_GETERROR && !defined(__EMSCRIPTEN__) // Eat errors (see #5908)
+    #if GLFW_HAS_GETERROR // Eat errors (see #5908)
     (void)glfwGetError(nullptr);
     #endif
 
@@ -883,24 +851,6 @@ static bool ImGui_ImplGlfw_Init(GLFWwindow *window, bool install_callbacks, Glfw
     bd->PrevWndProc = (WNDPROC)::GetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC);
     IM_ASSERT(bd->PrevWndProc != nullptr);
     ::SetWindowLongPtrW((HWND)main_viewport->PlatformHandleRaw, GWLP_WNDPROC, (LONG_PTR)ImGui_ImplGlfw_WndProc);
-    #endif
-
-    // Emscripten: the same application can run on various platforms, so we detect the Apple platform at runtime
-    // to override io.ConfigMacOSXBehaviors from its default (which is always false in Emscripten).
-    #ifdef __EMSCRIPTEN__
-        #if EMSCRIPTEN_USE_PORT_CONTRIB_GLFW3 >= 34020240817
-    if (emscripten::glfw3::IsRuntimePlatformApple())
-    {
-        ImGui::GetIO().ConfigMacOSXBehaviors = true;
-
-        // Due to how the browser (poorly) handles the Meta Key, this line essentially disables repeats when used.
-        // This means that Meta + V only registers a single key-press, even if the keys are held.
-        // This is a compromise for dealing with this issue in ImGui since ImGui implements key repeat itself.
-        // See
-        // https://github.com/pongasoft/emscripten-glfw/blob/v3.4.0.20240817/docs/Usage.md#the-problem-of-the-super-key
-        emscripten::glfw3::SetSuperPlusKeyTimeouts(10, 10);
-    }
-        #endif
     #endif
 
     bd->ClientApi = client_api;
@@ -1385,8 +1335,9 @@ static void ImGui_ImplGlfw_CreateWindow(ImGuiViewport *viewport)
     glfwWindowHint(GLFW_FLOATING, (viewport->Flags & ImGuiViewportFlags_TopMost) ? true : false);
     #endif
     GLFWwindow *share_window = (bd->ClientApi == GlfwClientApi_OpenGL) ? bd->Window : nullptr;
-    vd->Window      = glfwCreateWindow((int)viewport->Size.x, (int)viewport->Size.y, "No Title Yet", nullptr, share_window);
-    vd->WindowOwned = true;
+    vd->Window = glfwCreateWindow((int)viewport->Size.x, (int)viewport->Size.y, "No Title Yet", nullptr, share_window);
+    gWindows.insert(vd->Window);
+    vd->WindowOwned          = true;
     viewport->PlatformHandle = (void *)vd->Window;
     #ifdef _WIN32
     viewport->PlatformHandleRaw = glfwGetWin32Window(vd->Window);
@@ -1435,6 +1386,7 @@ static void ImGui_ImplGlfw_DestroyWindow(ImGuiViewport *viewport)
 
             glfwDestroyWindow(vd->Window);
         }
+        gWindows.erase(vd->Window);
         vd->Window = nullptr;
         IM_DELETE(vd);
     }
@@ -1492,6 +1444,10 @@ static void ImGui_ImplGlfw_SetWindowPos(ImGuiViewport *viewport, ImVec2 pos)
     ImGui_ImplGlfw_ViewportData *vd = (ImGui_ImplGlfw_ViewportData *)viewport->PlatformUserData;
     vd->IgnoreWindowPosEventFrame   = ImGui::GetFrameCount();
     glfwSetWindowPos(vd->Window, (int)pos.x, (int)pos.y);
+
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    if(bd->Window == vd->Window && gWindowRectChangeNotify)
+        gWindowRectChangeNotify((int)pos.x, (int)pos.y, -1, -1);
 }
 
 static ImVec2 ImGui_ImplGlfw_GetWindowSize(ImGuiViewport *viewport)
@@ -1517,6 +1473,10 @@ static void ImGui_ImplGlfw_SetWindowSize(ImGuiViewport *viewport, ImVec2 size)
     #endif
     vd->IgnoreWindowSizeEventFrame = ImGui::GetFrameCount();
     glfwSetWindowSize(vd->Window, (int)size.x, (int)size.y);
+
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    if(bd->Window == vd->Window && gWindowRectChangeNotify)
+        gWindowRectChangeNotify(-1, -1, (int)size.x, (int)size.y);
 }
 
 static void ImGui_ImplGlfw_SetWindowTitle(ImGuiViewport *viewport, const char *title)
@@ -1600,8 +1560,8 @@ enum VkResult
         #endif // VULKAN_H_
 extern "C"
 {
-    extern GLFWAPI VkResult glfwCreateWindowSurface(VkInstance instance, GLFWwindow *window,
-                                                    const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface);
+extern GLFWAPI VkResult glfwCreateWindowSurface(VkInstance instance, GLFWwindow *window,
+                                                const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface);
 }
 static int ImGui_ImplGlfw_CreateVkSurface(ImGuiViewport *viewport, ImU64 vk_instance, const void *vk_allocator,
                                           ImU64 *out_vk_surface)
@@ -1610,8 +1570,8 @@ static int ImGui_ImplGlfw_CreateVkSurface(ImGuiViewport *viewport, ImU64 vk_inst
     ImGui_ImplGlfw_ViewportData *vd = (ImGui_ImplGlfw_ViewportData *)viewport->PlatformUserData;
     IM_UNUSED(bd);
     IM_ASSERT(bd->ClientApi == GlfwClientApi_Vulkan);
-    VkResult err = glfwCreateWindowSurface((VkInstance)vk_instance, vd->Window, (const VkAllocationCallbacks *)vk_allocator,
-                                           (VkSurfaceKHR *)out_vk_surface);
+    VkResult err = glfwCreateWindowSurface((VkInstance)vk_instance, vd->Window,
+                                           (const VkAllocationCallbacks *)vk_allocator, (VkSurfaceKHR *)out_vk_surface);
     return (int)err;
 }
     #endif // GLFW_HAS_VULKAN
@@ -1723,6 +1683,59 @@ static LRESULT CALLBACK ImGui_ImplGlfw_WndProc(HWND hWnd, UINT msg, WPARAM wPara
 }
 
     #endif // #ifdef _WIN32
+
+
+ImRect GetDisplayWorkArea()
+{
+    auto monitor = glfwGetPrimaryMonitor();
+    if (monitor == nullptr)
+        return ImRect(0, 0, 640, 360);
+    int x, y, w, h;
+    glfwGetMonitorWorkarea(monitor, &x, &y, &w, &h);
+    return ImRect(x, y, x + w, y + h);
+}
+
+ImRect maximizeMainWindow()
+{
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwMaximizeWindow(bd->Window);
+    glfwSwapBuffers(bd->Window);
+
+    int x, y, w, h;
+    glfwGetWindowPos(bd->Window, &x, &y);
+    glfwGetWindowSize(bd->Window, &w, &h);
+
+    return ImRect(x, y, x + w, y + h);
+}
+
+void normalizeApplication(const ImRect &winRect){
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwRestoreWindow(bd->Window);
+    glfwSetWindowPos(bd->Window, (int)winRect.Min.x, (int)winRect.Min.y);
+    glfwSetWindowSize(bd->Window, (int)winRect.GetWidth(), (int)winRect.GetHeight());
+}
+
+void minimizeMainWindow()
+{
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwIconifyWindow(bd->Window);
+    for (auto &window : gWindows)
+    {
+        if (window == bd->Window)
+            continue;
+        glfwIconifyWindow(window);
+    }
+}
+
+void setApplicationTitle(const std::string &title)
+{
+    auto bd = ImGui_ImplGlfw_GetBackendData();
+    IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    glfwSetWindowTitle(bd->Window, title.c_str());
+}
 
 //-----------------------------------------------------------------------------
 

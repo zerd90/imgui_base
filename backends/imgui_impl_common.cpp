@@ -1,6 +1,4 @@
 
-
-#include <memory>
 #include "imgui_impl_common.h"
 
 using std::string;
@@ -9,37 +7,58 @@ using std::wstring;
 
 ImGuiApplication *g_user_app = nullptr;
 
+string gLastError;
+
+string getLastError()
+{
+    string res = gLastError;
+    gLastError.clear();
+    return res;
+}
+string getSystemError()
+{
+#ifdef _WIN32
+    char errBuf[1024];
+    strerror_s(errBuf, errno);
+    return localToUtf8(errBuf);
+#else
+    return strerror(errno);
+#endif
+}
+
 void setApp(ImGuiApplication *app)
 {
     g_user_app = app;
 }
 
-#if defined(ON_WINDOWS)
+#if defined(_WIN32)
     #include <Shlobj.h>
     #include <Windows.h>
+    #include <Winerror.h>
     #include <shlwapi.h>
-    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                                  \
-        do                                                                                                 \
-        {                                                                                                  \
-            size_t filterLength = inFilters.size();                                                        \
-            if (filterLength > 0)                                                                          \
-            {                                                                                              \
-                auto tmpFilters = std::unique_ptr<COMDLG_FILTERSPEC>(new COMDLG_FILTERSPEC[filterLength]); \
-                std::vector<wstring> filterStrings;                                                        \
-                std::vector<wstring> descStrings;                                                          \
-                for (size_t i = 0; i < filterLength; i++)                                                  \
-                {                                                                                          \
-                    filterStrings.push_back(utf8ToUnicode(inFilters[i].filter));                           \
-                    descStrings.push_back(utf8ToUnicode(inFilters[i].description));                        \
-                    tmpFilters.get()[i].pszSpec = filterStrings.back().c_str();                            \
-                    tmpFilters.get()[i].pszName = descStrings.back().c_str();                              \
-                }                                                                                          \
-                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters.get());                          \
-            }                                                                                              \
+    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                            \
+        do                                                                           \
+        {                                                                            \
+            size_t filterLength = inFilters.size();                                  \
+            if (filterLength > 0)                                                    \
+            {                                                                        \
+                COMDLG_FILTERSPEC *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
+                vector<wstring>    filterStrings(filterLength);                      \
+                vector<wstring>    descStrings(filterLength);                        \
+                for (size_t i = 0; i < filterLength; i++)                            \
+                {                                                                    \
+                    filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);      \
+                    descStrings[i]        = utf8ToUnicode(inFilters[i].description); \
+                    tmpFilters[i].pszSpec = filterStrings[i].c_str();                \
+                    tmpFilters[i].pszName = descStrings[i].c_str();                  \
+                }                                                                    \
+                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);          \
+                delete[] tmpFilters;                                                 \
+            }                                                                        \
         } while (0)
-#endif
 
-#if defined(ON_WINDOWS)
+    #define HR_CANCELED (0x800704C7L)
+
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc)
 {
     wchar_t **wArgv;
@@ -74,9 +93,9 @@ wstring utf8ToUnicode(const string &str)
 
 string utf8ToLocal(const string &str)
 {
-    std::string result;
-    WCHAR      *strSrc;
-    LPSTR       szRes;
+    string result;
+    WCHAR *strSrc;
+    LPSTR  szRes;
 
     // 获得临时变量的大小
     int i  = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
@@ -97,9 +116,9 @@ string utf8ToLocal(const string &str)
 
 string localToUtf8(const string &str)
 {
-    std::string result;
-    WCHAR      *strSrc;
-    LPSTR       szRes;
+    string result;
+    WCHAR *strSrc;
+    LPSTR  szRes;
 
     // 获得临时变量的大小
     int i  = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
@@ -118,6 +137,33 @@ string localToUtf8(const string &str)
     return result;
 }
 
+string HResultToStr(HRESULT hr)
+{
+    LPTSTR lpBuffer = NULL;
+    DWORD  dwSize   = 0;
+    string res;
+
+    if (hr == HR_CANCELED)
+        return "";
+
+    dwSize = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, NULL, hr,
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpBuffer, 0, NULL);
+
+    if (dwSize > 0)
+    {
+        res = lpBuffer;
+
+        // 释放缓冲区
+        LocalFree(lpBuffer);
+    }
+    res = localToUtf8(res);
+    while (res.back() == '\n' || res.back() == '\r')
+        res.pop_back();
+    res += " (0x" + (stringstream() << std::hex << hr).str() + ")";
+
+    return res;
+}
+
 string unicodeToUtf8(const wstring &wStr)
 {
     string result;
@@ -129,9 +175,9 @@ string unicodeToUtf8(const wstring &wStr)
     return result;
 }
 
-std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string defaultExt, std::string defaultPath)
+string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
 {
-    std::string      result;
+    string           result;
     IFileSaveDialog *pfd = NULL;
     HRESULT          hr  = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
     if (FAILED(hr))
@@ -149,27 +195,36 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
         pfd->SetDefaultExtension(utf8ToUnicode(defaultExt).c_str());
     }
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
-    if (!defaultPath.empty())
+    if (!initDirPath.empty())
     {
         IShellItem *folder = nullptr;
-        hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
-            pfd->SetDefaultFolder(folder);
+            pfd->SetFolder(folder);
             folder->Release();
         }
     }
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pfd->GetResult(&pSelResult);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResult->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _RELEASE_RESULT_;
+    }
 
     filePath = pszFilePath;
     CoTaskMemFree(pszFilePath);
@@ -180,7 +235,10 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
         UINT fileTypeIndex;
         hr = pfd->GetFileTypeIndex(&fileTypeIndex);
         if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
             goto _RELEASE_RESULT_;
+        }
         fileTypeIndex--;
         string extension = typeFilters[fileTypeIndex].filter;
         if (extension.find(';') != string::npos) // get the first extension
@@ -202,11 +260,11 @@ _OVER_:
     return result;
 }
 
-std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, std::string defaultPath)
+vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
-    std::vector<std::string> results;
-    IFileOpenDialog         *pfd = NULL;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    vector<string>   results;
+    IFileOpenDialog *pfd = NULL;
+    HRESULT          hr  = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
     if (FAILED(hr))
         return results;
 
@@ -216,24 +274,30 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
     hr                               = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
-    if (!defaultPath.empty())
+    if (!initDirPath.empty())
     {
         IShellItem *folder;
-        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
-            pfd->SetDefaultFolder(folder);
+            pfd->SetFolder(folder);
             folder->Release();
         }
     }
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     IShellItemArray *pSelResultArray;
     hr = pfd->GetResults(&pSelResultArray);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResultArray->GetCount(&dwNumItems); // get number of selected items
     for (DWORD i = 0; i < dwNumItems; i++)
@@ -261,9 +325,9 @@ _OVER_:
     return results;
 }
 
-std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultPath)
+string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
-    std::string           result;
+    string                result;
     IFileDialog          *pfd         = NULL;
     FILEOPENDIALOGOPTIONS dwFlags     = 0;
     IShellItem           *pSelResult  = nullptr;
@@ -278,19 +342,40 @@ std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultP
     hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
+    if (!initDirPath.empty())
+    {
+        IShellItem *folder = nullptr;
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        if (SUCCEEDED(hr))
+        {
+            pfd->SetFolder(folder);
+            folder->Release();
+        }
+    }
+
     hr = pfd->Show(NULL);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pfd->GetResult(&pSelResult);
     if (FAILED(hr))
+    {
+        gLastError = HResultToStr(hr);
         goto _OVER_;
+    }
 
     hr = pSelResult->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
     if (SUCCEEDED(hr))
     {
         result = unicodeToUtf8(pszFilePath);
         CoTaskMemFree(pszFilePath);
+    }
+    else
+    {
+        gLastError = HResultToStr(hr);
     }
 
     pSelResult->Release();
@@ -314,43 +399,29 @@ void openDebugWindow()
     consoleOpened = true;
 }
 
-ImVec2 GetDisplayWorkArea()
-{
-    RECT rect;
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
-    int cx = rect.right - rect.left;
-    int cy = rect.bottom - rect.top;
-    return ImVec2((float)cx, (float)cy);
-}
-
-void minimizedApplication()
-{
-    HWND hwnd = GetForegroundWindow();
-    while (hwnd)
-    {
-        HWND hParent = ::GetParent(hwnd);
-        if (!hParent)
-        {
-            break;
-        }
-        hwnd = hParent;
-    }
-    ShowWindow(hwnd, SW_MINIMIZE);
-}
-
 #elif defined(__linux)
     // using gtk
     #include <gtk/gtk.h>
     #ifndef dbg
         #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
     #endif
-typedef struct
+typedef struct GtkCallbackData
 {
     bool  done   = false;
     void *result = nullptr;
 } GtkCallbackData;
 
-void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFilters)
+string utf8ToLocal(const string &str)
+{
+    return str;
+}
+
+string localToUtf8(const string &str)
+{
+    return str;
+}
+
+void transformFileFilters(GtkFileDialog *fileDialog, const vector<FilterSpec> &typeFilters)
 {
     if (typeFilters.size() == 0)
         return;
@@ -360,17 +431,19 @@ void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFil
     {
         GtkFileFilter *filter      = gtk_file_filter_new();
         size_t         splitPos[2] = {0};
-        string        &filterStr   = typeFilters[i].filter;
-        while ((splitPos[1] = filterStr.find(';', splitPos[0])) != string::npos)
+        const string  &filterStr   = typeFilters[i].filter;
+        size_t         pos         = 0;
+        while ((pos = filterStr.find("*.", pos)) != string::npos)
         {
-            string suffix = filterStr.substr(splitPos[0], splitPos[1] - splitPos[0]).substr(2);
-            gtk_file_filter_add_suffix(filter, suffix.c_str());
-            splitPos[0] = splitPos[1] + 1;
-            if (splitPos[0] >= filterStr.length())
-                break;
+            size_t endPos = filterStr.find(';', pos);
+            if (endPos == string::npos)
+            {
+                endPos = filterStr.length();
+            }
+            string ext = filterStr.substr(pos + 2, endPos - (pos + 2));
+            gtk_file_filter_add_suffix(filter, ext.c_str());
+            pos = endPos;
         }
-        if (splitPos[0] < filterStr.length())
-            gtk_file_filter_add_suffix(filter, filterStr.substr(splitPos[0]).c_str());
 
         gtk_file_filter_set_name(filter, typeFilters[i].description.c_str());
         g_list_store_append(filters, filter);
@@ -380,11 +453,28 @@ void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFil
     g_object_unref(filters);
 }
 
-string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
+void setInitDir(GtkFileDialog *fileDialog, const string &initDirPath)
+{
+    if (initDirPath.empty())
+        return;
+
+    GFile *initialFolder = g_file_new_for_path(initDirPath.c_str());
+    if (!initialFolder)
+        return;
+
+    gtk_file_dialog_set_initial_folder(fileDialog, initialFolder);
+    g_object_unref(initialFolder);
+}
+
+string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     gtk_init();
 
-    GtkFileDialog  *fileDialog = gtk_file_dialog_new();
+    GtkFileDialog *fileDialog = gtk_file_dialog_new();
+
+    transformFileFilters(fileDialog, typeFilters);
+    setInitDir(fileDialog, initDirPath);
+
     GtkCallbackData data;
     gtk_file_dialog_open(
         fileDialog, nullptr, nullptr,
@@ -397,7 +487,11 @@ string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
 
             if (error)
             {
-                dbg("Error: %s\n", error->message);
+                if (error->message != string("Dismissed by user"))
+                {
+                    dbg("Error: (%d)%s\n", error->code, error->message);
+                    gLastError = error->message;
+                }
                 g_error_free(error);
             }
             else
@@ -410,7 +504,8 @@ string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
                 g_free(filePath);
                 callbackData->result = retFile;
             }
-            g_object_unref(file);
+            if (file)
+                g_object_unref(file);
             callbackData->done = true;
         },
         &data);
@@ -432,7 +527,7 @@ string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
     return res;
 }
 
-std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, string initDirPath)
+vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     gtk_init();
 
@@ -440,6 +535,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
     GtkCallbackData data;
 
     transformFileFilters(fileDialog, typeFilters);
+    setInitDir(fileDialog, initDirPath);
 
     gtk_file_dialog_open_multiple(
         fileDialog, nullptr, nullptr,
@@ -454,7 +550,11 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
             {
                 if (error)
                 {
-                    dbg("Error: %s\n", error->message);
+                    if (error->message != string("Dismissed by user"))
+                    {
+                        dbg("Error: (%d)%s\n", error->code, error->message);
+                        gLastError = error->message;
+                    }
                     g_error_free(error);
                     break;
                 }
@@ -468,7 +568,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
 
                 dbg("get %d files\n", count);
 
-                std::vector<string> *retFiles = new std::vector<string>;
+                vector<string> *retFiles = new vector<string>;
 
                 for (guint i = 0; i < count; i++)
                 {
@@ -490,7 +590,8 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
                 callbackData->result = retFiles;
             } while (0);
 
-            g_object_unref(files);
+            if (files)
+                g_object_unref(files);
 
             callbackData->done = true;
         },
@@ -513,11 +614,14 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
 
     return res;
 }
-string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::string defaultPath)
+string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
 {
     gtk_init();
 
-    GtkFileDialog  *fileDialog = gtk_file_dialog_new();
+    GtkFileDialog *fileDialog = gtk_file_dialog_new();
+
+    setInitDir(fileDialog, initDirPath);
+
     GtkCallbackData data;
     string          res;
     gtk_file_dialog_save(
@@ -531,7 +635,11 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
 
             if (error)
             {
-                dbg("Error: %s\n", error->message);
+                if (error->message != string("Dismissed by user"))
+                {
+                    dbg("Error: (%d)%s\n", error->code, error->message);
+                    gLastError = error->message;
+                }
                 g_error_free(error);
             }
             else
@@ -544,7 +652,9 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
                 g_free(filePath);
                 callbackData->result = retFile;
             }
-            g_object_unref(file);
+
+            if (file)
+                g_object_unref(file);
             callbackData->done = true;
         },
         &data);
@@ -560,6 +670,9 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
         string *resultStr = (string *)data.result;
         res               = *resultStr;
         delete resultStr;
+
+        if (!defaultExt.empty() && res.find(".") == string::npos)
+            res += "." + defaultExt;
     }
 
     return res;

@@ -30,7 +30,7 @@ public:
     void show(bool newLine = true);
     void showDisabled(bool disabled, bool newLine = true);
 
-    void         addActionCallback(ImGuiItemAction action, std::function<void()> callbackFunc);
+    void         addActionCallback(ImGuiItemAction action, const std::function<void()> &callbackFunc);
     const ImVec2 itemPos() { return mItemPos; }
     const ImVec2 itemSize() { return mItemSize; }
     virtual void setItemSize(ImVec2 size);
@@ -353,7 +353,7 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_TABLE_FLAGS, TableFlag, mTableFlags)
 
     // there should not be two columns with the same name
-    void                     addColumn(const std::string &name);
+    ImGuiItemTable          &addColumn(const std::string &name);
     std::vector<std::string> getColumns() { return mColumnNames; }
     void                     insertColumn(unsigned int index, const std::string &name);
     void                     removeColumn(unsigned int index);
@@ -361,63 +361,14 @@ public:
     void                     clearColumns();
 
     // addColumn first, data in row should be in the same order as columns, otherwise it will be ignored
-    size_t                   getRowCount() { return mRows.size(); }
+    size_t                   getRowCount();
     std::vector<std::string> getRow(unsigned int index);
-    void                     removeRow(unsigned int index);
-    void                     addEmptyRow();
-
-    void clearRows();
-
-    template <typename T>
-    void setDataOfRow(unsigned int rowIndex, unsigned int columnIndex, T &&data)
-    {
-        if (rowIndex >= mRows.size() || columnIndex >= mColumnNames.size())
-            return;
-        // string or char*
-        using NonRefrenceT = std::remove_reference_t<T>;
-        if constexpr (std::is_same_v<std::decay_t<NonRefrenceT>, std::string>
-                      || (std::is_pointer_v<NonRefrenceT>
-                          && std::is_same_v<std::decay_t<std::remove_pointer_t<NonRefrenceT>>, char>))
-            mRows[rowIndex][columnIndex] = data;
-        else
-            mRows[rowIndex][columnIndex] = std::to_string(data);
-    }
-    template <typename T>
-    void setDataOfRow(unsigned int rowIndex, const std::string &colName, T &&data)
-    {
-        if (rowIndex >= mRows.size())
-            return;
-
-        auto col = std::find(mColumnNames.begin(), mColumnNames.end(), colName);
-        if (col == mColumnNames.end())
-            return;
-
-        setDataOfRow(rowIndex, col - mColumnNames.begin(), data);
-    }
-
-    template <typename T, typename... Args>
-    void addRow(T arg1, Args &&...args)
-    {
-        if constexpr (std::is_same_v<std::decay_t<T>, std::vector<std::string>>)
-        {
-            // Z_INFO("add Row through vector\n");
-            mRows.push_back(std::vector<std::string>(mColumnNames.size()));
-
-            for (unsigned int i = 0; i < MIN(arg1.size(), mColumnNames.size()); i++)
-            {
-                mRows.back()[i] = arg1[i];
-            }
-        }
-        else
-        {
-            addEmptyRow();
-            int index = 0;
-            setDataOfRow((unsigned int)(mRows.size() - 1), index++, std::forward<T>(arg1));
-            (setDataOfRow((unsigned int)(mRows.size() - 1), index++, std::forward<Args>(args)), ...);
-        }
-    }
 
     void clear();
+    void setDataCallbacks(const std::function<size_t()>                                  &getRowCountCallback,
+                          const std::function<std::string(size_t rowIdx, size_t colIdx)> &getCellCallback,
+                          const std::function<bool(size_t rowIdx, size_t colIdx)> &cellClickableCallback = nullptr,
+                          const std::function<void(size_t rowIdx, size_t colIdx)> &cellClickedCallback   = nullptr);
 
     void ScrollFreeze(int rows, int cols);
     void ScrollFreezeRows(int rows);
@@ -427,14 +378,18 @@ protected:
     virtual bool showItem() override;
 
 private:
-    IMGUI_TABLE_FLAGS                     mTableFlags = ImGuiTableFlags_None;
-    std::vector<std::string>              mColumnNames;
-    std::vector<std::vector<std::string>> mRows;
-    std::vector<ImVec2>                   mHeadersPosition;
-    std::vector<ImVec2>                   mHeadersSize;
+    IMGUI_TABLE_FLAGS        mTableFlags = ImGuiTableFlags_None;
+    std::vector<std::string> mColumnNames;
+    std::vector<ImVec2>      mHeadersPosition;
+    std::vector<ImVec2>      mHeadersSize;
 
     int mFreezeRows = 0;
     int mFreezeCols = 0;
+
+    std::function<size_t()>                           mGetRowCountCallback;
+    std::function<std::string(size_t, size_t)>        mGetCellCallback;
+    std::function<bool(size_t rowIdx, size_t colIdx)> mCellClickableCallback;
+    std::function<void(size_t rowIdx, size_t colIdx)> mCellClickedCallback;
 };
 
 #endif
