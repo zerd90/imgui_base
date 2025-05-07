@@ -421,7 +421,7 @@ string localToUtf8(const string &str)
     return str;
 }
 
-void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFilters)
+void transformFileFilters(GtkFileDialog *fileDialog, const vector<FilterSpec> &typeFilters)
 {
     if (typeFilters.size() == 0)
         return;
@@ -431,17 +431,19 @@ void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFil
     {
         GtkFileFilter *filter      = gtk_file_filter_new();
         size_t         splitPos[2] = {0};
-        string        &filterStr   = typeFilters[i].filter;
-        while ((splitPos[1] = filterStr.find(';', splitPos[0])) != string::npos)
+        const string  &filterStr   = typeFilters[i].filter;
+        size_t         pos         = 0;
+        while ((pos = filterStr.find("*.", pos)) != string::npos)
         {
-            string suffix = filterStr.substr(splitPos[0], splitPos[1] - splitPos[0]).substr(2);
-            gtk_file_filter_add_suffix(filter, suffix.c_str());
-            splitPos[0] = splitPos[1] + 1;
-            if (splitPos[0] >= filterStr.length())
-                break;
+            size_t endPos = filterStr.find(';', pos);
+            if (endPos == string::npos)
+            {
+                endPos = filterStr.length();
+            }
+            string ext = filterStr.substr(pos + 2, endPos - (pos + 2));
+            gtk_file_filter_add_suffix(filter, ext.c_str());
+            pos = endPos;
         }
-        if (splitPos[0] < filterStr.length())
-            gtk_file_filter_add_suffix(filter, filterStr.substr(splitPos[0]).c_str());
 
         gtk_file_filter_set_name(filter, typeFilters[i].description.c_str());
         g_list_store_append(filters, filter);
@@ -451,11 +453,28 @@ void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFil
     g_object_unref(filters);
 }
 
+void setInitDir(GtkFileDialog *fileDialog, const string &initDirPath)
+{
+    if (initDirPath.empty())
+        return;
+
+    GFile *initialFolder = g_file_new_for_path(initDirPath.c_str());
+    if (!initialFolder)
+        return;
+
+    gtk_file_dialog_set_initial_folder(fileDialog, initialFolder);
+    g_object_unref(initialFolder);
+}
+
 string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     gtk_init();
 
-    GtkFileDialog  *fileDialog = gtk_file_dialog_new();
+    GtkFileDialog *fileDialog = gtk_file_dialog_new();
+
+    transformFileFilters(fileDialog, typeFilters);
+    setInitDir(fileDialog, initDirPath);
+
     GtkCallbackData data;
     gtk_file_dialog_open(
         fileDialog, nullptr, nullptr,
@@ -468,8 +487,11 @@ string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPa
 
             if (error)
             {
-                dbg("Error: %s\n", error->message);
-                gLastError = error->message;
+                if (error->message != string("Dismissed by user"))
+                {
+                    dbg("Error: (%d)%s\n", error->code, error->message);
+                    gLastError = error->message;
+                }
                 g_error_free(error);
             }
             else
@@ -482,7 +504,8 @@ string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPa
                 g_free(filePath);
                 callbackData->result = retFile;
             }
-            g_object_unref(file);
+            if (file)
+                g_object_unref(file);
             callbackData->done = true;
         },
         &data);
@@ -512,6 +535,7 @@ vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const 
     GtkCallbackData data;
 
     transformFileFilters(fileDialog, typeFilters);
+    setInitDir(fileDialog, initDirPath);
 
     gtk_file_dialog_open_multiple(
         fileDialog, nullptr, nullptr,
@@ -526,8 +550,11 @@ vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const 
             {
                 if (error)
                 {
-                    dbg("Error: %s\n", error->message);
-                    gLastError = error->message;
+                    if (error->message != string("Dismissed by user"))
+                    {
+                        dbg("Error: (%d)%s\n", error->code, error->message);
+                        gLastError = error->message;
+                    }
                     g_error_free(error);
                     break;
                 }
@@ -563,7 +590,8 @@ vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const 
                 callbackData->result = retFiles;
             } while (0);
 
-            g_object_unref(files);
+            if (files)
+                g_object_unref(files);
 
             callbackData->done = true;
         },
@@ -590,7 +618,10 @@ string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultE
 {
     gtk_init();
 
-    GtkFileDialog  *fileDialog = gtk_file_dialog_new();
+    GtkFileDialog *fileDialog = gtk_file_dialog_new();
+
+    setInitDir(fileDialog, initDirPath);
+
     GtkCallbackData data;
     string          res;
     gtk_file_dialog_save(
@@ -604,8 +635,11 @@ string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultE
 
             if (error)
             {
-                dbg("Error: %s\n", error->message);
-                gLastError = error->message;
+                if (error->message != string("Dismissed by user"))
+                {
+                    dbg("Error: (%d)%s\n", error->code, error->message);
+                    gLastError = error->message;
+                }
                 g_error_free(error);
             }
             else
@@ -618,7 +652,9 @@ string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultE
                 g_free(filePath);
                 callbackData->result = retFile;
             }
-            g_object_unref(file);
+
+            if (file)
+                g_object_unref(file);
             callbackData->done = true;
         },
         &data);
@@ -634,6 +670,9 @@ string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultE
         string *resultStr = (string *)data.result;
         res               = *resultStr;
         delete resultStr;
+
+        if (!defaultExt.empty() && res.find(".") == string::npos)
+            res += "." + defaultExt;
     }
 
     return res;

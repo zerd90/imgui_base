@@ -28,7 +28,6 @@ void setFilter(const vector<FilterSpec> &typeFilters, NSSavePanel *pPanel)
                 endPos = filterSpec.filter.length();
             }
             string ext = filterSpec.filter.substr(pos + 2, endPos - (pos + 2));
-            printf("ext = %s\n", ext.c_str());
             [allowedContentTypes
                 addObject:[UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext.c_str()]]];
             pos = endPos;
