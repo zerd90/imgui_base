@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <map>
 #include <string_view>
+#include <filesystem>
 #include <functional>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -14,7 +15,9 @@ using std::string;
 using std::string_view;
 using std::stringstream;
 using std::vector;
+
 using namespace ImGui;
+namespace fs = std::filesystem;
 
 #define MAKE_RGBA(r, g, b) (((r) << 24) | ((g) << 16) | ((b) << 8) | 0xff)
 
@@ -672,7 +675,7 @@ void ImGuiBinaryViewer::showContent()
         hasButtons = true;
         if (Button("Save"))
         {
-            string dstFilePath = getSavePath();
+            string dstFilePath = getSavePath({}, {}, mLastSaveDir);
             if (dstFilePath.empty())
             {
                 string err = getLastError();
@@ -686,6 +689,7 @@ void ImGuiBinaryViewer::showContent()
             if (!dstFilePath.empty())
             {
                 mSaveDataCallback(dstFilePath, mUserData);
+                mLastSaveDir = fs::path(dstFilePath).parent_path().string();
             }
         }
     }

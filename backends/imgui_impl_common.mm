@@ -1,35 +1,83 @@
-#import "imgui_impl_common.h"
 #include <string>
 #include <unistd.h>
-#include <objc/NSObjCRuntime.h>
-#include <Foundation/Foundation.h>
 #include <vector>
 #include <AppKit/AppKit.h>
 #import <AppKit/NSOpenPanel.h>
+#include <Foundation/Foundation.h>
+#include <objc/NSObjCRuntime.h>
+#import <UniformTypeIdentifiers/UTType.h>
+#import "imgui_impl_common.h"
 
 using std::string;
 using std::vector;
 
-string selectFile(vector<FilterSpec> typeFilters, string initDirPath)
+extern string gLastError;
+
+void setFilter(const vector<FilterSpec> &typeFilters, NSSavePanel *pPanel)
+{
+    // 从 typeFilters 中提取允许的文件 UTI
+    NSMutableArray<UTType *> *allowedContentTypes = [NSMutableArray array];
+    for (const auto &filterSpec : typeFilters)
+    {
+        size_t pos = 0;
+        while ((pos = filterSpec.filter.find("*.", pos)) != string::npos)
+        {
+            size_t endPos = filterSpec.filter.find(';', pos);
+            if (endPos == string::npos)
+            {
+                endPos = filterSpec.filter.length();
+            }
+            string ext = filterSpec.filter.substr(pos + 2, endPos - (pos + 2));
+            printf("ext = %s\n", ext.c_str());
+            [allowedContentTypes
+                addObject:[UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext.c_str()]]];
+            pos = endPos;
+        }
+    }
+
+    // 设置允许的文件类型
+    if ([allowedContentTypes count] > 0)
+    {
+        [pPanel setAllowedContentTypes:allowedContentTypes];
+    }
+}
+
+void setInitDir(const string &initDirPath, NSSavePanel *pPanel)
+{
+    if (initDirPath.empty())
+        return;
+
+    NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:initDirPath.c_str()]];
+    [pPanel setDirectoryURL:url];
+}
+
+string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     NSOpenPanel *openPanel = [NSOpenPanel openPanel];
-    // [openPanel setAllowedContentTypes:[NSImage imageFileTypes]];//设置文件的默认类型
 
-    [openPanel setMessage:@"Please select image(s) to show."];
-    int result = openPanel.runModal;
-    if (NSModalResponseOK == result)
+    setFilter(typeFilters, openPanel);
+    setInitDir(initDirPath, openPanel);
+
+    NSInteger result = [openPanel runModal];
+    if (result == NSModalResponseOK)
+    {
         return [[[openPanel URL] path] UTF8String];
+    }
+    else if (result != NSModalResponseCancel)
+    {
+        gLastError = strerror(errno);
+    }
 
     return string();
 }
 
-vector<string> selectMultipleFiles(vector<FilterSpec> typeFilters, string initDirPath)
+vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     NSOpenPanel *openPanel = [NSOpenPanel openPanel];
     [openPanel setAllowsMultipleSelection:true];
-    // [openPanel setAllowedContentTypes:[NSImage imageFileTypes]];//设置文件的默认类型
+    setFilter(typeFilters, openPanel);
+    setInitDir(initDirPath, openPanel);
 
-    [openPanel setMessage:@"Please select image(s) to show."];
     vector<string> selectFiles;
     NSInteger      result = [openPanel runModal];
     if (result == NSModalResponseOK)
@@ -40,17 +88,42 @@ vector<string> selectMultipleFiles(vector<FilterSpec> typeFilters, string initDi
     }
     return selectFiles;
 }
-string getSavePath(vector<FilterSpec> typeFilters, string defaultExt, string initDirPath)
-{
-     NSSavePanel *savePanel = [NSSavePanel savePanel];
-    // [savePanel setAllowedContentTypes:[NSImage imageFileTypes]];//设置文件的默认类型
 
-    [savePanel setMessage:@"Please select image(s) to show."];
+string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
+{
+    NSSavePanel *savePanel = [NSSavePanel savePanel];
+    setFilter(typeFilters, savePanel);
+    setInitDir(initDirPath, savePanel);
+
     auto result = [savePanel runModal];
-    if(NSModalResponseOK == result)
+    if (NSModalResponseOK == result)
     {
-        return [[[savePanel URL] path] UTF8String];
+        std::string res = [[[savePanel URL] path] UTF8String];
+        if(!defaultExt.empty() && res.find('.') == string::npos)
+        {
+            res += '.';
+            res += defaultExt;
+        }
+        return res;
     }
     return string();
 }
+
 void openDebugWindow() {}
+
+std::string getApplicationPath()
+{
+    NSString *bundlePath;
+    bundlePath = [[NSBundle mainBundle] executablePath];
+    return [bundlePath UTF8String];
+}
+
+string utf8ToLocal(const string &str)
+{
+    return str;
+}
+
+string localToUtf8(const string &str)
+{
+    return str;
+}

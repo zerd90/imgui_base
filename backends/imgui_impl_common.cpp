@@ -7,7 +7,6 @@ using std::wstring;
 
 ImGuiApplication *g_user_app = nullptr;
 
-// TODO: MAC
 string gLastError;
 
 string getLastError()
@@ -16,7 +15,7 @@ string getLastError()
     gLastError.clear();
     return res;
 }
-std::string getSystemError()
+string getSystemError()
 {
 #ifdef _WIN32
     char errBuf[1024];
@@ -37,25 +36,25 @@ void setApp(ImGuiApplication *app)
     #include <Windows.h>
     #include <Winerror.h>
     #include <shlwapi.h>
-    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                              \
-        do                                                                             \
-        {                                                                              \
-            size_t filterLength = inFilters.size();                                    \
-            if (filterLength > 0)                                                      \
-            {                                                                          \
-                COMDLG_FILTERSPEC   *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
-                std::vector<wstring> filterStrings(filterLength);                      \
-                std::vector<wstring> descStrings(filterLength);                        \
-                for (size_t i = 0; i < filterLength; i++)                              \
-                {                                                                      \
-                    filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);        \
-                    descStrings[i]        = utf8ToUnicode(inFilters[i].description);   \
-                    tmpFilters[i].pszSpec = filterStrings[i].c_str();                  \
-                    tmpFilters[i].pszName = descStrings[i].c_str();                    \
-                }                                                                      \
-                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);            \
-                delete[] tmpFilters;                                                   \
-            }                                                                          \
+    #define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                            \
+        do                                                                           \
+        {                                                                            \
+            size_t filterLength = inFilters.size();                                  \
+            if (filterLength > 0)                                                    \
+            {                                                                        \
+                COMDLG_FILTERSPEC *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
+                vector<wstring>    filterStrings(filterLength);                      \
+                vector<wstring>    descStrings(filterLength);                        \
+                for (size_t i = 0; i < filterLength; i++)                            \
+                {                                                                    \
+                    filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);      \
+                    descStrings[i]        = utf8ToUnicode(inFilters[i].description); \
+                    tmpFilters[i].pszSpec = filterStrings[i].c_str();                \
+                    tmpFilters[i].pszName = descStrings[i].c_str();                  \
+                }                                                                    \
+                dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);          \
+                delete[] tmpFilters;                                                 \
+            }                                                                        \
         } while (0)
 
     #define HR_CANCELED (0x800704C7L)
@@ -94,9 +93,9 @@ wstring utf8ToUnicode(const string &str)
 
 string utf8ToLocal(const string &str)
 {
-    std::string result;
-    WCHAR      *strSrc;
-    LPSTR       szRes;
+    string result;
+    WCHAR *strSrc;
+    LPSTR  szRes;
 
     // 获得临时变量的大小
     int i  = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, NULL, 0);
@@ -117,9 +116,9 @@ string utf8ToLocal(const string &str)
 
 string localToUtf8(const string &str)
 {
-    std::string result;
-    WCHAR      *strSrc;
-    LPSTR       szRes;
+    string result;
+    WCHAR *strSrc;
+    LPSTR  szRes;
 
     // 获得临时变量的大小
     int i  = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
@@ -160,7 +159,7 @@ string HResultToStr(HRESULT hr)
     res = localToUtf8(res);
     while (res.back() == '\n' || res.back() == '\r')
         res.pop_back();
-    res += " (0x" + (std::stringstream() << std::hex << hr).str() + ")";
+    res += " (0x" + (stringstream() << std::hex << hr).str() + ")";
 
     return res;
 }
@@ -176,9 +175,9 @@ string unicodeToUtf8(const wstring &wStr)
     return result;
 }
 
-std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string defaultExt, std::string defaultPath)
+string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
 {
-    std::string      result;
+    string           result;
     IFileSaveDialog *pfd = NULL;
     HRESULT          hr  = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
     if (FAILED(hr))
@@ -196,10 +195,10 @@ std::string getSavePath(std::vector<FilterSpec> typeFilters, std::string default
         pfd->SetDefaultExtension(utf8ToUnicode(defaultExt).c_str());
     }
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
-    if (!defaultPath.empty())
+    if (!initDirPath.empty())
     {
         IShellItem *folder = nullptr;
-        hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
             pfd->SetFolder(folder);
@@ -261,11 +260,11 @@ _OVER_:
     return result;
 }
 
-std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, std::string defaultPath)
+vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
-    std::vector<std::string> results;
-    IFileOpenDialog         *pfd = NULL;
-    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    vector<string>   results;
+    IFileOpenDialog *pfd = NULL;
+    HRESULT          hr  = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
     if (FAILED(hr))
         return results;
 
@@ -275,10 +274,10 @@ std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters
     hr                               = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
-    if (!defaultPath.empty())
+    if (!initDirPath.empty())
     {
         IShellItem *folder;
-        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
             pfd->SetFolder(folder);
@@ -326,9 +325,9 @@ _OVER_:
     return results;
 }
 
-std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultPath)
+string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
-    std::string           result;
+    string                result;
     IFileDialog          *pfd         = NULL;
     FILEOPENDIALOGOPTIONS dwFlags     = 0;
     IShellItem           *pSelResult  = nullptr;
@@ -343,10 +342,10 @@ std::string selectFile(std::vector<FilterSpec> typeFilters, std::string defaultP
     hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM);
 
     TRANSFORM_FILTERSPEC(typeFilters, pfd);
-    if (!defaultPath.empty())
+    if (!initDirPath.empty())
     {
         IShellItem *folder = nullptr;
-        hr = SHCreateItemFromParsingName(utf8ToUnicode(defaultPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
             pfd->SetFolder(folder);
@@ -452,7 +451,7 @@ void transformFileFilters(GtkFileDialog *fileDialog, vector<FilterSpec> &typeFil
     g_object_unref(filters);
 }
 
-string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
+string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     gtk_init();
 
@@ -505,7 +504,7 @@ string selectFile(std::vector<FilterSpec> typeFilters, string initDirPath)
     return res;
 }
 
-std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, string initDirPath)
+vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
 {
     gtk_init();
 
@@ -542,7 +541,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
 
                 dbg("get %d files\n", count);
 
-                std::vector<string> *retFiles = new std::vector<string>;
+                vector<string> *retFiles = new vector<string>;
 
                 for (guint i = 0; i < count; i++)
                 {
@@ -587,7 +586,7 @@ std::vector<string> selectMultipleFiles(std::vector<FilterSpec> typeFilters, str
 
     return res;
 }
-string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::string defaultPath)
+string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
 {
     gtk_init();
 
@@ -642,14 +641,4 @@ string getSavePath(std::vector<FilterSpec> typeFilters, string defaultExt, std::
 void openDebugWindow() {}
 #elif defined(__APPLE__)
 // in imgui_impl_common.mm
-string utf8ToLocal(const string &str)
-{
-    return str;
-}
-
-string localToUtf8(const string &str)
-{
-    return str;
-}
-
 #endif

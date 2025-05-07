@@ -88,20 +88,21 @@ using file_stat64_t = struct _stat64;
     #define ftell64 ftello64
 using file_stat64_t = struct stat64;
 
-#else // Mac
+#else // MacOS
     #define fseek64 fseek
     #define ftell64 ftell
     #define stat64  stat
 using file_stat64_t = struct stat;
 
+std::string getApplicationPath();
 #endif
 
-std::string              selectFile(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                    std::string             initDirPath = std::string());
-std::vector<std::string> selectMultipleFiles(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                             std::string             initDirPath = std::string());
-std::string              getSavePath(std::vector<FilterSpec> typeFilters = std::vector<FilterSpec>(),
-                                     std::string defaultExt = std::string(), std::string defaultPath = std::string());
+std::string              selectFile(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                    const std::string             &initDirPath = std::string());
+std::vector<std::string> selectMultipleFiles(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                             const std::string             &initDirPath = std::string());
+std::string              getSavePath(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                     const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
 void                     openDebugWindow();
 
 void setApplicationTitle(const std::string &title);

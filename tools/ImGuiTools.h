@@ -140,16 +140,18 @@ public:
     void setUserData(void *userData);
 
 protected:
-    void        showContent() override;
+    void showContent() override;
 
 private:
     std::function<ImS64(void *)>                     mGetDataSizeCallback;
     std::function<uint8_t(ImS64, void *)>            mGetDataCallback;
     std::function<void(const std::string &, void *)> mSaveDataCallback;
-    void                                            *mUserData;
 
-    ImS64                  mSelectOffset = 0;
-    ImS64                  mScrollPos    = 0;
+    std::string mLastSaveDir;
+    void       *mUserData;
+
+    ImS64 mSelectOffset = 0;
+    ImS64 mScrollPos    = 0;
 };
 
 void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,

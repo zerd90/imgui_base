@@ -6,8 +6,11 @@
 
 #include "ImGuiApplication.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
     #include "imgui_impl_common.h"
+#endif
+
+#ifdef _WIN32
     #include <Windows.h>
 #endif
 
@@ -28,7 +31,8 @@ ImGuiApplication::ImGuiApplication()
     mExePath = exePathStr;
     printf("current dir %s\n", exePathStr);
 #elif defined(__APPLE__)
-    // TODO: MAC
+    mExePath = getApplicationPath();
+    printf("current dir %s\n", mExePath.c_str());
 #endif
 
     fs::path exePath(mExePath);

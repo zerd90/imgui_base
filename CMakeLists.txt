@@ -10,7 +10,7 @@ execute_process(
 )
 
 if("${RENDER}" STREQUAL "")
-	message(WARNING "RENDER not Set, Using Default")
+	message(STATUS "RENDER not Set, Using Default")
 
 	if(WIN32)
 		SET(RENDER WIN32_DX11)
@@ -25,6 +25,7 @@ if("${RENDER}" STREQUAL "GLFW_OPENGL3")
 	if(glfw3_FOUND)
 		message(STATUS "glfw3 found ${glfw3_DIR}")
 		set(LINK_GLFW_LIBRARY glfw)
+		set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES} glfw)
 	else()
 		message(WARNING "Can't find glfw, set the include_directories and link_directories")
 		set(LINK_GLFW_LIBRARY glfw3)
@@ -84,7 +85,10 @@ if(NOT PROJECT_IS_TOP_LEVEL)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
 		elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 			set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
-				${PROJECT_NAME} ${LINK_GLFW_LIBRARY}
+				${PROJECT_NAME}
+				"-framework OpenGL"
+				"-framework Cocoa"
+				"-framework UniformTypeIdentifiers"
 			)
 			set(PLATFORM "GLFW" PARENT_SCOPE)
 			set(RENDER_API "OPENGL3" PARENT_SCOPE)
@@ -123,7 +127,7 @@ set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 	${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.cpp
 )
 
-if(APPLE)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 	set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
 		${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.mm
 	)
