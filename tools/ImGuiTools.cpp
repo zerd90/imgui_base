@@ -821,19 +821,19 @@ void ImGuiBinaryViewer::showContent()
     }
 
     // draw header color
-    ImVec2 pos      = GetCursorScreenPos();
-    ImVec2 startPos = pos + ImVec2(indexLength + spaceLength / 2, 0);
-    ImVec2 endPos   = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 contentStartPos = GetCursorScreenPos();
+    ImVec2 startPos        = contentStartPos + ImVec2(indexLength + spaceLength / 2, 0);
+    ImVec2 endPos = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
     GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
-    startPos = pos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    startPos = contentStartPos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
     endPos   = startPos + ImVec2(indexLength + spaceLength, showLineCount * (GetTextLineHeight() + spaceSize.y));
     GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
     // draw odd line color
     for (int j = 1; j < showBytes; j += 2)
     {
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(indexLength + j * (byteLength + spaceLength) + spaceLength / 2,
                           GetTextLineHeight() + spaceSize.y / 2);
         endPos = startPos + ImVec2(byteLength + spaceLength, (GetTextLineHeight() + spaceSize.y) * showLineCount);
@@ -848,19 +848,19 @@ void ImGuiBinaryViewer::showContent()
 
     if (offsetLine >= mScrollPos && offsetLine < mScrollPos + showLineCount)
     {
-        startPos = pos + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte, 0);
+        startPos = contentStartPos + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte, 0);
         endPos   = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y / 2);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
 
         ImS64 offLine = offsetLine - mScrollPos;
 
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(-spaceLength / 2,
                           GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
         endPos = startPos + ImVec2(indexLength + spaceLength, GetTextLineHeight() + spaceSize.y);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
 
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte,
                           GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
         endPos = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y);
@@ -868,7 +868,7 @@ void ImGuiBinaryViewer::showContent()
     }
 
     // show Texts
-    Text("%08llx" , mSelectOffset);
+    Text("%08llx", mSelectOffset);
     for (int i = 0; i < showBytes; i++)
     {
         SameLine();
@@ -878,6 +878,7 @@ void ImGuiBinaryViewer::showContent()
     // not showing all for big amount of data
     for (ImS64 i = mScrollPos; i < mScrollPos + showLineCount; i++)
     {
+        auto curPos = GetCursorScreenPos();
         Text("%08llx", i * showBytes);
 
         string showText;
@@ -897,24 +898,28 @@ void ImGuiBinaryViewer::showContent()
                 showText.push_back('.');
             }
         }
-        SameLine(0, 0);
-        auto curPos = GetCursorScreenPos();
-        SetCursorScreenPos(curPos + ImVec2(TEXT_GAP, 0));
-        if(i == offsetLine)
+        auto textPos =
+            curPos + ImVec2(TEXT_GAP + spaceLength / 2 + indexLength + (spaceLength + byteLength) * showBytes, 0);
+        if (i == offsetLine && offsetByte < showText.length())
         {
-            string preText = showText.substr(0, offsetByte);
-            startPos       = curPos + ImVec2(TEXT_GAP + CalcTextSize(preText.c_str()).x, 0);
-            string tmpText;
-            tmpText += showText[offsetByte];
-
-            endPos = startPos + ImVec2(CalcTextSize(tmpText.c_str()).x, GetTextLineHeight());
+            startPos = textPos + ImVec2(offsetByte * letterWidth, 0);
+            endPos   = startPos + ImVec2(letterWidth, GetTextLineHeight());
             GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
         }
-        Text("%s", showText.c_str());
+        for (int j = 0; j < showBytes; j++)
+        {
+            if (j >= showText.length())
+                break;
+
+            SetCursorScreenPos(textPos);
+            Text("%c", showText[j]);
+            textPos += ImVec2(letterWidth, 0);
+        }
     }
 
-    pos += ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
-
+    ImVec2 byteViewStartPos =
+        contentStartPos + ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 textViewStartPos = byteViewStartPos + ImVec2(TEXT_GAP + (spaceLength + byteLength) * showBytes, 0);
     if (IsWindowHovered())
     {
         if (IsMouseClicked(ImGuiMouseButton_Left))
@@ -922,13 +927,19 @@ void ImGuiBinaryViewer::showContent()
             ImVec2 mousePos = GetMousePos();
             mousePos.y += GetScrollY();
 
-            ImVec2 offset = mousePos - pos;
-
-            if (offset.x >= 0 && offset.x < showBytes * (byteLength + spaceLength) && offset.y >= 0
-                && offset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            ImVec2 ByteViewOffset = mousePos - byteViewStartPos;
+            ImVec2 textViewOffset = mousePos - textViewStartPos;
+            if (ByteViewOffset.x >= 0 && ByteViewOffset.x < showBytes * (byteLength + spaceLength)
+                && ByteViewOffset.y >= 0 && ByteViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
             {
-                mSelectOffset = ((int)(offset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
-                              + (int)(offset.x / (byteLength + spaceLength));
+                mSelectOffset = ((int)(ByteViewOffset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
+                              + (int)(ByteViewOffset.x / (byteLength + spaceLength));
+            }
+            else if (textViewOffset.x >= 0 && textViewOffset.x < showBytes * letterWidth && textViewOffset.y >= 0
+                     && textViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            {
+                mSelectOffset = ((int)(textViewOffset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
+                              + (int)(textViewOffset.x / letterWidth);
             }
         }
 
