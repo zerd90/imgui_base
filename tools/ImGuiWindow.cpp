@@ -476,10 +476,6 @@ bool drawMaximizeButton(const ImRect &buttonRect, bool maximized, bool buttonEna
 bool drawCloseButton(const ImRect &buttonRect, bool buttonEnabled)
 {
     bool clicked = drawButtonBg(buttonRect, buttonEnabled);
-    // Draw the close button icon
-    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
-                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
-                                 GetColorU32(ImGuiCol_Text));
 
     // Draw the close button icon
     GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
