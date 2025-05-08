@@ -2,6 +2,7 @@
 #include "imgui_impl_common.h"
 
 using std::string;
+using std::stringstream;
 using std::vector;
 using std::wstring;
 
