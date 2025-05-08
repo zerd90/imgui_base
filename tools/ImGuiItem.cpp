@@ -551,8 +551,10 @@ void ImGuiItemTable::ScrollFreezeCols(int cols)
 
 bool ImGuiItemTable::showItem()
 {
-
     size_t rowCount = 0;
+
+    if (mColumnNames.empty())
+        return false;
 
     if (mGetRowCountCallback)
         rowCount = mGetRowCountCallback();
