@@ -60,7 +60,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 {
     static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io          = nullptr;
-    static bool vSync = g_user_app->VSyncEnabled();
+    static bool     vSync       = g_user_app->VSyncEnabled();
     if (!io)
     {
         glfwMakeContextCurrent(window);
@@ -77,7 +77,7 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
         io = &ImGui::GetIO();
     }
 
-    if(g_user_app->VSyncEnabled() != vSync)
+    if (g_user_app->VSyncEnabled() != vSync)
     {
         vSync = g_user_app->VSyncEnabled();
         if (vSync)
@@ -108,7 +108,8 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 
     ImGui::NewFrame();
 
-    if (g_user_app->renderUI())
+    g_user_app->show();
+    if (g_user_app->justClosed())
         return true;
 
     // Rendering

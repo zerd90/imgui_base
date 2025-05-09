@@ -164,12 +164,12 @@ void IImGuiWindow::setHasCloseButton(bool hasCloseButton)
         mHasCloseButton = hasCloseButton;
 }
 
-void IImGuiWindow::setContent(std::function<void()> content)
+void IImGuiWindow::setContent(const std::function<void()> &content)
 {
     mContentCallback = content;
 }
 
-void IImGuiWindow::setStatus(std::string statusString, ImU32 color)
+void IImGuiWindow::setStatus(const std::string &statusString, ImU32 color)
 {
     if (mStatusString != statusString)
         mStatusString = statusString;
@@ -407,10 +407,16 @@ void ImGuiPopup::open()
 {
     mShouldOpen = true;
 }
+
+
+static int gMainWindowCount = 0;
+
 ImGuiMainWindow::ImGuiMainWindow() : IImGuiWindow("##App Main Window")
 {
+    IM_ASSERT(gMainWindowCount == 0 && "Only one main window is allowed");
     mOpened      = true;
     mWindowFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+    gMainWindowCount++;
 }
 
 ImGuiMainWindow::ImGuiMainWindow(const std::string &title) : ImGuiMainWindow()

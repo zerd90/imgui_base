@@ -5,16 +5,7 @@
 #include <vector>
 #include "imgui.h"
 #include "imgui_internal.h"
-
-#define Assert(expr)                                                             \
-    do                                                                           \
-    {                                                                            \
-        if (!(expr))                                                             \
-        {                                                                        \
-            printf("Assert From (%s %d) fail(%s)\n", __func__, __LINE__, #expr); \
-            abort();                                                             \
-        }                                                                        \
-    } while (0)
+#include "ImGuiWindow.h"
 
 struct SettingValue
 {
@@ -56,10 +47,9 @@ struct SettingValue
 private:
     void checkVariable()
     {
-
-        Assert(0 != (mType & 0x0000ffff));
-        Assert(nullptr != mVal);
-        Assert(SettingArray != (mType & 0xffff0000) || mArrLen > 0);
+        IM_ASSERT(0 != (mType & 0x0000ffff));
+        IM_ASSERT(nullptr != mVal);
+        IM_ASSERT(SettingArray != (mType & 0xffff0000) || mArrLen > 0);
     }
 
 public:
@@ -76,7 +66,7 @@ public:
     } mBorderVAl = {0};
 };
 
-class ImGuiApplication
+class ImGuiApplication : public ImGuiMainWindow
 {
 public:
     struct ImGuiAppRect
@@ -102,9 +92,6 @@ public:
             mWindowRect.h = rect.h;
     }
 
-    // return if need to exit the application
-    virtual bool renderUI() { return false; };
-
     virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
     virtual void dropFile(std::vector<std::string> &files) { IM_UNUSED(files); };
 
@@ -124,6 +111,11 @@ public:
                                              ImGuiTextBuffer *buf);
 
 protected:
+    // return if need to exit the application
+    virtual bool renderUI() = 0;
+
+    virtual void showContent() override final;
+
     virtual void presetInternal() {}
 
     // call addSetting in presetInternal or the constructor of derived class

@@ -339,3 +339,9 @@ void ImGuiApplication::addSettingArr(SettingValue::SettingType type, std::string
 {
     mAppSettings.push_back(SettingValue(type, name, valAddr, minVal, maxVal, defVal, arrLen));
 }
+
+void ImGuiApplication::showContent()
+{
+   if(renderUI())
+       this->close();
+}

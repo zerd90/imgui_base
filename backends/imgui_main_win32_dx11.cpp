@@ -69,7 +69,8 @@ bool doGUIRender()
 
     ImGui::NewFrame();
 
-    if (g_user_app->renderUI())
+    g_user_app->show();
+    if (g_user_app->justClosed())
         return true;
 
     // Rendering

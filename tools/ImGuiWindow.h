@@ -42,8 +42,8 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_HOVERED_FLAGS, HoveredFlag, mHoveredFlags)
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_FOCUSED_FLAGS, FocusedFlag, mFocusedFlags)
 
-    void setContent(std::function<void()> content);
-    void setStatus(std::string statusString, ImU32 color = 0);
+    void setContent(const std::function<void()> &content);
+    void setStatus(const std::string &statusString, ImU32 color = 0);
     void setStatusProgressBar(bool on, float fraction = 0.0f);
     void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
 
@@ -144,7 +144,7 @@ protected:
     bool   mMaximized = false;
     ImVec2 mStartMoveMousePos;
     ImVec2 mStartMoveWinPos;
-    bool   mStartMove = false;
+    bool   mStartMove         = false;
     bool   mTitleBarMouseDown = false;
 };
 
