@@ -110,6 +110,8 @@ public:
     static void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
                                              ImGuiTextBuffer *buf);
 
+    void restart();
+
 protected:
     // return if need to exit the application
     virtual bool renderUI() = 0;
@@ -167,6 +169,9 @@ protected:
 
 protected:
     std::vector<SettingValue> mAppSettings;
+
+private:
+    std::string mScriptPath;
 };
 
 void setApp(ImGuiApplication *app);

@@ -109,8 +109,7 @@ protected:
     bool   mFocused      = false;
     ImVec2 mWinSize;
     ImVec2 mWinPos;
-    ImVec2 mContentRegionSize; // considering scroll
-    ImVec2 mDisplayRegionSize; // excluding scroll
+    ImVec2 mContentRegionSize;
 
     std::list<std::string> mErrors;
 

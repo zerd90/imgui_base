@@ -138,6 +138,16 @@ string localToUtf8(const string &str)
     return result;
 }
 
+wstring localToUnicode(const string &str)
+{
+    return utf8ToUnicode(localToUtf8(str));
+}
+
+string unicodeToLocal(const wstring &wStr)
+{
+    return utf8ToLocal(unicodeToUtf8(wStr));
+}
+
 string HResultToStr(HRESULT hr)
 {
     LPTSTR lpBuffer = NULL;

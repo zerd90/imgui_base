@@ -1,5 +1,8 @@
 #include <stdint.h>
 #include <filesystem>
+#include <fstream>
+#include <string>
+
 #ifdef __linux
     #include <unistd.h>
 #endif
@@ -14,7 +17,87 @@
     #include <Windows.h>
 #endif
 
+using std::string;
 namespace fs = std::filesystem;
+
+bool restartApplication(const string &scriptPath, const string &programPath)
+{
+#if defined(_WIN32)
+    DWORD pid = GetCurrentProcessId();
+    printf("pid: %lu\n", pid);
+    std::string batchContent = R"(
+        @echo off
+        set "target_pid=%PID%"
+        set "program_to_start=%PROGRAM_PATH%"
+        set "timeout_seconds=5"
+        set "elapsed_seconds=1"
+
+        :check_process
+        tasklist /FI "PID eq %target_pid%" 2>NUL | find /I "%target_pid%">NUL
+        if %errorlevel% equ 0 (
+            timeout /t 1 /nobreak >nul
+            set /a elapsed_seconds+=1
+            if %elapsed_seconds% geq %timeout_seconds% (
+                echo timeout
+                exit /b 1
+            )
+            goto check_process
+        ) else (
+            start "" "%program_to_start%"
+        )
+        )";
+
+    // 替换占位符
+    size_t pos = batchContent.find("%PID%");
+    if (pos != std::string::npos)
+    {
+        batchContent.replace(pos, 5, std::to_string(pid));
+    }
+    printf("programPath: %s\n", utf8ToLocal(programPath).c_str());
+    pos = batchContent.find("%PROGRAM_PATH%");
+    if (pos != std::string::npos)
+    {
+        batchContent.replace(pos, 14, utf8ToLocal(programPath).c_str());
+    }
+
+    // 写入文件
+    string localScriptPath = utf8ToLocal(scriptPath);
+    if (fs::exists(localScriptPath))
+    {
+        std::error_code ec;
+        fs::remove(localScriptPath, ec);
+        if (ec)
+        {
+            fprintf(stderr, "remove file %s failed: %s\n", localScriptPath.c_str(), ec.message().c_str());
+            return false;
+        }
+    }
+    std::ofstream batchFile(localScriptPath);
+    if (!batchFile.is_open())
+    {
+        fprintf(stderr, "open file %s failed: %s\n", localScriptPath.c_str(), getSystemError().c_str());
+        return false;
+    }
+
+    batchFile << batchContent;
+    batchFile.close();
+
+    std::wstring wideBatchPath = utf8ToUnicode(scriptPath);
+    STARTUPINFOW si            = {sizeof(si)};
+    si.dwFlags                 = STARTF_USESHOWWINDOW;
+    si.wShowWindow             = SW_HIDE; // 隐藏窗口
+    PROCESS_INFORMATION pi;
+    if (!CreateProcessW(nullptr, const_cast<wchar_t *>(wideBatchPath.c_str()), nullptr, nullptr, FALSE, 0, nullptr,
+                        nullptr, &si, &pi))
+    {
+        fprintf(stderr, "CreateProcessW failed: %s\n", utf8ToLocal(getSystemError()).c_str());
+        return false;
+    }
+    return true;
+#elif defined(__linux) || defined(__APPLE__)
+    // TODO
+#endif
+}
 
 ImGuiApplication::ImGuiApplication()
 {
@@ -35,9 +118,14 @@ ImGuiApplication::ImGuiApplication()
     printf("current dir %s\n", mExePath.c_str());
 #endif
 
-    fs::path exePath(mExePath);
-    fs::path exeDir = exePath.parent_path();
+    fs::path exeDir = fs::path(mExePath).parent_path();
     mConfigPath     = (exeDir / "Setting.ini").string();
+
+#ifdef _WIN32
+    mScriptPath = (exeDir / "script.bat").string();
+#else
+    mScriptPath = (exeDir / "script.sh").string();
+#endif
 
     setApp(this);
 }
@@ -342,6 +430,12 @@ void ImGuiApplication::addSettingArr(SettingValue::SettingType type, std::string
 
 void ImGuiApplication::showContent()
 {
-   if(renderUI())
-       this->close();
+    if (renderUI())
+        this->close();
+}
+
+void ImGuiApplication::restart()
+{
+    if (restartApplication(mScriptPath, mExePath))
+        this->close();
 }

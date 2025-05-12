@@ -10,11 +10,12 @@
 
 #include "ImGuiApplication.h"
 
-// for Renderer
+// Renderer Relative
 
 struct TextureData;
 bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride);
 void freeTexture(TextureData *pTexture);
+// End for Renderer Relative
 
 // will be automatically freed in destructor
 struct TextureData
@@ -27,12 +28,6 @@ struct TextureData
     int         textureHeight = 0;
     void       *opaque        = nullptr; // used by renderer
 };
-
-typedef struct
-{
-    std::string filter; //*.xxx;*.xxx;...
-    std::string description;
-} FilterSpec;
 
 template <typename _T>
 static inline auto arrayMakeSharedPtr(size_t length)
@@ -97,6 +92,12 @@ using file_stat64_t = struct stat;
 std::string getApplicationPath();
 #endif
 
+typedef struct
+{
+    std::string filter; //*.xxx;*.xxx;...
+    std::string description;
+} FilterSpec;
+
 std::string              selectFile(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                     const std::string             &initDirPath = std::string());
 std::vector<std::string> selectMultipleFiles(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
@@ -105,6 +106,8 @@ std::string              getSavePath(const std::vector<FilterSpec> &typeFilters 
                                      const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
 void                     openDebugWindow();
 
+// End Platform Relative
+
 // Backend Relative
 void setApplicationTitle(const std::string &title);
 
@@ -112,5 +115,7 @@ ImRect getDisplayWorkArea();
 ImRect maximizeMainWindow();
 void   normalizeApplication(const ImRect &winRect);
 void   minimizeMainWindow();
+
+// End Backend Relative
 
 #endif

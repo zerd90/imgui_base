@@ -221,9 +221,11 @@ bool IImGuiInput::showItem()
 
     if (mLabelOnLeft)
     {
+        ImVec2 pos = GetCursorScreenPos();
+        SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
         Text("%s", mLabel.c_str());
-        SameLine();
-        SetCursorPosX(GetCursorPosX() + mSpacing);
+        pos += ImVec2(CalcTextSize(mLabel.c_str()).x + mSpacing, 0);
+        SetCursorScreenPos(pos);
     }
     else // inner spacing controlled by ImGui
     {

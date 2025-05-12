@@ -335,9 +335,9 @@ void IImGuiWindow::updateWindowStatus()
     mWinPos            = GetWindowPos();
     mWinSize           = GetWindowSize();
     mContentRegionSize = GetContentRegionAvail();
-    mDisplayRegionSize = mWinSize - ImGui::GetStyle().WindowPadding * 2;
-    if (mWindowFlags & ImGuiWindowFlags_MenuBar)
-        mDisplayRegionSize.y -= ImGui::GetCurrentWindowRead()->MenuBarHeight;
+
+    // if (mWindowFlags & ImGuiWindowFlags_MenuBar)
+    //     mContentRegionSize.y -= ImGui::GetCurrentWindowRead()->MenuBarHeight;
 
     mFocused = IsWindowFocused(mFocusedFlags);
 
@@ -387,7 +387,11 @@ void ImGuiPopup::show()
         mShouldOpen = false;
         mOpened     = true;
     }
-    if (mOpened && (mManualSize.x > 0 && mManualSize.y > 0))
+
+    if (!mOpened)
+        return;
+
+    if (mManualSize.x > 0 && mManualSize.y > 0)
         SetNextWindowSize(mManualSize, mManualSizeCond);
 
     pushStyles();
@@ -407,7 +411,6 @@ void ImGuiPopup::open()
 {
     mShouldOpen = true;
 }
-
 
 static int gMainWindowCount = 0;
 
