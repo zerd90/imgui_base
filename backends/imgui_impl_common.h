@@ -89,7 +89,6 @@ using file_stat64_t = struct stat64;
     #define stat64  stat
 using file_stat64_t = struct stat;
 
-std::string getApplicationPath();
 #endif
 
 typedef struct
@@ -105,6 +104,10 @@ std::vector<std::string> selectMultipleFiles(const std::vector<FilterSpec> &type
 std::string              getSavePath(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                      const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
 void                     openDebugWindow();
+
+std::string getApplicationPath();
+
+bool restartApplication(const std::string &scriptPath, const std::string &programPath);
 
 // End Platform Relative
 
