@@ -334,6 +334,7 @@ void IImGuiWindow::updateWindowStatus()
 {
     mWinPos            = GetWindowPos();
     mWinSize           = GetWindowSize();
+    mContentRegionPos  = GetCursorScreenPos();
     mContentRegionSize = GetContentRegionAvail();
 
     // if (mWindowFlags & ImGuiWindowFlags_MenuBar)

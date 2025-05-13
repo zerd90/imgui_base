@@ -109,6 +109,7 @@ protected:
     bool   mFocused      = false;
     ImVec2 mWinSize;
     ImVec2 mWinPos;
+    ImVec2 mContentRegionPos;
     ImVec2 mContentRegionSize;
 
     std::list<std::string> mErrors;

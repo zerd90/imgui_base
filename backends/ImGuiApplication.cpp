@@ -3,7 +3,7 @@
 #include <fstream>
 #include <string>
 
-#ifdef __linux
+#if defined(__linux) || defined(__APPLE__)
     #include <unistd.h>
 #endif
 
@@ -24,13 +24,12 @@ bool restartApplication(const string &scriptPath, const string &programPath)
 {
 #if defined(_WIN32)
     DWORD pid = GetCurrentProcessId();
-    printf("pid: %lu\n", pid);
     std::string batchContent = R"(
         @echo off
         set "target_pid=%PID%"
         set "program_to_start=%PROGRAM_PATH%"
         set "timeout_seconds=5"
-        set "elapsed_seconds=1"
+        set "elapsed_seconds=0"
 
         :check_process
         tasklist /FI "PID eq %target_pid%" 2>NUL | find /I "%target_pid%">NUL
@@ -53,7 +52,6 @@ bool restartApplication(const string &scriptPath, const string &programPath)
     {
         batchContent.replace(pos, 5, std::to_string(pid));
     }
-    printf("programPath: %s\n", utf8ToLocal(programPath).c_str());
     pos = batchContent.find("%PROGRAM_PATH%");
     if (pos != std::string::npos)
     {
@@ -95,7 +93,84 @@ bool restartApplication(const string &scriptPath, const string &programPath)
     }
     return true;
 #elif defined(__linux) || defined(__APPLE__)
-    // TODO
+
+    auto pid = getpid();
+
+    std::string shellContent = R"(
+    target_pid=%PID%
+    program_to_start=%PROGRAM_PATH%
+    timeout_seconds=5
+    elapsed_seconds=0
+
+    while kill -0 "$target_pid" 2>/dev/null
+    do
+        if [ "$elapsed_seconds" -ge "$timeout_seconds" ]; then
+            echo "Timeout reached"
+            exit 1
+        fi
+        sleep 1
+        elapsed_seconds=$((elapsed_seconds + 1))
+    done
+
+    exec "$program_to_start"
+    )";
+
+    size_t pos = shellContent.find("%PID%");
+    if (pos != std::string::npos)
+    {
+        shellContent.replace(pos, 4, std::to_string(pid));
+    }
+    pos = shellContent.find("%PROGRAM_PATH%");
+    if (pos != std::string::npos)
+    {
+        shellContent.replace(pos, 14, utf8ToLocal(programPath));
+    }
+
+    // 写入文件
+    string localScriptPath = utf8ToLocal(scriptPath);
+    if (fs::exists(localScriptPath))
+    {
+        std::error_code ec;
+        fs::remove(localScriptPath, ec);
+        if (ec)
+        {
+            fprintf(stderr, "remove file %s failed: %s\n", localScriptPath.c_str(), ec.message().c_str());
+            return false;
+        }
+    }
+    std::ofstream shellFile(localScriptPath);
+    if (!shellFile.is_open())
+    {
+        fprintf(stderr, "open file %s failed: %s\n", localScriptPath.c_str(), getSystemError().c_str());
+        return false;
+    }
+
+    shellFile << shellContent;
+    shellFile.close();
+    // 添加执行权限
+    fs::permissions(localScriptPath, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                    fs::perm_options::add);
+
+    // 使用POSIX接口创建分离进程
+    pid_t child_pid = fork();
+    if (child_pid == -1)
+    {
+        fprintf(stderr, "fork failed: %s\n", getSystemError().c_str());
+        return false;
+    }
+
+    if (child_pid == 0)
+    {             // 子进程
+        setsid(); // 创建新会话
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+
+        execl("/bin/sh", "sh", localScriptPath.c_str(), (char *)NULL);
+        _exit(EXIT_FAILURE); // 如果execl失败
+    }
+
+    return true; // 父进程返回成功
 #endif
 }
 
@@ -126,7 +201,11 @@ ImGuiApplication::ImGuiApplication()
 #else
     mScriptPath = (exeDir / "script.sh").string();
 #endif
-
+    std::error_code ec;
+    if(fs::exists(mScriptPath, ec))
+    {
+        fs::remove(mScriptPath, ec);
+    }
     setApp(this);
 }
 
