@@ -705,7 +705,7 @@ vector<FontFamilyInfo> listSystemFonts()
             err = FT_New_Face(ftLibrary, localPath.c_str(), fontInfo.index, &face);
             if (err)
             {
-                printf("init freetype face fail: %s\n", ftErrorToString(err).c_str());
+                printf("init freetype face fail: %s\n", FT_Error_String(err));
                 continue;
             }
             FT_CharMap charmap = face->charmap;
@@ -713,7 +713,7 @@ vector<FontFamilyInfo> listSystemFonts()
             if (err)
             {
                 printf("select charmap for unicode on font %s fail: %s\n", localPath.c_str(),
-                       ftErrorToString(err).c_str());
+                       FT_Error_String(err));
                 continue;
             }
             familyInfo.name = face->family_name;

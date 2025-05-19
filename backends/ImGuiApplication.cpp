@@ -211,19 +211,19 @@ bool checkFontAvailable(const std::string &fontPath, int fontIdx, bool &fontSupp
     int err = FT_Init_FreeType(&ftLibrary);
     if (err)
     {
-        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype library fail: ", FT_Error_String(err), "\n"));
         goto CHECK_DONE;
     }
     err = FT_New_Face(ftLibrary, fontPath.c_str(), fontIdx, &face);
     if (err || !face)
     {
-        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype face fail: ", FT_Error_String(err), "\n"));
         goto CHECK_DONE;
     }
     err = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
     if (err)
     {
-        gUserApp->addLog(combineString("select freetype charmap fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("select freetype charmap fail: ", FT_Error_String(err), "\n"));
         goto CHECK_DONE;
     }
 

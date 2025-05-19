@@ -130,7 +130,6 @@ struct FontFamilyInfo
     std::string           displayName;
     std::vector<FontInfo> fonts;
 };
-std::string ftErrorToString(FT_Error errorCode);
 
 std::vector<FontFamilyInfo> listSystemFonts();
 

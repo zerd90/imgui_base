@@ -1185,14 +1185,14 @@ void FontChooseWindow::setCurrentFont(const std::string &fontPath, int fontIdx, 
     int err = FT_Init_FreeType(&ftLibrary);
     if (err)
     {
-        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype library fail: ", FT_Error_String(err), "\n"));
         return;
     }
 
     err = FT_New_Face(ftLibrary, utf8ToLocal(mOldFont.fontPath).c_str(), mOldFont.fontIdx, &face);
     if (err || !face)
     {
-        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype face fail: ", FT_Error_String(err), "\n"));
         return;
     }
     string fontName = face->family_name;
@@ -1260,14 +1260,14 @@ void FontChooseWindow::updateFontDisplayTexture()
     int err = FT_Init_FreeType(&ftLibrary);
     if (err)
     {
-        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype library fail: ", FT_Error_String(err), "\n"));
         return;
     }
 
     err = FT_New_Face(ftLibrary, utf8ToLocal(mNewFont.fontPath).c_str(), mNewFont.fontIdx, &face);
     if (err || !face)
     {
-        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        gUserApp->addLog(combineString("init freetype face fail: ", FT_Error_String(err), "\n"));
         return;
     }
 
