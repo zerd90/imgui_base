@@ -1,7 +1,9 @@
 
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 #include <unistd.h>
+#include <pwd.h>
 
 #include "imgui_common_tools.h"
 
@@ -116,6 +118,32 @@ string utf8ToLocal(const string &str)
 string localToUtf8(const string &str)
 {
     return str;
+}
+string unicodeToUtf8(const wstring &wStr)
+{
+    return localToUtf8(unicodeToLocal(wStr));
+}
+wstring utf8ToUnicode(const string &str)
+{
+    return localToUnicode(utf8ToLocal(str));
+}
+
+string unicodeToLocal(const wstring &wStr)
+{
+    char *str = new char[wStr.size() * 4 + 1];
+    wcstombs(str, wStr.c_str(), wStr.size() * 4 + 1);
+    std::string utf8_str(str);
+    delete[] str;
+    return utf8_str;
+}
+
+wstring localToUnicode(const string &str)
+{
+    wchar_t *wstr = new wchar_t[str.size() + 1];
+    mbstowcs(wstr, str.c_str(), str.size() + 1);
+    std::wstring unicode_str(wstr);
+    delete[] wstr;
+    return unicode_str;
 }
 
 void transformFileFilters(GtkFileDialog *fileDialog, const vector<FilterSpec> &typeFilters)
@@ -388,3 +416,115 @@ string getApplicationPath()
     exePathStr[len] = '\0';
     return exePathStr;
 }
+
+void listAllFontFiles(const std::string &dirPath, std::vector<std::string> &fontFiles)
+{
+    if (fs::exists(dirPath) && fs::is_directory(dirPath))
+    {
+        for (auto &entry : fs::directory_iterator(dirPath))
+        {
+            if (entry.is_regular_file())
+            {
+                if (entry.path().extension() == ".ttf" || entry.path().extension() == ".TTF"
+                    || entry.path().extension() == ".ttc" || entry.path().extension() == ".TTC")
+                {
+                    fontFiles.push_back(localToUtf8(entry.path().string()));
+                }
+            }
+            else if (entry.is_directory())
+            {
+                listAllFontFiles(entry.path().string(), fontFiles);
+            }
+        }
+    }
+}
+
+#ifdef IMGUI_ENABLE_FREETYPE
+vector<FontFamilyInfo> listSystemFonts()
+{
+    uid_t          uid = getuid();
+    struct passwd *pw  = getpwuid(uid);
+
+    std::string userDir    = pw->pw_dir;
+    std::string fontDirs[] = {"/usr/share/fonts", "/usr/local/share/fonts", userDir + "/.local/share/fonts",
+                              userDir + "/.fonts"};
+    std::vector<std::string> fontFiles;
+
+    for (const auto &dir : fontDirs)
+    {
+        listAllFontFiles(dir, fontFiles);
+    }
+
+    std::vector<FontFamilyInfo> fontFamilies;
+    FT_Library                  ftLibrary = nullptr;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        printf("FT_Init_FreeType error: %s\n", FT_Error_String(err));
+        return fontFamilies;
+    }
+    for (const auto &fontFile : fontFiles)
+    {
+        FT_Face face          = nullptr;
+        int     idx           = 0;
+        string  localFontPath = utf8ToLocal(fontFile);
+
+        while (1)
+        {
+            err = FT_New_Face(ftLibrary, localFontPath.c_str(), idx, &face);
+            if (err)
+            {
+                break;
+            }
+
+            err = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+            if (err)
+            {
+                printf("select charmap for unicode on font %s fail: %s\n", localFontPath.c_str(), FT_Error_String(err));
+                continue;
+            }
+
+            string familyName = face->family_name;
+            string styleName  = face->style_name;
+
+            auto familyIter =
+                std::find_if(fontFamilies.begin(), fontFamilies.end(),
+                             [&familyName](const FontFamilyInfo &info) { return info.name == familyName; });
+            if (familyIter == fontFamilies.end())
+            {
+                FontFamilyInfo familyInfo;
+                familyInfo.name        = familyName;
+                familyInfo.displayName = familyName;
+
+                fontFamilies.push_back(familyInfo);
+                familyIter = fontFamilies.end() - 1;
+            }
+
+            FontInfo fontInfo;
+            fontInfo.style            = styleName;
+            fontInfo.styleDisplayName = styleName;
+            fontInfo.path             = fontFile;
+            fontInfo.index            = idx;
+
+            if (std::find_if(familyIter->fonts.begin(), familyIter->fonts.end(),
+                             [&fontInfo](const FontInfo &info) {
+                                 return info.style == fontInfo.style
+                                     || (info.path == fontInfo.path && info.index == fontInfo.index);
+                             })
+                == familyIter->fonts.end())
+            {
+                familyIter->fonts.push_back(fontInfo);
+            }
+
+            FT_Done_Face(face);
+            idx++;
+        }
+    }
+
+    FT_Done_FreeType(ftLibrary);
+
+    return fontFamilies;
+}
+
+#endif

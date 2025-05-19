@@ -1384,12 +1384,18 @@ void ConfirmDialog::showContent()
     ImVec2 pos         = GetCursorScreenPos();
     ImVec2 buttonsSize = ImVec2(0, 0);
 
-    for (auto &button : mButtons)
+    for (size_t i = 0; i < mButtons.size(); i++)
     {
+        auto &button = mButtons[i];
         buttonsSize.x += button.pButton->itemSize().x;
+        if (i > 0)
+            buttonsSize.x += GetStyle().ItemSpacing.x;
         buttonsSize.y = std::max(buttonsSize.y, button.pButton->itemSize().y);
     }
+
     mManualSize = pos + buttonsSize + ImVec2(100, 50) - mWinPos;
+
+    SetCursorScreenPos(mWinPos + mWinSize - buttonsSize - GetStyle().WindowPadding);
 
     for (size_t i = 0; i < mButtons.size(); i++)
     {

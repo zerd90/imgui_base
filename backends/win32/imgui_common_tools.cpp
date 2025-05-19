@@ -708,12 +708,11 @@ vector<FontFamilyInfo> listSystemFonts()
                 printf("init freetype face fail: %s\n", FT_Error_String(err));
                 continue;
             }
-            FT_CharMap charmap = face->charmap;
-            err                = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+
+            err = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
             if (err)
             {
-                printf("select charmap for unicode on font %s fail: %s\n", localPath.c_str(),
-                       FT_Error_String(err));
+                printf("select charmap for unicode on font %s fail: %s\n", localPath.c_str(), FT_Error_String(err));
                 continue;
             }
             familyInfo.name = face->family_name;

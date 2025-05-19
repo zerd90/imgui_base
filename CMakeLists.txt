@@ -11,7 +11,7 @@ execute_process(
 
 option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
 
-if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
+if(CMAKE_SYSTEM_NAME MATCHES Darwin)
 	set(USING_FREETYPE OFF)
 endif()
 
@@ -177,6 +177,7 @@ if(NOT TARGET ${PROJECT_NAME})
 	add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${SRC_RENDER})
 
 	if(USING_FREETYPE)
+		set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES} freetype)
 		target_compile_definitions(${PROJECT_NAME}
 			PUBLIC
 			IMGUI_ENABLE_FREETYPE

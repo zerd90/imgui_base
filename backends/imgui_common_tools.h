@@ -53,14 +53,16 @@ static inline auto arrayMakeSharedPtr(size_t length, _T defaultValue)
 #if defined(_WIN32)
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
 
-std::string  unicodeToUtf8(const std::wstring &wStr);
-std::wstring utf8ToUnicode(const std::string &str);
-std::string  unicodeToLocal(const std::wstring &wStr);
-std::wstring localToUnicode(const std::string &str);
 #endif
 
 std::string utf8ToLocal(const std::string &str);
 std::string localToUtf8(const std::string &str);
+
+std::string  unicodeToUtf8(const std::wstring &wStr);
+std::wstring utf8ToUnicode(const std::string &str);
+
+std::string  unicodeToLocal(const std::wstring &wStr);
+std::wstring localToUnicode(const std::string &str);
 
 template <typename... Args>
 std::string combineString(Args... args)

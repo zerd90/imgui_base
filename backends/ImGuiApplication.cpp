@@ -201,7 +201,7 @@ void ImGuiApplication::windowRectChange(ImGuiAppRect rect)
 }
 
 #ifdef IMGUI_ENABLE_FREETYPE
-bool checkFontAvailable(const std::string &fontPath, int fontIdx, bool &fontSupportFullRange)
+bool checkFontAvailable(const std::string &fontPath, int fontIdx, bool &fontSupportFullRange, bool &fontSupportEnglish)
 {
     bool       fontAvailable = false;
     FT_Library ftLibrary     = nullptr;
@@ -232,12 +232,24 @@ bool checkFontAvailable(const std::string &fontPath, int fontIdx, bool &fontSupp
     charIndex = FT_Get_Char_Index(face, u'中');
     if (charIndex == 0)
     {
-        gUserApp->addLog("font not support chinese character\n");
+        printf("font not support chinese character\n");
         fontSupportFullRange = false;
     }
     else
     {
         fontSupportFullRange = true;
+    }
+
+    charIndex = FT_Get_Char_Index(face, u'A');
+    if (charIndex == 0)
+    {
+        printf("font not support english character\n");
+        fontSupportEnglish = false;
+    }
+    else
+    {
+        printf("font support english character %d\n", charIndex);
+        fontSupportEnglish = true;
     }
 
     fontAvailable = true;
@@ -277,6 +289,7 @@ void ImGuiApplication::loadResources()
         mAppFontPath = R"(C:\WINDOWS\FONTS\SEGUIVAR.TTF)";
 // TODO:
 #elif defined(__linux)
+        mAppFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
 #elif defined(__APPLE__)
 #endif
     }
@@ -284,7 +297,8 @@ void ImGuiApplication::loadResources()
     bool fontAvailable = true;
 #ifdef IMGUI_ENABLE_FREETYPE
     bool fontSupportFullRange = true;
-    fontAvailable             = checkFontAvailable(mAppFontPath, mAppFontIdx, fontSupportFullRange);
+    bool fontSupportEnglish   = true;
+    fontAvailable             = checkFontAvailable(mAppFontPath, mAppFontIdx, fontSupportFullRange, fontSupportEnglish);
 #endif
     // TODO: support multi language
     if (fontAvailable)
@@ -298,11 +312,34 @@ void ImGuiApplication::loadResources()
 #ifdef IMGUI_ENABLE_FREETYPE
         if (!fontSupportFullRange)
         {
-            addLog("font not support full range character, use simhei for chinese\n");
+            addLog("font not support full range character, use default for chinese\n");
             ImFontConfig fontConfig;
             fontConfig.MergeMode = true;
+    #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
                                          io.Fonts->GetGlyphRangesChineseFull());
+    #elif defined(__linux)
+            io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf)", mAppFontSize,
+                                         &fontConfig, io.Fonts->GetGlyphRangesChineseFull());
+    #elif defined(__APPLE__)
+                // TODO:
+    #endif
+        }
+
+        if (!fontSupportEnglish)
+        {
+            addLog("font not support english character, use default for english\n");
+            ImFontConfig fontConfig;
+            fontConfig.MergeMode = true;
+    #ifdef _WIN32
+            io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
+                                         io.Fonts->GetGlyphRangesDefault());
+    #elif defined(__linux)
+            io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf)", mAppFontSize,
+                                         &fontConfig, io.Fonts->GetGlyphRangesDefault());
+    #elif defined(__APPLE__)
+                // TODO:
+    #endif
         }
 #endif
     }
