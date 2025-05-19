@@ -8,32 +8,66 @@
 
 #include "ImGuiApplication.h"
 
-#include "imgui_impl_common.h"
+#include "imgui_common_tools.h"
+#include "ApplicationSetting.h"
 
 using std::string;
 namespace fs = std::filesystem;
 
+ImGuiApplication *gUserApp = nullptr;
+
 ImGuiApplication::ImGuiApplication()
+    : mLogger("Application Log"),
+      mFontChooser("Font Chooser", std::bind(&ImGuiApplication::onFontChanged, this, std::placeholders::_1,
+                                             std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
 {
     mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
 
     mExePath = getApplicationPath();
 
-    fs::path exeDir = fs::path(mExePath).parent_path();
-    mConfigPath     = (exeDir / "Setting.ini").string();
+    fs::path exeDir = fs::path(utf8ToLocal(mExePath)).parent_path();
+    mConfigPath     = localToUtf8((exeDir / "Setting.ini").string());
 
 #ifdef _WIN32
-    mScriptPath = (exeDir / "script.bat").string();
+    mScriptPath = localToUtf8((exeDir / "script.bat").string());
 #else
-    mScriptPath = (exeDir / "script.sh").string();
+    mScriptPath = localToUtf8((exeDir / "script.sh").string());
 #endif
     std::error_code ec;
     if (fs::exists(mScriptPath, ec))
     {
         fs::remove(mScriptPath, ec);
     }
-    setApp(this);
+
+    addSetting(
+        SettingValue::SettingInt, "Theme", [this](const void *val) { mAppTheme = (GUI_THEME)(*((int *)val)); },
+        [this](void *val) { *((int *)val) = mAppTheme; });
+    addSetting(
+        SettingValue::SettingBool, "GUI VSync", [this](const void *val) { mGuiVSync = *((bool *)val); },
+        [this](void *val) { *((bool *)val) = mGuiVSync; });
+    addSetting(
+        SettingValue::SettingBool, "Show Log Window", [this](const void *val) { mShowLogWindow = *((bool *)val); },
+        [this](void *val) { *((bool *)val) = mShowLogWindow; });
+
+    addSetting(
+        SettingValue::SettingStr, "GUI Font Path", [this](const void *val) { mAppFontPath = (char *)val; },
+        [this](void *val)
+        {
+            char **pStr = (char **)val;
+            *pStr       = (char *)mAppFontPath.c_str();
+        });
+    addSetting(
+        SettingValue::SettingInt, "GUI Font Index", [this](const void *val) { mAppFontIdx = *((int *)val); },
+        [this](void *val) { *((int *)val) = mAppFontIdx; });
+    addSetting(
+        SettingValue::SettingFloat, "GUI Font Size", [this](const void *val) { mAppFontSize = *((float *)val); },
+        [this](void *val) { *((float *)val) = mAppFontSize; });
+
+    mFontChooser.setHasCloseButton(false);
+    mFontChooser.addWindowFlag(ImGuiWindowFlags_NoScrollbar);
+
+    gUserApp = this;
 }
 
 void ImGuiApplication::preset()
@@ -43,7 +77,24 @@ void ImGuiApplication::preset()
     io.ConfigErrorRecoveryEnableAssert  = false;
 
     presetInternal();
-    mAppSettings.push_back(SettingValue(SettingValue::SettingArrInt, "WinRect", &mWindowRect.x, 4));
+    addSettingArr(
+        SettingValue::SettingArrInt, "WinRect", 4,
+        [this](const void *val)
+        {
+            int *arr      = (int *)val;
+            mWindowRect.x = arr[0];
+            mWindowRect.y = arr[1];
+            mWindowRect.w = arr[2];
+            mWindowRect.h = arr[3];
+        },
+        [this](void *val)
+        {
+            int *arr = (int *)val;
+            arr[0]   = mWindowRect.x;
+            arr[1]   = mWindowRect.y;
+            arr[2]   = mWindowRect.w;
+            arr[3]   = mWindowRect.h;
+        });
 
     ImGuiSettingsHandler ini_handler;
     ini_handler.TypeName   = "App Window";
@@ -51,297 +102,226 @@ void ImGuiApplication::preset()
     ini_handler.ReadOpenFn = WinSettingsHandler_ReadOpen;
     ini_handler.ReadLineFn = WinSettingsHandler_ReadLine;
     ini_handler.WriteAllFn = WinSettingsHandler_WriteAll;
-    ini_handler.UserData   = this;
+    ini_handler.UserData   = &mAppSettings;
 
     ImGui::AddSettingsHandler(&ini_handler);
-}
-void *ImGuiApplication::WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name)
-{
-    ImGuiApplication *app = (ImGuiApplication *)handler->UserData;
-    if (!app)
-        return nullptr;
 
-    for (uintptr_t i = 0; i < app->mAppSettings.size(); i++)
+    // Menu
+    if (mMenuEnable)
     {
-        if (strcmp(name, app->mAppSettings[i].mName.c_str()) == 0)
-            return (void *)(i + 1); // not returning 0
+        addMenu({"Settings", "Show Log"}, [this]() { mLogger.open(); }, &mShowLogWindow);
+        addMenu(
+            {"GUI", "Theme", "Dark"},
+            [this]()
+            {
+                mAppTheme = THEME_DARK;
+                ImGui::StyleColorsDark();
+            },
+            [this]() { return mAppTheme == THEME_DARK; });
+
+        addMenu(
+            {"GUI", "Theme", "Light"},
+            [this]()
+            {
+                mAppTheme = THEME_LIGHT;
+                ImGui::StyleColorsLight();
+            },
+            [this]() { return mAppTheme == THEME_LIGHT; });
+
+        addMenu(
+            {"GUI", "Theme", "Classic"},
+            [this]()
+            {
+                mAppTheme = THEME_CLASSIC;
+                ImGui::StyleColorsClassic();
+            },
+            [this]() { return mAppTheme == THEME_CLASSIC; });
+
+        addMenu({"GUI", "V-Sync"}, nullptr, &mGuiVSync);
+        addMenu({"GUI", "Show Status"}, nullptr, &mShowUIStatus);
+
+        addMenu({"GUI", "Font"}, [&]() { mFontChooser.open(); });
     }
-    return nullptr;
-}
-
-void ImGuiApplication::WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
-                                                   const char *line)
-{
-    if ('\0' == *line) // empty line
-        return;
-
-    ImGuiApplication *app = (ImGuiApplication *)handler->UserData;
-    if (!app)
-        return;
-
-    size_t settingIndex = (size_t)(uintptr_t)entry;
-    if (0 == settingIndex || settingIndex > app->mAppSettings.size())
-        return;
-
-    settingIndex -= 1; // ReadOpen not return 0, so need to minus 1
-
-    SettingValue &setting = app->mAppSettings[settingIndex];
-
-    switch (setting.mType)
+    else
     {
-        default:
-            break;
-        case SettingValue::SettingInt:
-        {
-            int *pVal = (int *)setting.mVal;
-            *pVal     = atoi(line);
-            if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-            {
-                if (*pVal < setting.mBorderVAl.minVal || *pVal > setting.mBorderVAl.maxVal)
-                {
-                    *pVal = (int)setting.mBorderVAl.defVal;
-                }
-            }
-            break;
-        }
-        case SettingValue::SettingFloat:
-        {
-            float *pVal = (float *)setting.mVal;
-            *pVal       = (float)atof(line);
-            if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-            {
-                if (*pVal < setting.mBorderVAl.minVal || *pVal > setting.mBorderVAl.maxVal)
-                {
-                    *pVal = (float)setting.mBorderVAl.defVal;
-                }
-            }
-            break;
-        }
-        case SettingValue::SettingDouble:
-        {
-            double *pVal = (double *)setting.mVal;
-            *pVal        = atof(line);
-            if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-            {
-                if (*pVal < setting.mBorderVAl.minVal || *pVal > setting.mBorderVAl.maxVal)
-                {
-                    *pVal = setting.mBorderVAl.defVal;
-                }
-            }
-            break;
-        }
-        case SettingValue::SettingStdString:
-            *(std::string *)setting.mVal = std::string(line);
-            break;
-        case SettingValue::SettingBool:
-            *(bool *)setting.mVal = !!atoi(line);
-            break;
-        case SettingValue::SettingArrInt:
-        case SettingValue::SettingArrFloat:
-        case SettingValue::SettingArrDouble:
-        {
-            std::string         tmpLine(line);
-            int                 valCount = 1;
-            std::vector<size_t> valStart = {0};
-            while (tmpLine.find(',', valStart[valCount - 1]) != std::string::npos)
-            {
-                valStart.push_back(tmpLine.find(',', valStart[valCount - 1]) + 1);
-                valCount++;
-            }
-            if (valCount != setting.mArrLen)
-                return;
-            switch (setting.mType)
-            {
-                default:
-                    break;
-                case SettingValue::SettingArrInt:
-                {
-                    int *arr = (int *)setting.mVal;
-                    for (int i = 0; i < setting.mArrLen; i++)
-                    {
-                        sscanf(tmpLine.substr(valStart[i]).c_str(), "%d", &arr[i]);
-                        if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-                        {
-                            if (arr[i] < setting.mBorderVAl.minVal || arr[i] > setting.mBorderVAl.maxVal)
-                            {
-                                arr[i] = (int)setting.mBorderVAl.defVal;
-                            }
-                        }
-                    }
-                    break;
-                }
-                case SettingValue::SettingArrFloat:
-                {
-                    float *arr = (float *)setting.mVal;
-                    for (int i = 0; i < setting.mArrLen; i++)
-                    {
-                        sscanf(tmpLine.substr(valStart[i]).c_str(), "%f", &arr[i]);
-                        if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-                        {
-                            if (arr[i] < setting.mBorderVAl.minVal || arr[i] > setting.mBorderVAl.maxVal)
-                            {
-                                arr[i] = (float)setting.mBorderVAl.defVal;
-                            }
-                        }
-                    }
-                    break;
-                }
-                case SettingValue::SettingArrDouble:
-                {
-                    double *arr = (double *)setting.mVal;
-                    for (int i = 0; i < setting.mArrLen; i++)
-                    {
-                        sscanf(tmpLine.substr(valStart[i]).c_str(), "%lf", &arr[i]);
-                        if (setting.mBorderVAl.minVal < setting.mBorderVAl.maxVal)
-                        {
-                            if (arr[i] < setting.mBorderVAl.minVal || arr[i] > setting.mBorderVAl.maxVal)
-                            {
-                                arr[i] = setting.mBorderVAl.defVal;
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
-            break;
-        }
-        case SettingValue::SettingVectorInt:
-        {
-            std::vector<int> *vecInt = (std::vector<int> *)setting.mVal;
-            vecInt->push_back(atoi(line));
-        }
-        break;
-        case SettingValue::SettingVectorFloat:
-        {
-            std::vector<float> *vecFloat = (std::vector<float> *)setting.mVal;
-            vecFloat->push_back((float)atof(line));
-        }
-        break;
-        case SettingValue::SettingVectorDouble:
-        {
-            std::vector<double> *vecDouble = (std::vector<double> *)setting.mVal;
-            vecDouble->push_back(atof(line));
-        }
-        break;
-        case SettingValue::SettingVecStdString:
-        {
-            std::vector<std::string> *vecString = (std::vector<std::string> *)setting.mVal;
-            vecString->push_back(std::string(line));
-        }
-        break;
+        removeWindowFlag(ImGuiWindowFlags_MenuBar);
     }
 }
 
-void ImGuiApplication::WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
-                                                   ImGuiTextBuffer *buf)
+void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name,
+                                  std::function<void(const void *)> setVal, std::function<void(void *)> getVal)
 {
-    IM_UNUSED(imgui_ctx);
-    ImGuiApplication *app = (ImGuiApplication *)handler->UserData;
-    if (!app)
-        return;
-
-    for (auto &setting : app->mAppSettings)
-    {
-        buf->appendf("[%s][%s]\n", handler->TypeName, setting.mName.c_str());
-        switch (setting.mType)
-        {
-            default:
-                break;
-            case SettingValue::SettingInt:
-                buf->appendf("%d\n", *(int *)setting.mVal);
-                break;
-            case SettingValue::SettingFloat:
-                buf->appendf("%f\n", *(float *)setting.mVal);
-                break;
-            case SettingValue::SettingDouble:
-                buf->appendf("%lf\n", *(double *)setting.mVal);
-                break;
-            case SettingValue::SettingStdString:
-                buf->appendf("%s\n", ((std::string *)setting.mVal)->c_str());
-                break;
-            case SettingValue::SettingBool:
-                buf->appendf("%d\n", *(bool *)setting.mVal);
-                break;
-            case SettingValue::SettingArrInt:
-                for (int i = 0; i < setting.mArrLen; i++)
-                {
-                    int val = ((int *)setting.mVal)[i];
-                    buf->appendf("%d%c", val, ", "[(setting.mArrLen - 1) == i]);
-                }
-                break;
-            case SettingValue::SettingArrFloat:
-                for (int i = 0; i < setting.mArrLen; i++)
-                {
-                    buf->appendf("%f%c", ((float *)setting.mVal)[i], ", "[(setting.mArrLen - 1) == i]);
-                }
-                break;
-            case SettingValue::SettingArrDouble:
-                for (int i = 0; i < setting.mArrLen; i++)
-                {
-                    buf->appendf("%lf%c", ((double *)setting.mVal)[i], ", "[(setting.mArrLen - 1) == i]);
-                }
-                break;
-            case SettingValue::SettingVectorInt:
-            {
-                std::vector<int> *vecInt = (std::vector<int> *)setting.mVal;
-                for (size_t i = 0; i < vecInt->size(); i++)
-                {
-                    buf->appendf("%d\n", (*vecInt)[i]);
-                }
-                break;
-            }
-            case SettingValue::SettingVectorFloat:
-            {
-                std::vector<float> *vecFloat = (std::vector<float> *)setting.mVal;
-                for (size_t i = 0; i < vecFloat->size(); i++)
-                {
-                    buf->appendf("%f\n", (*vecFloat)[i]);
-                }
-                break;
-            }
-            case SettingValue::SettingVectorDouble:
-            {
-                std::vector<double> *vecDouble = (std::vector<double> *)setting.mVal;
-                for (size_t i = 0; i < vecDouble->size(); i++)
-                {
-                    buf->appendf("%lf\n", (*vecDouble)[i]);
-                }
-                break;
-            }
-            case SettingValue::SettingVecStdString:
-            {
-                std::vector<std::string> *vecString = (std::vector<std::string> *)setting.mVal;
-                for (size_t i = 0; i < vecString->size(); i++)
-                {
-                    buf->appendf("%s\n", (*vecString)[i].c_str());
-                }
-                break;
-            }
-        }
-        buf->append("\n");
-    }
+    mAppSettings.emplace_back(type, name, setVal, getVal);
 }
 
-void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name, void *valAddr, double minVal,
-                                  double maxVal, double defVal)
+void ImGuiApplication::addSettingArr(SettingValue::SettingType type, std::string name, int arrLen,
+                                     std::function<void(const void *)> setVal, std::function<void(void *)> getVal)
 {
-    mAppSettings.push_back(SettingValue(type, name, valAddr, minVal, maxVal, defVal));
-}
-
-void ImGuiApplication::addSettingArr(SettingValue::SettingType type, std::string name, void *valAddr, int arrLen,
-                                     double minVal, double maxVal, double defVal)
-{
-    mAppSettings.push_back(SettingValue(type, name, valAddr, minVal, maxVal, defVal, arrLen));
+    mAppSettings.emplace_back(type, name, setVal, getVal, arrLen);
 }
 
 void ImGuiApplication::showContent()
 {
     if (renderUI())
         this->close();
+
+    if (mShowUIStatus)
+        ImGui::ShowMetricsWindow(&mShowUIStatus);
+
+    if (mShowLogWindow)
+    {
+        mLogger.show();
+        if (mLogger.justClosed())
+            mShowLogWindow = false;
+    }
+    mFontChooser.show();
+}
+
+void ImGuiApplication::addLog(const std::string &logString)
+{
+    mLogger.appendString(logString);
 }
 
 void ImGuiApplication::restart()
 {
     if (restartApplication(mScriptPath, mExePath))
         this->close();
+}
+
+void ImGuiApplication::windowRectChange(ImGuiAppRect rect)
+{
+    if (rect.x >= 0)
+        mWindowRect.x = rect.x;
+    if (rect.y >= 0)
+        mWindowRect.y = rect.y;
+    if (rect.w > 0)
+        mWindowRect.w = rect.w;
+    if (rect.h > 0)
+        mWindowRect.h = rect.h;
+}
+
+#ifdef IMGUI_ENABLE_FREETYPE
+bool checkFontAvailable(const std::string &fontPath, int fontIdx, bool &fontSupportFullRange)
+{
+    bool       fontAvailable = false;
+    FT_Library ftLibrary     = nullptr;
+    FT_Face    face          = nullptr;
+    FT_UInt    charIndex;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        goto CHECK_DONE;
+    }
+    err = FT_New_Face(ftLibrary, fontPath.c_str(), fontIdx, &face);
+    if (err || !face)
+    {
+        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        goto CHECK_DONE;
+    }
+    err = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+    if (err)
+    {
+        gUserApp->addLog(combineString("select freetype charmap fail: ", ftErrorToString(err), "\n"));
+        goto CHECK_DONE;
+    }
+
+    // TODO: support multi language
+    // check if the font support chinese, if not, use simhei as default font
+    charIndex = FT_Get_Char_Index(face, u'中');
+    if (charIndex == 0)
+    {
+        gUserApp->addLog("font not support chinese character\n");
+        fontSupportFullRange = false;
+    }
+    else
+    {
+        fontSupportFullRange = true;
+    }
+
+    fontAvailable = true;
+
+CHECK_DONE:
+    FT_Done_Face(face);
+    FT_Done_FreeType(ftLibrary);
+
+    return fontAvailable;
+}
+#endif
+
+void ImGuiApplication::loadResources()
+{
+    setTitle(mApplicationName);
+
+    switch (mAppTheme)
+    {
+        default:
+        case THEME_DARK:
+            ImGui::StyleColorsDark();
+            break;
+        case THEME_LIGHT:
+            ImGui::StyleColorsLight();
+            break;
+        case THEME_CLASSIC:
+            ImGui::StyleColorsClassic();
+            break;
+    }
+
+    auto &io = ImGui::GetIO();
+    if (mAppFontSize <= 0)
+        mAppFontSize = 15;
+    if (mAppFontPath.empty())
+    {
+#ifdef _WIN32
+        mAppFontPath = R"(C:\WINDOWS\FONTS\SEGUIVAR.TTF)";
+// TODO:
+#elif defined(__linux)
+#elif defined(__APPLE__)
+#endif
+    }
+    // check if font is available
+    bool fontAvailable = true;
+#ifdef IMGUI_ENABLE_FREETYPE
+    bool fontSupportFullRange = true;
+    fontAvailable             = checkFontAvailable(mAppFontPath, mAppFontIdx, fontSupportFullRange);
+#endif
+    // TODO: support multi language
+    if (fontAvailable)
+    {
+        ImFontConfig fontConfig;
+        fontConfig.FontNo = mAppFontIdx;
+        io.Fonts->AddFontFromFileTTF(mAppFontPath.c_str(), mAppFontSize, &fontConfig,
+                                     io.Fonts->GetGlyphRangesChineseFull());
+        mFontChooser.setCurrentFont(mAppFontPath, mAppFontIdx, mAppFontSize);
+
+#ifdef IMGUI_ENABLE_FREETYPE
+        if (!fontSupportFullRange)
+        {
+            addLog("font not support full range character, use simhei for chinese\n");
+            ImFontConfig fontConfig;
+            fontConfig.MergeMode = true;
+            io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
+                                         io.Fonts->GetGlyphRangesChineseFull());
+        }
+#endif
+    }
+
+    if (mShowLogWindow)
+        mLogger.open();
+}
+
+bool ImGuiApplication::VSyncEnabled()
+{
+    return mGuiVSync;
+}
+
+void ImGuiApplication::onFontChanged(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)
+{
+    mAppFontPath = fontPath;
+    mAppFontIdx  = fontIdx;
+    mAppFontSize = fontSize;
+
+    if (applyNow)
+        restart();
 }

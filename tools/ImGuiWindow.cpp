@@ -2,7 +2,7 @@
 #include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
-#include "imgui_impl_common.h"
+#include "imgui_common_tools.h"
 #include "ImGuiWindow.h"
 
 using namespace ImGui;
@@ -671,7 +671,9 @@ void ImGuiMainWindow::show()
     {
         tmpWinSize.y -= (GetTextLineHeightWithSpacing() + style.DockingSeparatorSize + style.ItemSpacing.y);
     }
-    BeginChild("##Main Window Content", tmpWinSize, 0, ImGuiWindowFlags_MenuBar);
+
+    BeginChild("##Main Window Content", tmpWinSize, ImGuiChildFlags_AlwaysUseWindowPadding,
+               !mMenuBarItems.subMenus.empty() ? ImGuiWindowFlags_MenuBar : 0);
 
     if (!mMenuBarItems.subMenus.empty())
     {
@@ -720,7 +722,7 @@ void ImGuiMainWindow::show()
             EndMenuBar();
         }
     }
-    SetCursorPos(GetCursorPos() + ImVec2(8, 0));
+
     showContent();
 
     EndChild();

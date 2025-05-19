@@ -168,7 +168,7 @@
         #include "imgui_impl_opengl3_loader.h"
     #endif
 
-    #include "imgui_impl_common.h"
+    #include "imgui_common_tools.h"
 
     // Vertex arrays are not supported on ES2/WebGL1 unless Emscripten which uses an extension
     #ifndef IMGUI_IMPL_OPENGL_ES2

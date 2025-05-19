@@ -133,6 +133,7 @@ class ImGuiMainWindow : public IImGuiWindow
 public:
     ImGuiMainWindow();
     ImGuiMainWindow(const std::string &title);
+    virtual ~ImGuiMainWindow() {}
 
     virtual void show() override;
 
@@ -156,12 +157,14 @@ public:
         mIsChildWindow = true;
         mOpened        = true;
     }
+    virtual ~IImGuiChildWindow() {}
 };
 
 class ImGuiPopup : public IImGuiWindow
 {
 public:
     ImGuiPopup(const std::string &title);
+    virtual ~ImGuiPopup() {}
     virtual void show() override;
     void         open();
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_POPUP_FLAGS, PopupFlag, mPopupFlags)

@@ -9,6 +9,12 @@ execute_process(
 	WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
+option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
+
+if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
+	set(USING_FREETYPE OFF)
+endif()
+
 if(RENDER MATCHES "")
 	if(CMAKE_SYSTEM_NAME MATCHES Windows)
 		SET(RENDER WIN32_DX11)
@@ -111,6 +117,11 @@ if(${CMAKE_SYSTEM_NAME} MATCHES Linux)
 	endif()
 endif()
 
+if(USING_FREETYPE AND CMAKE_SYSTEM_NAME MATCHES Windows)
+	# for font listing
+	set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES} Dwrite)
+endif()
+
 if(NOT PROJECT_IS_TOP_LEVEL)
 	set(LINK_LIBRARIES ${LINK_LIBRARIES}
 		${PARENT_LINK_LIBRARIES}
@@ -122,15 +133,23 @@ endif()
 aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source IMGUI_BASE_SRC_LIST)
 aux_source_directory(${PROJECT_SOURCE_DIR}/3rdparty IMGUI_BASE_SRC_LIST)
 aux_source_directory(${PROJECT_SOURCE_DIR}/tools IMGUI_BASE_SRC_LIST)
+
+if(USING_FREETYPE)
+	aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source/misc/freetype IMGUI_BASE_SRC_LIST)
+endif()
+
 set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
+	${PROJECT_SOURCE_DIR}/backends/imgui_common_tools.cpp
 	${PROJECT_SOURCE_DIR}/backends/ImGuiApplication.cpp
-	${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.cpp
+	${PROJECT_SOURCE_DIR}/backends/ApplicationSetting.cpp
 )
 
-if(CMAKE_SYSTEM_NAME MATCHES Darwin)
-	set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
-		${PROJECT_SOURCE_DIR}/backends/imgui_impl_common.mm
-	)
+if(CMAKE_SYSTEM_NAME MATCHES Windows)
+	aux_source_directory(${PROJECT_SOURCE_DIR}/backends/win32 IMGUI_BASE_SRC_LIST)
+elseif(CMAKE_SYSTEM_NAME MATCHES Linux)
+	aux_source_directory(${PROJECT_SOURCE_DIR}/backends/linux IMGUI_BASE_SRC_LIST)
+elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+	aux_source_directory(${PROJECT_SOURCE_DIR}/backends/darwin IMGUI_BASE_SRC_LIST)
 endif()
 
 if(RENDER MATCHES WIN32_DX11)
@@ -156,5 +175,13 @@ include_directories(${INCLUDE_DIRECTORIES})
 
 if(NOT TARGET ${PROJECT_NAME})
 	add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${SRC_RENDER})
+
+	if(USING_FREETYPE)
+		target_compile_definitions(${PROJECT_NAME}
+			PUBLIC
+			IMGUI_ENABLE_FREETYPE
+		)
+	endif()
+
 	target_link_libraries(${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES})
 endif()

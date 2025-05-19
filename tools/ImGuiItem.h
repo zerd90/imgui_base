@@ -11,7 +11,7 @@
 
 enum ImGuiItemAction
 {
-    ImGuiItemNativeActive = 0, // Button Pressed / Checkbox state Changed/TexLink Clicked/...
+    ImGuiItemNativeActive = 0, // Button Clicked / Checkbox state Changed/TexLink Clicked/...
     ImGuiItemHovered,
     ImGuiItemActive,
     ImGuiItemActivated,
@@ -59,7 +59,7 @@ protected:
     ImVec2              mManualItemSize;
     std::string         mLabel;
 
-private:
+protected:
     bool                  mItemStatus[ImGuiItemActionButt];
     std::function<void()> mActionCallbacks[ImGuiItemActionButt];
 };
@@ -142,7 +142,8 @@ public:
     // spacing between label and input box
     void setSpacing(float spacing);
 
-    void setLabelPosition(bool labelOnLeft);
+    void         setLabelPosition(bool labelOnLeft);
+    virtual void updateItemStatus() override;
 
 protected:
     virtual bool showInputItem() = 0;
@@ -157,7 +158,7 @@ template <typename T>
 class ImGuiInput : public IImGuiInput
 {
 public:
-    ImGuiInput(const std::string &label, T &initalValue, bool labelOnLeft = false,
+    ImGuiInput(const std::string &label, T initalValue, bool labelOnLeft = false,
                const T &min = (std::numeric_limits<T>::min)(), const T &max = (std::numeric_limits<T>::max)(),
                const T &step = 0, const T &stepFast = 0)
         : IImGuiInput(label, labelOnLeft)
@@ -169,7 +170,7 @@ public:
     }
 
     const T &getValue() { return mValue; }
-    void     setValue(T &newValue) { mValue = newValue; }
+    void     setValue(const T &newValue) { mValue = newValue; }
 
     void setStep(T step, T stepFast = 0)
     {
@@ -184,16 +185,22 @@ protected:
     virtual bool showInputItem() override
     {
         std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+        bool        res;
         if constexpr (std::is_same<T, int>::value)
         {
-            bool res = ImGui::InputInt(showLabel.c_str(), &mValue, mStep, mStepFast);
-            return res;
+            res = ImGui::InputInt(showLabel.c_str(), &mValue, mStep, mStepFast);
         }
         else if constexpr (std::is_same<T, float>::value)
         {
-            bool res = ImGui::InputFloat(showLabel.c_str(), &mValue, mStep, mStepFast);
-            return res;
+            res = ImGui::InputFloat(showLabel.c_str(), &mValue, mStep, mStepFast);
         }
+
+        if (mValue < mMinValue)
+            mValue = mMinValue;
+        if (mValue > mMaxValue)
+            mValue = mMaxValue;
+
+        return res;
     }
 
 private:
@@ -254,6 +261,7 @@ public:
     void     removeSelectableItem(ComboTag tag);
     bool     selectChanged();
     ComboTag getSelected();
+    void     setSelected(ComboTag tag);
     void     clear();
 
 protected:

@@ -9,6 +9,7 @@
 #include "imgui_internal.h"
 #include "ImGuiTools.h"
 #include "ImGuiBaseTypes.h"
+#include "ImGuiApplication.h"
 
 using std::map;
 using std::string;
@@ -118,15 +119,6 @@ void LoggerWindow::displayTexts()
 
     mTotalLines = 0;
 
-    ImGuiResourceGuard guard(
-        [&]()
-        {
-            if (colorSet)
-            {
-                PopStyleColor(1);
-            }
-        });
-
     TextColorCode curColor  = ColorNone;
     bool          newLine   = true;
     float         lineWidth = 0;
@@ -183,6 +175,9 @@ void LoggerWindow::displayTexts()
                 }
                 if (0 == displayLength) // can't display even one character
                 {
+                    if (colorSet)
+                        PopStyleColor(1);
+
                     return;
                 }
                 Text("%s", showStr.substr(displayStart, displayLength).c_str());
@@ -203,6 +198,9 @@ void LoggerWindow::displayTexts()
     }
     if (lineWidth > mMaxLineWidth)
         mMaxLineWidth = lineWidth;
+
+    if (colorSet)
+        PopStyleColor(1);
 }
 
 bool positiveDirSelection(ImVec2 start, ImVec2 end)
@@ -213,7 +211,10 @@ bool positiveDirSelection(ImVec2 start, ImVec2 end)
 LoggerWindow::LoggerWindow(std::string title, bool embed) : IImGuiWindow(title)
 {
     if (embed)
+    {
         mIsChildWindow = true;
+        mOpened        = true;
+    }
     else
         mHasCloseButton = true;
 }
@@ -807,7 +808,7 @@ void ImGuiBinaryViewer::showContent()
         if (mIsChildWindow && mHovered)
             SetKeyOwner(ImGuiKey_MouseWheelY, GetCurrentWindow()->ID);
 
-        float scrollbar_size                 = ImGui::GetStyle().ScrollbarSize;
+        float scrollbar_size                 = GetStyle().ScrollbarSize;
         GetCurrentWindow()->ScrollbarSizes.x = scrollbar_size; // Hack to use GetWindowScrollbarRect()
         ImRect  scrollbar_rect               = ImGui::GetWindowScrollbarRect(GetCurrentWindow(), ImGuiAxis_Y);
         ImGuiID scrollbar_id                 = ImGui::GetWindowScrollbarID(GetCurrentWindow(), ImGuiAxis_Y);
@@ -969,4 +970,437 @@ void ImGuiBinaryViewer::setDataCallbacks(std::function<ImS64(void *)>           
 void ImGuiBinaryViewer::setUserData(void *userData)
 {
     mUserData = userData;
+}
+
+#define MIN_FONT_SIZE 10
+#define MAX_FONT_SIZE 25
+#define DEF_FONT_SIZE 15
+FontChooseWindow::FontChooseWindow(
+    const std::string                                                                                 &name,
+    const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)> onFontChanged)
+    : ImGuiPopup(name), mOnFontChanged(onFontChanged),
+#ifdef IMGUI_ENABLE_FREETYPE
+      mFontFamiliesCombo("##font Families"), mFontStylesCombo("##font style"),
+#endif
+      mFontSizeInput("##Font Size", DEF_FONT_SIZE, false, MIN_FONT_SIZE, MAX_FONT_SIZE, 0.5, 1.0),
+      mApplyButton("Apply"), mCancelButton("Cancel"),
+      mConfirmWindow("Apply Font", "Restart Application To Apply New Font"), mRestartButton("Restart Now"),
+      mLatterButton("Restart Latter")
+{
+    mManualSizeCond = ImGuiCond_Always;
+    mFontSizeInput.setValue(15.f);
+    mFontSizeInput.setItemWidth(150);
+    mConfirmWindow.addWindowFlag(ImGuiWindowFlags_NoResize);
+    mConfirmWindow.addButton("Restart Now",
+                             [this]()
+                             {
+                                 mConfirmWindow.close();
+                                 this->close();
+                                 mOldFont = mNewFont;
+                                 mOnFontChanged(mNewFont.fontPath, mNewFont.fontIdx, mNewFont.fontSize, true);
+                             });
+    mConfirmWindow.addButton("Restart Latter",
+                             [this]()
+                             {
+                                 mConfirmWindow.close();
+                                 this->close();
+                                 mOldFont = mNewFont;
+                                 mOnFontChanged(mNewFont.fontPath, mNewFont.fontIdx, mNewFont.fontSize, false);
+                             });
+
+#ifdef IMGUI_ENABLE_FREETYPE
+    if (mSystemFontFamilies.empty())
+    {
+        mSystemFontFamilies = listSystemFonts();
+        for (int i = 0; i < mSystemFontFamilies.size(); i++)
+        {
+            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName);
+        }
+        updateFontStyles();
+    }
+    mFontFamiliesCombo.setItemWidth(150);
+    mFontStylesCombo.setItemWidth(150);
+#endif
+}
+
+void FontChooseWindow::showContent()
+{
+    float maxItemWidth = 0;
+    bool  fontChanged  = false;
+
+#ifdef IMGUI_ENABLE_FREETYPE
+
+    ImVec2 inputStartPos = GetCursorScreenPos();
+
+    mFontFamiliesCombo.show();
+    if (mFontFamiliesCombo.selectChanged())
+    {
+        updateFontStyles();
+        mFontSelectChanged = true;
+    }
+    mFontStylesCombo.show();
+    if (mFontStylesCombo.selectChanged())
+    {
+        mFontSelectChanged = true;
+    }
+
+    mFontSizeInput.show();
+    if (mFontSizeInput.isNativeActive())
+    {
+        mNewFont.fontSize  = mFontSizeInput.getValue();
+        mFontSelectChanged = true;
+    }
+    ImVec2 inputEndPos = GetCursorScreenPos();
+
+    int   fontFamilyIdx = mFontFamiliesCombo.getSelected();
+    int   fontIdx       = mFontStylesCombo.getSelected();
+    auto &font          = mSystemFontFamilies[fontFamilyIdx].fonts[fontIdx];
+    mFontFamilyName     = mSystemFontFamilies[fontFamilyIdx].displayName;
+
+    mNewFont.fontPath = font.path;
+    mNewFont.fontIdx  = font.index;
+
+    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx
+        || mNewFont.fontSize != mOldFont.fontSize)
+    {
+        fontChanged = true;
+    }
+
+    if (mFontSelectChanged)
+    {
+        updateFontDisplayTexture();
+        mFontSelectChanged = false;
+    }
+
+    maxItemWidth     = std::max(mFontFamiliesCombo.itemSize().x, mFontStylesCombo.itemSize().x);
+    maxItemWidth     = std::max(maxItemWidth, mFontSizeInput.itemSize().x);
+    ImVec2 cursorPos = GetCursorScreenPos();
+
+    #define FONT_RENDER_SPACING 50
+
+    if (mFontDisplayTexture.textureWidth > 0)
+    {
+        ImVec2 cursorPos;
+        cursorPos.x = inputStartPos.x + maxItemWidth + FONT_RENDER_SPACING;
+        cursorPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.textureHeight) / 2;
+
+        SetCursorScreenPos(cursorPos);
+
+        Image(mFontDisplayTexture.texture,
+              ImVec2((float)mFontDisplayTexture.textureWidth, (float)mFontDisplayTexture.textureHeight));
+
+        maxItemWidth += FONT_RENDER_SPACING + mFontDisplayTexture.textureWidth;
+    }
+    SetCursorScreenPos(cursorPos);
+
+#else
+    if (ImGui::Button("Select Font"))
+    {
+        vector<FilterSpec> filter = {
+            {"*.ttf;*.TTF;*.ttc;*.TTC", "TrueType Font File"},
+        };
+        string initDir;
+        if (!mNewFont.fontPath.empty())
+        {
+            fs::path fontPath(mNewFont.fontPath);
+            if (fs::exists(fontPath))
+            {
+                initDir = fontPath.parent_path().string();
+            }
+        }
+        string fontPath = selectFile({}, initDir);
+        if (!fontPath.empty())
+        {
+            mNewFont.fontPath = fontPath;
+        }
+        else
+        {
+            auto err = getLastError();
+            if (!err.empty())
+            {
+                printf("Select Font Fail: %s\n", err.c_str());
+            }
+        }
+    }
+    maxItemWidth = ImGui::GetItemRectSize().x;
+    ImGui::SameLine();
+    maxItemWidth += ImGui::GetStyle().ItemSpacing.x;
+    string showText = fs::path(mNewFont.fontPath).filename().string();
+    maxItemWidth += ImGui::CalcTextSize(showText.c_str()).x;
+    ImGui::Text("%s", showText.c_str());
+
+    mFontSizeInput.show();
+    if (mFontSizeInput.isNativeActive())
+    {
+        mNewFont.fontSize = mFontSizeInput.getValue();
+    }
+    maxItemWidth = std::max(maxItemWidth, mFontSizeInput.itemSize().x);
+
+    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontSize != mOldFont.fontSize)
+        fontChanged = true;
+#endif
+
+    ImVec2 curCursorPos = GetCursorScreenPos();
+    mManualSize         = curCursorPos
+                + ImVec2(std::max(maxItemWidth, mApplyButton.itemSize().x + mCancelButton.itemSize().x + 200)
+                             + GetStyle().ItemSpacing.x * 2 + GetStyle().WindowPadding.x * 2,
+                         GetStyle().ItemSpacing.y + mApplyButton.itemSize().y + 20)
+                - mWinPos;
+
+    ImVec2 showPos = mWinPos + mWinSize
+                   - ImVec2(GetStyle().WindowPadding.x + mApplyButton.itemSize().x + mCancelButton.itemSize().x
+                                + GetStyle().ItemSpacing.x * 2,
+                            GetStyle().WindowPadding.y + mApplyButton.itemSize().y);
+
+    ImGui::SetCursorScreenPos(showPos);
+
+    mApplyButton.showDisabled(!fontChanged);
+    if (mApplyButton.isPressed())
+    {
+        mConfirmWindow.open();
+    }
+
+    mCancelButton.show(false);
+    if (mCancelButton.isPressed())
+    {
+        mNewFont = mOldFont;
+#ifdef IMGUI_ENABLE_FREETYPE
+        setCurrentFont(mOldFont.fontPath, mOldFont.fontIdx, mOldFont.fontSize);
+#endif
+        close();
+    }
+
+    mConfirmWindow.show();
+}
+void FontChooseWindow::setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize)
+{
+    if (fontSize < MIN_FONT_SIZE || fontSize > MAX_FONT_SIZE)
+        fontSize = DEF_FONT_SIZE;
+    mNewFont = mOldFont = {fontPath, fontIdx, fontSize};
+    mFontSizeInput.setValue(mOldFont.fontSize);
+#ifdef IMGUI_ENABLE_FREETYPE
+    FT_Library ftLibrary = nullptr;
+    FT_Face    face      = nullptr;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        return;
+    }
+
+    err = FT_New_Face(ftLibrary, utf8ToLocal(mOldFont.fontPath).c_str(), mOldFont.fontIdx, &face);
+    if (err || !face)
+    {
+        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        return;
+    }
+    string fontName = face->family_name;
+    string style    = face->style_name;
+
+    FT_Done_Face(face);
+    FT_Done_FreeType(ftLibrary);
+
+    int fontFamilyIdx = -1;
+    for (int i = 0; i < mSystemFontFamilies.size(); i++)
+    {
+        if (mSystemFontFamilies[i].name == fontName)
+        {
+            fontFamilyIdx = i;
+            break;
+        }
+    }
+    if (fontFamilyIdx < 0)
+    {
+        gUserApp->addLog(combineString("font family not found: ", fontName, "\n"));
+        return;
+    }
+    int fontStyleIdx = -1;
+    for (int i = 0; i < mSystemFontFamilies[fontFamilyIdx].fonts.size(); i++)
+    {
+        if (mSystemFontFamilies[fontFamilyIdx].fonts[i].style == style)
+        {
+            fontStyleIdx = i;
+            break;
+        }
+    }
+    if (fontStyleIdx < 0)
+    {
+        gUserApp->addLog(combineString("font style not found: ", style, " in ", fontName, "\n"));
+        return;
+    }
+
+    mFontFamilyName = mSystemFontFamilies[fontFamilyIdx].displayName;
+
+    mFontFamiliesCombo.setSelected(fontFamilyIdx);
+    updateFontStyles();
+    mFontStylesCombo.setSelected(fontStyleIdx);
+    updateFontDisplayTexture();
+
+#endif
+}
+#ifdef IMGUI_ENABLE_FREETYPE
+void FontChooseWindow::updateFontStyles()
+{
+    ComboTag idx = mFontFamiliesCombo.getSelected();
+    if (idx >= 0 && idx < mSystemFontFamilies.size())
+    {
+        mFontStylesCombo.clear();
+        for (int i = 0; i < mSystemFontFamilies[idx].fonts.size(); i++)
+        {
+            mFontStylesCombo.addSelectableItem(i, mSystemFontFamilies[idx].fonts[i].styleDisplayName);
+        }
+    }
+}
+void FontChooseWindow::updateFontDisplayTexture()
+{
+    FT_Library ftLibrary = nullptr;
+    FT_Face    face      = nullptr;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        gUserApp->addLog(combineString("init freetype library fail: ", ftErrorToString(err), "\n"));
+        return;
+    }
+
+    err = FT_New_Face(ftLibrary, utf8ToLocal(mNewFont.fontPath).c_str(), mNewFont.fontIdx, &face);
+    if (err || !face)
+    {
+        gUserApp->addLog(combineString("init freetype face fail: ", ftErrorToString(err), "\n"));
+        return;
+    }
+
+    FT_Size_RequestRec req;
+    req.type           = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+    req.width          = 0;
+    req.height         = (uint32_t)(mNewFont.fontSize * 64);
+    req.horiResolution = 0;
+    req.vertResolution = 0;
+    FT_Request_Size(face, &req);
+
+    printf("Load font %s\n", utf8ToLocal(mFontFamilyName).c_str());
+    std::wstring fontName     = utf8ToUnicode(mFontFamilyName);
+    int          totalWidth   = 0;
+    int          maxAscender  = 0;
+    unsigned int maxDescender = 0;
+
+    for (auto c : fontName)
+    {
+        err = FT_Load_Char(face, c, FT_LOAD_RENDER);
+        if (err)
+            continue;
+
+        totalWidth += face->glyph->advance.x >> 6;
+        maxAscender  = std::max(maxAscender, face->glyph->bitmap_top);
+        maxDescender = std::max(maxDescender, face->glyph->bitmap.rows - face->glyph->bitmap_top);
+    }
+
+    int imageWidth  = totalWidth;
+    int imageHeight = maxAscender + maxDescender;
+
+    size_t imgSize = imageWidth * imageHeight * 4;
+    auto   image   = std::make_unique<uint8_t[]>(imgSize);
+    for (int i = 0; i < imgSize; i += 4)
+    {
+        image[i + 0] = 255;
+        image[i + 1] = 255;
+        image[i + 2] = 255;
+        image[i + 3] = 0;
+    }
+
+    int xOffset = 0;
+    for (auto c : fontName)
+    {
+        err = FT_Load_Char(face, c, FT_LOAD_RENDER);
+        if (err)
+            continue;
+
+        FT_Bitmap &bitmap = face->glyph->bitmap;
+
+        int x = xOffset + face->glyph->bitmap_left;
+        int y = maxAscender - face->glyph->bitmap_top;
+
+        for (unsigned int row = 0; row < bitmap.rows; ++row)
+        {
+            for (unsigned int col = 0; col < bitmap.width; ++col)
+            {
+                int idx = ((y + row) * imageWidth + (x + col)) * 4;
+                if (idx < imgSize && idx >= 0)
+                {
+                    if (bitmap.buffer[row * bitmap.width + col] > 0)
+                        image[idx + 3] = 255;
+                    image[idx]     = 255 - bitmap.buffer[row * bitmap.width + col];
+                    image[idx + 1] = 255 - bitmap.buffer[row * bitmap.width + col];
+                    image[idx + 2] = 255 - bitmap.buffer[row * bitmap.width + col];
+                }
+            }
+        }
+
+        xOffset += face->glyph->advance.x >> 6;
+    }
+
+    updateImageTexture(&mFontDisplayTexture, image.get(), imageWidth, imageHeight, imageWidth * 4);
+
+    FT_Done_Face(face);
+    FT_Done_FreeType(ftLibrary);
+}
+#endif // IMGUI_ENABLE_FREETYPE
+ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message)
+    : ImGuiPopup(title), mMessage(message)
+{
+    mWindowFlags |= ImGuiWindowFlags_NoResize;
+    mManualSizeCond = ImGuiCond_Always;
+}
+
+void ConfirmDialog::addButton(const std::string &name, std::function<void()> onPressed)
+{
+    auto it = std::find_if(mButtons.begin(), mButtons.end(),
+                           [&name](const ConfirmDialogButton &button) { return button.name == name; });
+    if (it == mButtons.end())
+    {
+        ConfirmDialogButton button;
+        button.name      = name;
+        button.onPressed = onPressed;
+        button.pButton   = std::make_unique<ImGuiButton>(name);
+        mButtons.push_back(std::move(button));
+    }
+    else
+        it->onPressed = onPressed;
+}
+
+void ConfirmDialog::removeButton(const std::string &name)
+{
+    auto it = std::find_if(mButtons.begin(), mButtons.end(),
+                           [&name](const ConfirmDialogButton &button) { return button.name == name; });
+    if (it != mButtons.end())
+        mButtons.erase(it);
+}
+
+void ConfirmDialog::showContent()
+{
+    ImGui::Text("%s", mMessage.c_str());
+
+    ImVec2 pos         = GetCursorScreenPos();
+    ImVec2 buttonsSize = ImVec2(0, 0);
+
+    for (auto &button : mButtons)
+    {
+        buttonsSize.x += button.pButton->itemSize().x;
+        buttonsSize.y = std::max(buttonsSize.y, button.pButton->itemSize().y);
+    }
+    mManualSize = pos + buttonsSize + ImVec2(100, 50) - mWinPos;
+
+    for (size_t i = 0; i < mButtons.size(); i++)
+    {
+        auto &button = mButtons[i];
+        if (0 == i)
+        {
+            button.pButton->show();
+        }
+        else
+            button.pButton->show(false);
+        if (button.pButton->isPressed() && button.onPressed)
+            button.onPressed();
+    }
 }

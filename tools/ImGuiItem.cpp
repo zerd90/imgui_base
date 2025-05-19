@@ -266,6 +266,10 @@ ComboTag ImGuiInputCombo::getSelected()
 {
     return mCurrSelect;
 }
+void ImGuiInputCombo::setSelected(ComboTag tag)
+{
+    mCurrSelect = tag;
+}
 
 void ImGuiInputCombo::clear()
 {
@@ -289,6 +293,7 @@ bool ImGuiInputCombo::showInputItem()
             if (is_selected)
                 ImGui::SetItemDefaultFocus();
         }
+        EndCombo();
     }
 
     return mCurrSelect != lastSelect;
@@ -642,4 +647,16 @@ void ImGuiItemTable::setDataCallbacks(const std::function<size_t()>             
     mGetCellCallback       = getCellCallback;
     mCellClickableCallback = cellClickableCallback;
     mCellClickedCallback   = cellClickedCallback;
+}
+void IImGuiInput::updateItemStatus()
+{
+    mItemSize = GetItemRectSize();
+    if (mLabelOnLeft)
+    {
+        mItemSize.x += CalcTextSize(mLabel.c_str(), nullptr, true).x + ImGui::GetStyle().ItemInnerSpacing.x;
+    }
+    UPDATE_STATUS(ImGuiItemHovered, IsItemHovered(mHoveredFlags));
+    UPDATE_STATUS(ImGuiItemActive, IsItemActive());
+    UPDATE_STATUS(ImGuiItemActivated, IsItemActivated());
+    UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }
