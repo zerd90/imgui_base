@@ -9,6 +9,7 @@
 #include "imgui_internal.h"
 #include "ImGuiTools.h"
 #include "ImGuiBaseTypes.h"
+#include "ImGuiApplication.h"
 
 using std::map;
 using std::string;
@@ -118,15 +119,6 @@ void LoggerWindow::displayTexts()
 
     mTotalLines = 0;
 
-    ImGuiResourceGuard guard(
-        [&]()
-        {
-            if (colorSet)
-            {
-                PopStyleColor(1);
-            }
-        });
-
     TextColorCode curColor  = ColorNone;
     bool          newLine   = true;
     float         lineWidth = 0;
@@ -183,6 +175,9 @@ void LoggerWindow::displayTexts()
                 }
                 if (0 == displayLength) // can't display even one character
                 {
+                    if (colorSet)
+                        PopStyleColor(1);
+
                     return;
                 }
                 Text("%s", showStr.substr(displayStart, displayLength).c_str());
@@ -203,6 +198,9 @@ void LoggerWindow::displayTexts()
     }
     if (lineWidth > mMaxLineWidth)
         mMaxLineWidth = lineWidth;
+
+    if (colorSet)
+        PopStyleColor(1);
 }
 
 bool positiveDirSelection(ImVec2 start, ImVec2 end)
@@ -213,7 +211,10 @@ bool positiveDirSelection(ImVec2 start, ImVec2 end)
 LoggerWindow::LoggerWindow(std::string title, bool embed) : IImGuiWindow(title)
 {
     if (embed)
+    {
         mIsChildWindow = true;
+        mOpened        = true;
+    }
     else
         mHasCloseButton = true;
 }
@@ -689,7 +690,7 @@ void ImGuiBinaryViewer::showContent()
             if (!dstFilePath.empty())
             {
                 mSaveDataCallback(dstFilePath, mUserData);
-                mLastSaveDir = fs::path(dstFilePath).parent_path().string();
+                mLastSaveDir = fs::path(utf8ToLocal(dstFilePath)).parent_path().string();
             }
         }
     }
@@ -807,7 +808,7 @@ void ImGuiBinaryViewer::showContent()
         if (mIsChildWindow && mHovered)
             SetKeyOwner(ImGuiKey_MouseWheelY, GetCurrentWindow()->ID);
 
-        float scrollbar_size                 = ImGui::GetStyle().ScrollbarSize;
+        float scrollbar_size                 = GetStyle().ScrollbarSize;
         GetCurrentWindow()->ScrollbarSizes.x = scrollbar_size; // Hack to use GetWindowScrollbarRect()
         ImRect  scrollbar_rect               = ImGui::GetWindowScrollbarRect(GetCurrentWindow(), ImGuiAxis_Y);
         ImGuiID scrollbar_id                 = ImGui::GetWindowScrollbarID(GetCurrentWindow(), ImGuiAxis_Y);
@@ -821,19 +822,19 @@ void ImGuiBinaryViewer::showContent()
     }
 
     // draw header color
-    ImVec2 pos      = GetCursorScreenPos();
-    ImVec2 startPos = pos + ImVec2(indexLength + spaceLength / 2, 0);
-    ImVec2 endPos   = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 contentStartPos = GetCursorScreenPos();
+    ImVec2 startPos        = contentStartPos + ImVec2(indexLength + spaceLength / 2, 0);
+    ImVec2 endPos = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
     GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
-    startPos = pos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    startPos = contentStartPos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
     endPos   = startPos + ImVec2(indexLength + spaceLength, showLineCount * (GetTextLineHeight() + spaceSize.y));
     GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
     // draw odd line color
     for (int j = 1; j < showBytes; j += 2)
     {
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(indexLength + j * (byteLength + spaceLength) + spaceLength / 2,
                           GetTextLineHeight() + spaceSize.y / 2);
         endPos = startPos + ImVec2(byteLength + spaceLength, (GetTextLineHeight() + spaceSize.y) * showLineCount);
@@ -848,19 +849,19 @@ void ImGuiBinaryViewer::showContent()
 
     if (offsetLine >= mScrollPos && offsetLine < mScrollPos + showLineCount)
     {
-        startPos = pos + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte, 0);
+        startPos = contentStartPos + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte, 0);
         endPos   = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y / 2);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
 
         ImS64 offLine = offsetLine - mScrollPos;
 
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(-spaceLength / 2,
                           GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
         endPos = startPos + ImVec2(indexLength + spaceLength, GetTextLineHeight() + spaceSize.y);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
 
-        startPos = pos
+        startPos = contentStartPos
                  + ImVec2(indexLength + spaceLength / 2 + (spaceLength + byteLength) * offsetByte,
                           GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
         endPos = startPos + ImVec2(byteLength + spaceLength, GetTextLineHeight() + spaceSize.y);
@@ -868,7 +869,7 @@ void ImGuiBinaryViewer::showContent()
     }
 
     // show Texts
-    Text("%08llx" , mSelectOffset);
+    Text("%08llx", mSelectOffset);
     for (int i = 0; i < showBytes; i++)
     {
         SameLine();
@@ -878,6 +879,7 @@ void ImGuiBinaryViewer::showContent()
     // not showing all for big amount of data
     for (ImS64 i = mScrollPos; i < mScrollPos + showLineCount; i++)
     {
+        auto curPos = GetCursorScreenPos();
         Text("%08llx", i * showBytes);
 
         string showText;
@@ -897,24 +899,28 @@ void ImGuiBinaryViewer::showContent()
                 showText.push_back('.');
             }
         }
-        SameLine(0, 0);
-        auto curPos = GetCursorScreenPos();
-        SetCursorScreenPos(curPos + ImVec2(TEXT_GAP, 0));
-        if(i == offsetLine)
+        auto textPos =
+            curPos + ImVec2(TEXT_GAP + spaceLength / 2 + indexLength + (spaceLength + byteLength) * showBytes, 0);
+        if (i == offsetLine && offsetByte < showText.length())
         {
-            string preText = showText.substr(0, offsetByte);
-            startPos       = curPos + ImVec2(TEXT_GAP + CalcTextSize(preText.c_str()).x, 0);
-            string tmpText;
-            tmpText += showText[offsetByte];
-
-            endPos = startPos + ImVec2(CalcTextSize(tmpText.c_str()).x, GetTextLineHeight());
+            startPos = textPos + ImVec2(offsetByte * letterWidth, 0);
+            endPos   = startPos + ImVec2(letterWidth, GetTextLineHeight());
             GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
         }
-        Text("%s", showText.c_str());
+        for (int j = 0; j < showBytes; j++)
+        {
+            if (j >= showText.length())
+                break;
+
+            SetCursorScreenPos(textPos);
+            Text("%c", showText[j]);
+            textPos += ImVec2(letterWidth, 0);
+        }
     }
 
-    pos += ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
-
+    ImVec2 byteViewStartPos =
+        contentStartPos + ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 textViewStartPos = byteViewStartPos + ImVec2(TEXT_GAP + (spaceLength + byteLength) * showBytes, 0);
     if (IsWindowHovered())
     {
         if (IsMouseClicked(ImGuiMouseButton_Left))
@@ -922,13 +928,19 @@ void ImGuiBinaryViewer::showContent()
             ImVec2 mousePos = GetMousePos();
             mousePos.y += GetScrollY();
 
-            ImVec2 offset = mousePos - pos;
-
-            if (offset.x >= 0 && offset.x < showBytes * (byteLength + spaceLength) && offset.y >= 0
-                && offset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            ImVec2 ByteViewOffset = mousePos - byteViewStartPos;
+            ImVec2 textViewOffset = mousePos - textViewStartPos;
+            if (ByteViewOffset.x >= 0 && ByteViewOffset.x < showBytes * (byteLength + spaceLength)
+                && ByteViewOffset.y >= 0 && ByteViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
             {
-                mSelectOffset = ((int)(offset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
-                              + (int)(offset.x / (byteLength + spaceLength));
+                mSelectOffset = ((int)(ByteViewOffset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
+                              + (int)(ByteViewOffset.x / (byteLength + spaceLength));
+            }
+            else if (textViewOffset.x >= 0 && textViewOffset.x < showBytes * letterWidth && textViewOffset.y >= 0
+                     && textViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            {
+                mSelectOffset = ((int)(textViewOffset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
+                              + (int)(textViewOffset.x / letterWidth);
             }
         }
 
@@ -958,4 +970,454 @@ void ImGuiBinaryViewer::setDataCallbacks(std::function<ImS64(void *)>           
 void ImGuiBinaryViewer::setUserData(void *userData)
 {
     mUserData = userData;
+}
+
+#define MIN_FONT_SIZE 10
+#define MAX_FONT_SIZE 25
+#define DEF_FONT_SIZE 15
+FontChooseWindow::FontChooseWindow(
+    const std::string                                                                                 &name,
+    const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)> onFontChanged)
+    : ImGuiPopup(name), mOnFontChanged(onFontChanged),
+#ifdef IMGUI_ENABLE_FREETYPE
+      mFontFamiliesCombo("##font Families"), mFontStylesCombo("##font style"),
+#endif
+      mFontSizeInput("##Font Size", DEF_FONT_SIZE, false, MIN_FONT_SIZE, MAX_FONT_SIZE, 0.5, 1.0),
+      mApplyButton("Apply"), mCancelButton("Cancel"),
+      mConfirmWindow("Apply Font", "Restart Application To Apply New Font"), mRestartButton("Restart Now"),
+      mLatterButton("Restart Latter")
+{
+    mWindowFlags |= ImGuiWindowFlags_NoResize;
+    mManualSizeCond = ImGuiCond_Always;
+    mConfirmWindow.addWindowFlag(ImGuiWindowFlags_NoResize);
+    mConfirmWindow.addButton("Restart Now",
+                             [this]()
+                             {
+                                 mConfirmWindow.close();
+                                 this->close();
+                                 mOldFont = mNewFont;
+                                 mOnFontChanged(mNewFont.fontPath, mNewFont.fontIdx, mNewFont.fontSize, true);
+                             });
+    mConfirmWindow.addButton("Restart Latter",
+                             [this]()
+                             {
+                                 mConfirmWindow.close();
+                                 this->close();
+                                 mOldFont = mNewFont;
+                                 mOnFontChanged(mNewFont.fontPath, mNewFont.fontIdx, mNewFont.fontSize, false);
+                             });
+
+#ifdef IMGUI_ENABLE_FREETYPE
+    if (mSystemFontFamilies.empty())
+    {
+        mSystemFontFamilies = listSystemFonts();
+        sortFonts(mSystemFontFamilies);
+        for (int i = 0; i < mSystemFontFamilies.size(); i++)
+        {
+            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName + "##"
+                                                        + mSystemFontFamilies[i].name);
+        }
+        updateFontStyles();
+    }
+    mFontSelect.addInput(&mFontFamiliesCombo);
+    mFontSelect.addInput(&mFontStylesCombo);
+    mFontSelect.addInput(&mFontSizeInput);
+    mFontSelect.setLabelPosition(true);
+    mFontSelect.setItemWidth(150);
+#else
+    mFontSizeInput.setValue(15.f);
+    mFontSizeInput.setItemWidth(150);
+#endif
+}
+
+void FontChooseWindow::showContent()
+{
+    float maxItemWidth = 0;
+    bool  fontChanged  = false;
+
+#ifdef IMGUI_ENABLE_FREETYPE
+
+    ImVec2 inputStartPos = GetCursorScreenPos();
+
+    mFontSelect.show();
+    if (mFontFamiliesCombo.selectChanged())
+    {
+        updateFontStyles();
+        mFontSelectChanged = true;
+    }
+
+    if (mFontStylesCombo.selectChanged())
+        mFontSelectChanged = true;
+
+    if (mFontSizeInput.isNativeActive())
+    {
+        mNewFont.fontSize  = mFontSizeInput.getValue();
+        mFontSelectChanged = true;
+    }
+
+    ImVec2 inputEndPos = GetCursorScreenPos();
+
+    int   fontFamilyIdx = mFontFamiliesCombo.getSelected();
+    int   fontIdx       = mFontStylesCombo.getSelected();
+    auto &font          = mSystemFontFamilies[fontFamilyIdx].fonts[fontIdx];
+    mFontFamilyName     = mSystemFontFamilies[fontFamilyIdx].displayName;
+
+    mNewFont.fontPath = font.path;
+    mNewFont.fontIdx  = font.index;
+
+    ImVec2 displaySize = CalcTextSize(mFontFamilyName.c_str());
+    if (displaySize.x + 50 > mFontSelect.itemSize().x)
+    {
+        mFontSelect.setItemWidth(displaySize.x + 50);
+    }
+
+    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx
+        || mNewFont.fontSize != mOldFont.fontSize)
+    {
+        fontChanged = true;
+    }
+
+    if (mFontSelectChanged)
+    {
+        updateFontDisplayTexture();
+        mFontSelectChanged = false;
+    }
+
+    maxItemWidth     = mFontSelect.itemSize().x;
+    ImVec2 cursorPos = GetCursorScreenPos();
+
+    #define FONT_RENDER_SPACING 50
+
+    if (mFontDisplayTexture.textureWidth > 0)
+    {
+        ImVec2 cursorPos;
+        cursorPos.x = inputStartPos.x + maxItemWidth + FONT_RENDER_SPACING;
+        cursorPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.textureHeight) / 2;
+
+        SetCursorScreenPos(cursorPos);
+
+        Image(mFontDisplayTexture.texture,
+              ImVec2((float)mFontDisplayTexture.textureWidth, (float)mFontDisplayTexture.textureHeight));
+
+        maxItemWidth += FONT_RENDER_SPACING + mFontDisplayTexture.textureWidth;
+    }
+    SetCursorScreenPos(cursorPos);
+
+#else
+    if (ImGui::Button("Select Font"))
+    {
+        vector<FilterSpec> filter = {
+            {"*.ttf;*.TTF;*.ttc;*.TTC", "TrueType Font File"},
+        };
+        string initDir;
+        if (!mNewFont.fontPath.empty())
+        {
+            fs::path fontPath(utf8ToLocal(mNewFont.fontPath));
+            if (fs::exists(fontPath))
+                initDir = fontPath.parent_path().string();
+        }
+        string fontPath = selectFile({}, initDir);
+        if (!fontPath.empty())
+        {
+            mNewFont.fontPath = fontPath;
+        }
+        else
+        {
+            auto err = getLastError();
+            if (!err.empty())
+            {
+                printf("Select Font Fail: %s\n", err.c_str());
+            }
+        }
+    }
+    maxItemWidth = ImGui::GetItemRectSize().x;
+    ImGui::SameLine();
+    maxItemWidth += ImGui::GetStyle().ItemSpacing.x;
+    string showText = fs::path(mNewFont.fontPath).filename().string();
+    maxItemWidth += ImGui::CalcTextSize(showText.c_str()).x;
+    ImGui::Text("%s", showText.c_str());
+
+    mFontSizeInput.show();
+    if (mFontSizeInput.isNativeActive())
+    {
+        mNewFont.fontSize = mFontSizeInput.getValue();
+    }
+    maxItemWidth = std::max(maxItemWidth, mFontSizeInput.itemSize().x);
+
+    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontSize != mOldFont.fontSize)
+        fontChanged = true;
+#endif
+
+    ImVec2 curCursorPos = GetCursorScreenPos();
+    mManualSize         = curCursorPos
+                + ImVec2(std::max(maxItemWidth, mApplyButton.itemSize().x + mCancelButton.itemSize().x + 200)
+                             + GetStyle().ItemSpacing.x * 2 + GetStyle().WindowPadding.x * 2,
+                         GetStyle().ItemSpacing.y + mApplyButton.itemSize().y + 20)
+                - mWinPos;
+
+    ImVec2 showPos = mWinPos + mWinSize
+                   - ImVec2(GetStyle().WindowPadding.x + mApplyButton.itemSize().x + mCancelButton.itemSize().x
+                                + GetStyle().ItemSpacing.x * 2,
+                            GetStyle().WindowPadding.y + mApplyButton.itemSize().y);
+
+    ImGui::SetCursorScreenPos(showPos);
+
+    mApplyButton.showDisabled(!fontChanged);
+    if (mApplyButton.isPressed())
+    {
+        mConfirmWindow.open();
+    }
+
+    mCancelButton.show(false);
+    if (mCancelButton.isPressed())
+    {
+        mNewFont = mOldFont;
+#ifdef IMGUI_ENABLE_FREETYPE
+        setCurrentFont(mOldFont.fontPath, mOldFont.fontIdx, mOldFont.fontSize);
+#endif
+        close();
+    }
+
+    mConfirmWindow.show();
+}
+void FontChooseWindow::setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize)
+{
+    if (fontSize < MIN_FONT_SIZE || fontSize > MAX_FONT_SIZE)
+        fontSize = DEF_FONT_SIZE;
+    mNewFont = mOldFont = {fontPath, fontIdx, fontSize};
+    mFontSizeInput.setValue(mOldFont.fontSize);
+#ifdef IMGUI_ENABLE_FREETYPE
+    FT_Library ftLibrary = nullptr;
+    FT_Face    face      = nullptr;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        gUserApp->addLog(combineString("init freetype library fail: ", FT_Error_String(err), "\n"));
+        return;
+    }
+
+    err = FT_New_Face(ftLibrary, utf8ToLocal(mOldFont.fontPath).c_str(), mOldFont.fontIdx, &face);
+    if (err || !face)
+    {
+        gUserApp->addLog(combineString("init freetype face fail: ", FT_Error_String(err), "\n"));
+        return;
+    }
+    string fontName = face->family_name;
+    string style    = face->style_name;
+
+    FT_Done_Face(face);
+    FT_Done_FreeType(ftLibrary);
+
+    int fontFamilyIdx = -1;
+    for (int i = 0; i < mSystemFontFamilies.size(); i++)
+    {
+        if (mSystemFontFamilies[i].name == fontName)
+        {
+            fontFamilyIdx = i;
+            break;
+        }
+    }
+    if (fontFamilyIdx < 0)
+    {
+        gUserApp->addLog(combineString("font family not found: ", fontName, "\n"));
+        return;
+    }
+    int fontStyleIdx = -1;
+    for (int i = 0; i < mSystemFontFamilies[fontFamilyIdx].fonts.size(); i++)
+    {
+        if (mSystemFontFamilies[fontFamilyIdx].fonts[i].style == style)
+        {
+            fontStyleIdx = i;
+            break;
+        }
+    }
+    if (fontStyleIdx < 0)
+    {
+        gUserApp->addLog(combineString("font style not found: ", style, " in ", fontName, "\n"));
+        return;
+    }
+
+    mFontFamilyName = mSystemFontFamilies[fontFamilyIdx].displayName;
+
+    mFontFamiliesCombo.setSelected(fontFamilyIdx);
+    updateFontStyles();
+    mFontStylesCombo.setSelected(fontStyleIdx);
+    updateFontDisplayTexture();
+
+#endif
+}
+#ifdef IMGUI_ENABLE_FREETYPE
+void FontChooseWindow::updateFontStyles()
+{
+    ComboTag idx = mFontFamiliesCombo.getSelected();
+    if (idx >= 0 && idx < mSystemFontFamilies.size())
+    {
+        mFontStylesCombo.clear();
+        for (int i = 0; i < mSystemFontFamilies[idx].fonts.size(); i++)
+        {
+            mFontStylesCombo.addSelectableItem(i, mSystemFontFamilies[idx].fonts[i].styleDisplayName);
+        }
+    }
+}
+void FontChooseWindow::updateFontDisplayTexture()
+{
+    FT_Library ftLibrary = nullptr;
+    FT_Face    face      = nullptr;
+
+    int err = FT_Init_FreeType(&ftLibrary);
+    if (err)
+    {
+        gUserApp->addLog(combineString("init freetype library fail: ", FT_Error_String(err), "\n"));
+        return;
+    }
+
+    err = FT_New_Face(ftLibrary, utf8ToLocal(mNewFont.fontPath).c_str(), mNewFont.fontIdx, &face);
+    if (err || !face)
+    {
+        gUserApp->addLog(combineString("init freetype face fail: ", FT_Error_String(err), "\n"));
+        return;
+    }
+
+    FT_Size_RequestRec req;
+    req.type           = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+    req.width          = 0;
+    req.height         = (uint32_t)(mNewFont.fontSize * 64);
+    req.horiResolution = 0;
+    req.vertResolution = 0;
+    FT_Request_Size(face, &req);
+
+    printf("Load font %s\n", utf8ToLocal(mFontFamilyName).c_str());
+    std::wstring fontName     = utf8ToUnicode(mFontFamilyName);
+    int          totalWidth   = 0;
+    int          maxAscender  = 0;
+    unsigned int maxDescender = 0;
+
+    for (auto c : fontName)
+    {
+        err = FT_Load_Char(face, c, FT_LOAD_RENDER);
+        if (err)
+        {
+            printf("load char 0x%x fail: %s\n", c, FT_Error_String(err));
+            continue;
+        }
+
+        totalWidth += face->glyph->advance.x >> 6;
+        maxAscender  = std::max(maxAscender, face->glyph->bitmap_top);
+        maxDescender = std::max(maxDescender, face->glyph->bitmap.rows - face->glyph->bitmap_top);
+    }
+
+    int imageWidth  = totalWidth;
+    int imageHeight = maxAscender + maxDescender;
+
+    size_t imgSize = imageWidth * imageHeight * 4;
+    auto   image   = std::make_unique<uint8_t[]>(imgSize);
+    for (int i = 0; i < imgSize; i += 4)
+    {
+        image[i + 0] = 255;
+        image[i + 1] = 255;
+        image[i + 2] = 255;
+        image[i + 3] = 0;
+    }
+
+    int xOffset = 0;
+    for (auto c : fontName)
+    {
+        err = FT_Load_Char(face, c, FT_LOAD_RENDER);
+        if (err)
+            continue;
+
+        FT_Bitmap &bitmap = face->glyph->bitmap;
+
+        int x = xOffset + face->glyph->bitmap_left;
+        int y = maxAscender - face->glyph->bitmap_top;
+
+        for (unsigned int row = 0; row < bitmap.rows; ++row)
+        {
+            for (unsigned int col = 0; col < bitmap.width; ++col)
+            {
+                int idx = ((y + row) * imageWidth + (x + col)) * 4;
+                if (idx < imgSize && idx >= 0)
+                {
+                    if (bitmap.buffer[row * bitmap.width + col] > 0)
+                        image[idx + 3] = 255;
+                    image[idx]     = 255 - bitmap.buffer[row * bitmap.width + col];
+                    image[idx + 1] = 255 - bitmap.buffer[row * bitmap.width + col];
+                    image[idx + 2] = 255 - bitmap.buffer[row * bitmap.width + col];
+                }
+            }
+        }
+
+        xOffset += face->glyph->advance.x >> 6;
+    }
+
+    updateImageTexture(&mFontDisplayTexture, image.get(), imageWidth, imageHeight, imageWidth * 4);
+
+    FT_Done_Face(face);
+    FT_Done_FreeType(ftLibrary);
+}
+#endif // IMGUI_ENABLE_FREETYPE
+ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message)
+    : ImGuiPopup(title), mMessage(message)
+{
+    mWindowFlags |= ImGuiWindowFlags_NoResize;
+    mManualSizeCond = ImGuiCond_Always;
+}
+
+void ConfirmDialog::addButton(const std::string &name, std::function<void()> onPressed)
+{
+    auto it = std::find_if(mButtons.begin(), mButtons.end(),
+                           [&name](const ConfirmDialogButton &button) { return button.name == name; });
+    if (it == mButtons.end())
+    {
+        ConfirmDialogButton button;
+        button.name      = name;
+        button.onPressed = onPressed;
+        button.pButton   = std::make_unique<ImGuiButton>(name);
+        mButtons.push_back(std::move(button));
+    }
+    else
+        it->onPressed = onPressed;
+}
+
+void ConfirmDialog::removeButton(const std::string &name)
+{
+    auto it = std::find_if(mButtons.begin(), mButtons.end(),
+                           [&name](const ConfirmDialogButton &button) { return button.name == name; });
+    if (it != mButtons.end())
+        mButtons.erase(it);
+}
+
+void ConfirmDialog::showContent()
+{
+    ImGui::Text("%s", mMessage.c_str());
+
+    ImVec2 pos         = GetCursorScreenPos();
+    ImVec2 buttonsSize = ImVec2(0, 0);
+
+    for (size_t i = 0; i < mButtons.size(); i++)
+    {
+        auto &button = mButtons[i];
+        buttonsSize.x += button.pButton->itemSize().x;
+        if (i > 0)
+            buttonsSize.x += GetStyle().ItemSpacing.x;
+        buttonsSize.y = std::max(buttonsSize.y, button.pButton->itemSize().y);
+    }
+
+    mManualSize = pos + buttonsSize + ImVec2(100, 50) - mWinPos;
+
+    SetCursorScreenPos(mWinPos + mWinSize - buttonsSize - GetStyle().WindowPadding);
+
+    for (size_t i = 0; i < mButtons.size(); i++)
+    {
+        auto &button = mButtons[i];
+        if (0 == i)
+        {
+            button.pButton->show();
+        }
+        else
+            button.pButton->show(false);
+        if (button.pButton->isPressed() && button.onPressed)
+            button.onPressed();
+    }
 }

@@ -6,12 +6,13 @@
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
 // - Introduction, links and more at the top of imgui.cpp
 
-#include "imgui_impl_common.h"
-#include "imgui_impl_dx11.h"
-#include "imgui_impl_win32.h"
-
 #include <d3d11.h>
 #include <tchar.h>
+
+#include "imgui_common_tools.h"
+#include "imgui_impl_dx11.h"
+#include "imgui_impl_win32.h"
+#include "ImGuiApplication.h"
 
 // Data
 static ID3D11Device           *g_pd3dDevice        = nullptr;
@@ -65,16 +66,17 @@ bool doGUIRender()
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
 
-    g_user_app->newFramePreAction();
+    gUserApp->newFramePreAction();
 
     ImGui::NewFrame();
 
-    if (g_user_app->renderUI())
+    gUserApp->show();
+    if (gUserApp->justClosed())
         return true;
 
     // Rendering
     ImGui::Render();
-    g_user_app->endFramePostAction();
+    gUserApp->endFramePostAction();
 
     const float clear_color_with_alpha[4] = {clear_color.x * clear_color.w, clear_color.y * clear_color.w,
                                              clear_color.z * clear_color.w, clear_color.w};
@@ -91,7 +93,7 @@ bool doGUIRender()
 
     // Present
     HRESULT hr = S_OK;
-    if (g_user_app->VSyncEnabled())
+    if (gUserApp->VSyncEnabled())
         hr = g_pSwapChain->Present(1, 0); // Present with vsync
     else
         hr = g_pSwapChain->Present(0, 0); // Present without vsync
@@ -107,11 +109,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     IM_UNUSED(hPrevInstance);
     IM_UNUSED(lpCmdLine);
     IM_UNUSED(nShowCmd);
-    if (!g_user_app)
-    {
-        printf("user app not given\n");
-        return 0;
-    }
+
+    IM_ASSERT(gUserApp != nullptr);
 
     int  argc;
     auto argv = CommandLineToArgvA(&argc);
@@ -121,11 +120,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::CreateContext();
 
     // Our state
-    g_user_app->preset();
+    gUserApp->preset();
 
     ImGuiIO &io = ImGui::GetIO();
 
-    io.IniFilename = g_user_app->getConfigPath();
+    io.IniFilename = gUserApp->getConfigPath();
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
     // Create application window
@@ -144,12 +143,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       nullptr};
     ::RegisterClassExW(&wc);
 
-    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(g_user_app->getAppName()).c_str(), WS_POPUP,
-                                  g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y,
-                                  g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h, nullptr,
+    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(gUserApp->getAppName()).c_str(), WS_POPUP,
+                                  gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y,
+                                  gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h, nullptr,
                                   nullptr, wc.hInstance, nullptr);
 
-    g_user_app->setWindowHandle(hwnd);
+    gUserApp->setWindowHandle(hwnd);
 
     ::DragAcceptFiles(hwnd, TRUE);
 
@@ -194,7 +193,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
-    g_user_app->loadResources();
+    gUserApp->loadResources();
 
     {
         std::vector<std::string> tmpArgs;
@@ -202,7 +201,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         {
             tmpArgs.push_back(argv[i].get());
         }
-        g_user_app->transferCmdArgs(tmpArgs);
+        gUserApp->transferCmdArgs(tmpArgs);
     }
 
     // Main loop
@@ -227,7 +226,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             break;
     }
 
-    g_user_app->exit();
+    gUserApp->exit();
 
     // Cleanup
     ImGui_ImplDX11_Shutdown();
@@ -356,7 +355,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             g_ResizeHeight = (UINT)HIWORD(lParam);
             RECT win_rect;
             if (GetWindowRect(hWnd, &win_rect))
-                g_user_app->windowRectChange(
+                gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
             return 0;
         }
@@ -391,11 +390,12 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             {
                 if (DragQueryFileW(hDrop, i, filename, MAX_PATH))
                 {
-                    auto tmpStr = unicodeToUtf8(filename);
+                    std::wstring wFileName = filename;
+                    auto tmpStr = unicodeToUtf8(wFileName);
                     files.push_back(tmpStr);
                 }
             }
-            g_user_app->dropFile(files);
+            gUserApp->dropFile(files);
 
             DragFinish(hDrop);
             break;
@@ -404,7 +404,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             RECT win_rect;
             if (GetWindowRect(hWnd, &win_rect))
-                g_user_app->windowRectChange(
+                gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
             break;
         }

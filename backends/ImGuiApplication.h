@@ -5,79 +5,18 @@
 #include <vector>
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "ImGuiTools.h"
+#include "ImGuiWindow.h"
+#include "ApplicationSetting.h"
 
-#define Assert(expr)                                                             \
-    do                                                                           \
-    {                                                                            \
-        if (!(expr))                                                             \
-        {                                                                        \
-            printf("Assert From (%s %d) fail(%s)\n", __func__, __LINE__, #expr); \
-            abort();                                                             \
-        }                                                                        \
-    } while (0)
-
-struct SettingValue
+class ImGuiApplication : public ImGuiMainWindow
 {
-    enum SettingType
-    {
-        // single value
-        SettingSingleValue = 0x00010000,
-        SettingInt         = 0x00010001,
-        SettingFloat       = 0x00010002,
-        SettingDouble      = 0x00010003,
-        SettingStdString   = 0x00010004,
-        SettingBool        = 0x00010005,
+    friend void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
+    friend void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
+                                             const char *line);
+    friend void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
+                                             ImGuiTextBuffer *buf);
 
-        // constant length
-        SettingArray     = 0x00020000,
-        SettingArrInt    = 0x00020001,
-        SettingArrFloat  = 0x00020002,
-        SettingArrDouble = 0x00020003,
-
-        // variable length
-        SettingVector       = 0x00030000,
-        SettingVectorInt    = 0x00030001,
-        SettingVectorFloat  = 0x00030002,
-        SettingVectorDouble = 0x00030003,
-        SettingVecStdString = 0x00030004,
-    };
-    SettingValue(SettingType type, std::string name, void *valAddr, double minVal, double maxVal, double defVal,
-                 int arrLen = 0)
-        : mType(type), mName(name), mVal(valAddr), mArrLen(arrLen), mBorderVAl({minVal, maxVal, defVal})
-    {
-        checkVariable();
-    }
-    SettingValue(SettingType type, std::string name, void *valAddr) : SettingValue(type, name, valAddr, 0, 0, 0, 0) {}
-    SettingValue(SettingType type, std::string name, void *valAddr, int arrLen)
-        : SettingValue(type, name, valAddr, 0, 0, 0, arrLen)
-    {
-    }
-
-private:
-    void checkVariable()
-    {
-
-        Assert(0 != (mType & 0x0000ffff));
-        Assert(nullptr != mVal);
-        Assert(SettingArray != (mType & 0xffff0000) || mArrLen > 0);
-    }
-
-public:
-    SettingType mType;
-    std::string mName;
-    void       *mVal    = nullptr;
-    int         mArrLen = 0;
-
-    struct BorderValue
-    {
-        double minVal;
-        double maxVal;
-        double defVal;
-    } mBorderVAl = {0};
-};
-
-class ImGuiApplication
-{
 public:
     struct ImGuiAppRect
     {
@@ -90,81 +29,38 @@ public:
     ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
     void         preset();
     std::string  getAppName() { return mApplicationName; };
-    void         windowRectChange(ImGuiAppRect rect)
-    {
-        if (rect.x >= 0)
-            mWindowRect.x = rect.x;
-        if (rect.y >= 0)
-            mWindowRect.y = rect.y;
-        if (rect.w > 0)
-            mWindowRect.w = rect.w;
-        if (rect.h > 0)
-            mWindowRect.h = rect.h;
-    }
-
-    // return if need to exit the application
-    virtual bool renderUI() { return false; };
+    void         windowRectChange(ImGuiAppRect rect);
 
     virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
-    virtual void dropFile(std::vector<std::string> &files) { IM_UNUSED(files); };
+    virtual void dropFile(const std::vector<std::string> &files) { IM_UNUSED(files); };
 
     virtual void setWindowHandle(void *handle) { IM_UNUSED(handle); };
-    // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
-    virtual void loadResources() {}
     virtual void newFramePreAction() {}
     virtual void endFramePostAction() {}
     // anything ned to be done before program exit, such as waiting thread exit
     virtual void exit() {}
-    virtual bool VSyncEnabled() { return true; }
 
-    static void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
-    static void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
-                                             const char *line);
-    static void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
-                                             ImGuiTextBuffer *buf);
+    // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
+    void loadResources();
+
+    bool VSyncEnabled();
+    void restart();
+    void addLog(const std::string &logString);
 
 protected:
+    // return if need to exit the application
+    virtual bool renderUI() = 0;
+
+    virtual void showContent() override final;
+
     virtual void presetInternal() {}
 
     // call addSetting in presetInternal or the constructor of derived class
-    void addSetting(SettingValue::SettingType type, std::string name, void *valAddr, double minVal = 0,
-                    double maxVal = 0, double defVal = 0);
+    void addSetting(SettingValue::SettingType type, std::string name, std::function<void(const void *)> setVal,
+                    std::function<void(void *)> getVal);
 
-    void addSettingArr(SettingValue::SettingType type, std::string name, void *valAddr, int arrLen, double minVal = 0,
-                       double maxVal = 0, double defVal = 0);
-
-    template <typename T>
-    void addSetting(const std::string &name, T *valAddr, double minVal = 0, double maxVal = 0, double defVal = 0)
-    {
-        if constexpr (std::is_same_v<std::decay_t<T>, int> || std::is_enum_v<std::decay_t<T>>)
-            addSetting(SettingValue::SettingInt, name, valAddr, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, float>)
-            addSetting(SettingValue::SettingFloat, name, valAddr, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, double>)
-            addSetting(SettingValue::SettingDouble, name, valAddr, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, std::string>)
-            addSetting(SettingValue::SettingStdString, name, valAddr, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, bool>)
-            addSetting(SettingValue::SettingBool, name, valAddr);
-        else if constexpr (std::is_same_v<std::decay_t<T>, std::vector<std::string>>)
-            addSetting(SettingValue::SettingVecStdString, name, valAddr);
-        else
-            static_assert(false);
-    }
-
-    template <typename T>
-    void addSettingArr(const std::string &name, T *valAddr, int arrLen, double minVal = 0, double maxVal = 0,
-                       double defVal = 0)
-    {
-        if constexpr (std::is_same_v<std::decay_t<T>, int> || std::is_enum_v<std::decay_t<T>>)
-            addSettingArr(SettingValue::SettingArrInt, name, valAddr, arrLen, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, float>)
-            addSettingArr(SettingValue::SettingArrFloat, name, valAddr, arrLen, minVal, maxVal, defVal);
-        else if constexpr (std::is_same_v<std::decay_t<T>, double>)
-            addSettingArr(SettingValue::SettingArrDouble, name, valAddr, arrLen, minVal, maxVal, defVal);
-        else
-            static_assert(false);
-    }
+    void addSettingArr(SettingValue::SettingType type, std::string name, int arrLen,
+                       std::function<void(const void *)> setVal, std::function<void(void *)> getVal);
 
 protected:
     // Set these in presetInternal
@@ -175,8 +71,40 @@ protected:
 
 protected:
     std::vector<SettingValue> mAppSettings;
+    bool                      mMenuEnable = true;
+
+private:
+    std::string mScriptPath;
+
+    // Settings
+    // Saving
+protected:
+    std::string mAppFontPath = "";
+    float       mAppFontSize = 15;
+    int         mAppFontIdx  = 0;
+
+private:
+    bool mGuiVSync = true;
+    enum GUI_THEME
+    {
+        THEME_DARK,
+        THEME_LIGHT,
+        THEME_CLASSIC
+    } mAppTheme         = THEME_LIGHT;
+    bool mShowLogWindow = false;
+
+private:
+    // Not Saving
+    bool mShowUIStatus = false;
+
+public:
+    void onFontChanged(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow);
+
+private:
+    LoggerWindow     mLogger;
+    FontChooseWindow mFontChooser;
 };
 
-void setApp(ImGuiApplication *app);
+extern ImGuiApplication *gUserApp;
 
 #endif

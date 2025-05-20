@@ -9,9 +9,10 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include "imgui.h"
-#include "imgui_impl_common.h"
+#include "imgui_common_tools.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "ImGuiApplication.h"
 
 #include <stdio.h>
 #define GL_SILENCE_DEPRECATION
@@ -39,7 +40,7 @@ static void glfw_error_callback(int error, const char *description)
 
 void windowResizeCallback(int x, int y, int width, int height)
 {
-    g_user_app->windowRectChange(ImGuiApplication::ImGuiAppRect{x, y, width, height});
+    gUserApp->windowRectChange(ImGuiApplication::ImGuiAppRect{x, y, width, height});
 }
 
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
@@ -53,14 +54,14 @@ void dropFileCallback(GLFWwindow *window, int count, const char **files)
     {
         wFiles.push_back(files[i]);
     }
-    g_user_app->dropFile(wFiles);
+    gUserApp->dropFile(wFiles);
 }
 
 bool doGUIRender(const char *glsl_version, GLFWwindow *window)
 {
     static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io          = nullptr;
-    static bool vSync = g_user_app->VSyncEnabled();
+    static bool     vSync       = gUserApp->VSyncEnabled();
     if (!io)
     {
         glfwMakeContextCurrent(window);
@@ -72,14 +73,14 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
         // Setup Platform/Renderer backends
         ImGui_ImplOpenGL3_Init(glsl_version);
 
-        g_user_app->loadResources();
+        gUserApp->loadResources();
 
         io = &ImGui::GetIO();
     }
 
-    if(g_user_app->VSyncEnabled() != vSync)
+    if (gUserApp->VSyncEnabled() != vSync)
     {
-        vSync = g_user_app->VSyncEnabled();
+        vSync = gUserApp->VSyncEnabled();
         if (vSync)
             glfwSwapInterval(1);
         else
@@ -104,16 +105,17 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     StdRMutexUniqueLock locker(glfwGetEventLock());
 #endif
 
-    g_user_app->newFramePreAction();
+    gUserApp->newFramePreAction();
 
     ImGui::NewFrame();
 
-    if (g_user_app->renderUI())
+    gUserApp->show();
+    if (gUserApp->justClosed())
         return true;
 
     // Rendering
     ImGui::Render();
-    g_user_app->endFramePostAction();
+    gUserApp->endFramePostAction();
 
 #if defined(_WIN32)
     locker.unlock();
@@ -155,13 +157,9 @@ int main(int argc, char **argv)
     IM_UNUSED(hPrevInstance);
     IM_UNUSED(lpCmdLine);
     IM_UNUSED(nShowCmd);
-#else
 #endif
-    if (!g_user_app)
-    {
-        printf("user app not given\n");
-        return 0;
-    }
+
+    IM_ASSERT(gUserApp != nullptr);
 
 #if defined(_WIN32)
     int  argc;
@@ -198,19 +196,19 @@ int main(int argc, char **argv)
     ImGui::CreateContext();
 
     // Our state
-    g_user_app->preset();
+    gUserApp->preset();
 
     ImGuiIO &io    = ImGui::GetIO();
-    io.IniFilename = g_user_app->getConfigPath();
+    io.IniFilename = gUserApp->getConfigPath();
     printf("ini file: %s\n", io.IniFilename);
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
     glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(g_user_app->getWindowInitialRect().w, g_user_app->getWindowInitialRect().h,
-                                          g_user_app->getAppName().c_str(), nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h,
+                                          gUserApp->getAppName().c_str(), nullptr, nullptr);
     if (window == nullptr)
         return 1;
-    glfwSetWindowPos(window, g_user_app->getWindowInitialRect().x, g_user_app->getWindowInitialRect().y);
+    glfwSetWindowPos(window, gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y);
 
     ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
     glfwSetDropCallback(window, dropFileCallback);
@@ -243,7 +241,7 @@ int main(int argc, char **argv)
             tmpArgs.push_back(argv[i]);
 #endif
         }
-        g_user_app->transferCmdArgs(tmpArgs);
+        gUserApp->transferCmdArgs(tmpArgs);
     }
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -265,7 +263,7 @@ int main(int argc, char **argv)
             break;
     }
 
-    g_user_app->exit();
+    gUserApp->exit();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();

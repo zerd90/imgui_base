@@ -2,7 +2,7 @@
 #include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
-#include "imgui_impl_common.h"
+#include "imgui_common_tools.h"
 #include "ImGuiWindow.h"
 
 using namespace ImGui;
@@ -164,12 +164,12 @@ void IImGuiWindow::setHasCloseButton(bool hasCloseButton)
         mHasCloseButton = hasCloseButton;
 }
 
-void IImGuiWindow::setContent(std::function<void()> content)
+void IImGuiWindow::setContent(const std::function<void()> &content)
 {
     mContentCallback = content;
 }
 
-void IImGuiWindow::setStatus(std::string statusString, ImU32 color)
+void IImGuiWindow::setStatus(const std::string &statusString, ImU32 color)
 {
     if (mStatusString != statusString)
         mStatusString = statusString;
@@ -334,10 +334,11 @@ void IImGuiWindow::updateWindowStatus()
 {
     mWinPos            = GetWindowPos();
     mWinSize           = GetWindowSize();
+    mContentRegionPos  = GetCursorScreenPos();
     mContentRegionSize = GetContentRegionAvail();
-    mDisplayRegionSize = mWinSize - ImGui::GetStyle().WindowPadding * 2;
-    if (mWindowFlags & ImGuiWindowFlags_MenuBar)
-        mDisplayRegionSize.y -= ImGui::GetCurrentWindowRead()->MenuBarHeight;
+
+    // if (mWindowFlags & ImGuiWindowFlags_MenuBar)
+    //     mContentRegionSize.y -= ImGui::GetCurrentWindowRead()->MenuBarHeight;
 
     mFocused = IsWindowFocused(mFocusedFlags);
 
@@ -387,7 +388,11 @@ void ImGuiPopup::show()
         mShouldOpen = false;
         mOpened     = true;
     }
-    if (mOpened && (mManualSize.x > 0 && mManualSize.y > 0))
+
+    if (!mOpened)
+        return;
+
+    if (mManualSize.x > 0 && mManualSize.y > 0)
         SetNextWindowSize(mManualSize, mManualSizeCond);
 
     pushStyles();
@@ -407,10 +412,15 @@ void ImGuiPopup::open()
 {
     mShouldOpen = true;
 }
+
+static int gMainWindowCount = 0;
+
 ImGuiMainWindow::ImGuiMainWindow() : IImGuiWindow("##App Main Window")
 {
+    IM_ASSERT(gMainWindowCount == 0 && "Only one main window is allowed");
     mOpened      = true;
     mWindowFlags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
+    gMainWindowCount++;
 }
 
 ImGuiMainWindow::ImGuiMainWindow(const std::string &title) : ImGuiMainWindow()
@@ -476,10 +486,6 @@ bool drawMaximizeButton(const ImRect &buttonRect, bool maximized, bool buttonEna
 bool drawCloseButton(const ImRect &buttonRect, bool buttonEnabled)
 {
     bool clicked = drawButtonBg(buttonRect, buttonEnabled);
-    // Draw the close button icon
-    GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
-                                 buttonRect.Max - ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
-                                 GetColorU32(ImGuiCol_Text));
 
     // Draw the close button icon
     GetWindowDrawList()->AddLine(buttonRect.Min + ImVec2(buttonRect.GetWidth() / 4, buttonRect.GetHeight() / 4),
@@ -665,7 +671,9 @@ void ImGuiMainWindow::show()
     {
         tmpWinSize.y -= (GetTextLineHeightWithSpacing() + style.DockingSeparatorSize + style.ItemSpacing.y);
     }
-    BeginChild("##Main Window Content", tmpWinSize, 0, ImGuiWindowFlags_MenuBar);
+
+    BeginChild("##Main Window Content", tmpWinSize, ImGuiChildFlags_AlwaysUseWindowPadding,
+               !mMenuBarItems.subMenus.empty() ? ImGuiWindowFlags_MenuBar : 0);
 
     if (!mMenuBarItems.subMenus.empty())
     {
@@ -714,7 +722,7 @@ void ImGuiMainWindow::show()
             EndMenuBar();
         }
     }
-    SetCursorPos(GetCursorPos() + ImVec2(8, 0));
+
     showContent();
 
     EndChild();

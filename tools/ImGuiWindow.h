@@ -42,8 +42,8 @@ public:
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_HOVERED_FLAGS, HoveredFlag, mHoveredFlags)
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_FOCUSED_FLAGS, FocusedFlag, mFocusedFlags)
 
-    void setContent(std::function<void()> content);
-    void setStatus(std::string statusString, ImU32 color = 0);
+    void setContent(const std::function<void()> &content);
+    void setStatus(const std::string &statusString, ImU32 color = 0);
     void setStatusProgressBar(bool on, float fraction = 0.0f);
     void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
 
@@ -109,8 +109,8 @@ protected:
     bool   mFocused      = false;
     ImVec2 mWinSize;
     ImVec2 mWinPos;
-    ImVec2 mContentRegionSize; // considering scroll
-    ImVec2 mDisplayRegionSize; // excluding scroll
+    ImVec2 mContentRegionPos;
+    ImVec2 mContentRegionSize;
 
     std::list<std::string> mErrors;
 
@@ -133,6 +133,7 @@ class ImGuiMainWindow : public IImGuiWindow
 public:
     ImGuiMainWindow();
     ImGuiMainWindow(const std::string &title);
+    virtual ~ImGuiMainWindow() {}
 
     virtual void show() override;
 
@@ -144,7 +145,7 @@ protected:
     bool   mMaximized = false;
     ImVec2 mStartMoveMousePos;
     ImVec2 mStartMoveWinPos;
-    bool   mStartMove = false;
+    bool   mStartMove         = false;
     bool   mTitleBarMouseDown = false;
 };
 
@@ -156,12 +157,14 @@ public:
         mIsChildWindow = true;
         mOpened        = true;
     }
+    virtual ~IImGuiChildWindow() {}
 };
 
 class ImGuiPopup : public IImGuiWindow
 {
 public:
     ImGuiPopup(const std::string &title);
+    virtual ~ImGuiPopup() {}
     virtual void show() override;
     void         open();
     DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_POPUP_FLAGS, PopupFlag, mPopupFlags)

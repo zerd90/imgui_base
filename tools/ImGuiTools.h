@@ -6,7 +6,8 @@
 #include <map>
 
 #include "imgui.h"
-#include "imgui_impl_common.h"
+#include "imgui_common_tools.h"
+#include "ImGuiItem.h"
 
 #include "ImGuiWindow.h"
 
@@ -152,6 +153,84 @@ private:
 
     ImS64 mSelectOffset = 0;
     ImS64 mScrollPos    = 0;
+};
+
+struct ConfirmDialogButton
+{
+    std::string                  name;
+    std::function<void()>        onPressed;
+    std::unique_ptr<ImGuiButton> pButton;
+};
+
+class ConfirmDialog : public ImGuiPopup
+{
+public:
+    ConfirmDialog(const std::string &title, const std::string &message);
+    virtual ~ConfirmDialog() {}
+    void addButton(const std::string &name, std::function<void()> onPressed);
+    void removeButton(const std::string &name);
+
+protected:
+    virtual void showContent() override;
+
+private:
+    std::string mMessage;
+
+    std::vector<ConfirmDialogButton> mButtons;
+};
+
+class FontChooseWindow : public ImGuiPopup
+{
+public:
+    FontChooseWindow(const std::string &name,
+                     const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)>
+                         onFontChanged);
+
+    void setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize);
+
+    ~FontChooseWindow() {}
+
+protected:
+    virtual void showContent() override;
+
+#ifdef IMGUI_ENABLE_FREETYPE
+public:
+    const std::vector<FreetypeFontFamilyInfo> &getSystemFontFamilies() { return mSystemFontFamilies; }
+
+private:
+    void updateFontStyles();
+    void updateFontDisplayTexture();
+#endif
+
+private:
+    struct
+    {
+        std::string fontPath;
+        int         fontIdx;
+        float       fontSize = 0;
+    } mOldFont, mNewFont;
+    bool mFontSelectChanged = false;
+
+    std::function<void(const std::string &, int, float, bool)> mOnFontChanged;
+
+#ifdef IMGUI_ENABLE_FREETYPE
+    std::vector<FreetypeFontFamilyInfo> mSystemFontFamilies;
+
+    ImGuiInputGroup mFontSelect;
+    ImGuiInputCombo mFontFamiliesCombo;
+    ImGuiInputCombo mFontStylesCombo;
+
+    TextureData mFontDisplayTexture;
+    std::string mFontFamilyName;
+#endif
+
+    ImGuiInputFloat mFontSizeInput;
+    ImGuiButton     mApplyButton;
+    ImGuiButton     mCancelButton;
+
+    ConfirmDialog mConfirmWindow;
+    ImGuiButton   mRestartButton;
+    ImGuiButton   mLatterButton;
 };
 
 void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,

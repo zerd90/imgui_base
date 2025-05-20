@@ -50,7 +50,7 @@
         #pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
     #endif
 
-    #include "imgui_impl_common.h"
+    #include "imgui_common_tools.h"
 
     #ifndef dbg
         #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__);

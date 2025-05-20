@@ -11,7 +11,7 @@
 
 enum ImGuiItemAction
 {
-    ImGuiItemNativeActive = 0, // Button Pressed / Checkbox state Changed/TexLink Clicked/...
+    ImGuiItemNativeActive = 0, // Button Clicked / Checkbox state Changed/TexLink Clicked/...
     ImGuiItemHovered,
     ImGuiItemActive,
     ImGuiItemActivated,
@@ -59,7 +59,7 @@ protected:
     ImVec2              mManualItemSize;
     std::string         mLabel;
 
-private:
+protected:
     bool                  mItemStatus[ImGuiItemActionButt];
     std::function<void()> mActionCallbacks[ImGuiItemActionButt];
 };
@@ -142,7 +142,8 @@ public:
     // spacing between label and input box
     void setSpacing(float spacing);
 
-    void setLabelPosition(bool labelOnLeft);
+    void         setLabelPosition(bool labelOnLeft);
+    virtual void updateItemStatus() override;
 
 protected:
     virtual bool showInputItem() = 0;
@@ -157,54 +158,96 @@ template <typename T>
 class ImGuiInput : public IImGuiInput
 {
 public:
-    ImGuiInput(const std::string &label, T &initalValue, bool labelOnLeft = false) : IImGuiInput(label, labelOnLeft)
+    ImGuiInput(const std::string &label, T initalValue, bool labelOnLeft = false,
+               const T &min = (std::numeric_limits<T>::min)(), const T &max = (std::numeric_limits<T>::max)(),
+               const T &step = 0, const T &stepFast = 0)
+        : IImGuiInput(label, labelOnLeft)
     {
-        mValue = initalValue;
+        mValue    = initalValue;
+        mMinValue = min;
+        mMaxValue = max;
+        setStep(step, stepFast);
     }
 
     const T &getValue() { return mValue; }
-    void     setValue(T &newValue) { mValue = newValue; }
+    void     setValue(const T &newValue) { mValue = newValue; }
+
+    void setStep(T step, T stepFast = 0)
+    {
+        mStep = step;
+        if (0 == stepFast)
+            stepFast = step;
+        else
+            mStepFast = stepFast;
+    }
 
 protected:
     virtual bool showInputItem() override
     {
         std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+        bool        res;
         if constexpr (std::is_same<T, int>::value)
         {
-            bool res = ImGui::InputInt(showLabel.c_str(), &mValue, 0);
-            return res;
+            res = ImGui::InputInt(showLabel.c_str(), &mValue, mStep, mStepFast);
         }
         else if constexpr (std::is_same<T, float>::value)
         {
-            bool res = ImGui::InputFloat(showLabel.c_str(), &mValue);
-            return res;
+            res = ImGui::InputFloat(showLabel.c_str(), &mValue, mStep, mStepFast);
         }
-        else if constexpr (std::is_same<T, std::string>::value)
-        {
-            bool res = ImGui::InputText(
-                showLabel.c_str(), (char *)mValue.c_str(), mValue.capacity() + 1, ImGuiInputTextFlags_CallbackResize,
-                [](ImGuiInputTextCallbackData *data)
-                {
-                    std::string *valueString = (std::string *)data->UserData;
-                    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-                    {
-                        valueString->resize(data->BufTextLen);
-                        data->Buf = (char *)valueString->c_str();
-                    }
-                    return 0;
-                },
-                &mValue);
-            return res;
-        }
+
+        if (mValue < mMinValue)
+            mValue = mMinValue;
+        if (mValue > mMaxValue)
+            mValue = mMaxValue;
+
+        return res;
     }
 
 private:
     T mValue;
+    T mMinValue;
+    T mMaxValue;
+    T mStep;
+    T mStepFast;
 };
 
-using ImGuiInputInt    = ImGuiInput<int>;
-using ImGuiInputFloat  = ImGuiInput<float>;
-using ImGuiInputString = ImGuiInput<std::string>;
+using ImGuiInputInt   = ImGuiInput<int>;
+using ImGuiInputFloat = ImGuiInput<float>;
+class ImGuiInputString : public IImGuiInput
+{
+    ImGuiInputString(const std::string &label, const std::string &initalValue, bool labelOnLeft = false)
+        : IImGuiInput(label, labelOnLeft)
+    {
+        mValue = initalValue;
+    }
+
+    const std::string &getValue() { return mValue; }
+    void               setValue(const std::string &newValue) { mValue = newValue; }
+
+protected:
+    virtual bool showInputItem() override
+    {
+        std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+
+        bool res = ImGui::InputText(
+            showLabel.c_str(), (char *)mValue.c_str(), mValue.capacity() + 1, ImGuiInputTextFlags_CallbackResize,
+            [](ImGuiInputTextCallbackData *data)
+            {
+                std::string *valueString = (std::string *)data->UserData;
+                if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+                {
+                    valueString->resize(data->BufTextLen);
+                    data->Buf = (char *)valueString->c_str();
+                }
+                return 0;
+            },
+            &mValue);
+        return res;
+    }
+
+private:
+    std::string mValue;
+};
 
 using ComboTag = int;
 // use ComboTag to distinguish between different selectable items
@@ -218,6 +261,7 @@ public:
     void     removeSelectableItem(ComboTag tag);
     bool     selectChanged();
     ComboTag getSelected();
+    void     setSelected(ComboTag tag);
     void     clear();
 
 protected:

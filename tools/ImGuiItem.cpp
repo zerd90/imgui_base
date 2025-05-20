@@ -221,9 +221,18 @@ bool IImGuiInput::showItem()
 
     if (mLabelOnLeft)
     {
-        Text("%s", mLabel.c_str());
-        SameLine();
-        SetCursorPosX(GetCursorPosX() + mSpacing);
+        ImVec2 pos = GetCursorScreenPos();
+        SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
+        string label = mLabel;
+
+        if (label.find("##") != string::npos)
+            label = label.substr(0, label.find("##"));
+
+        if (!label.empty())
+            Text("%s", label.c_str());
+
+        pos += ImVec2(CalcTextSize(mLabel.c_str(), nullptr, true).x + mSpacing, 0);
+        SetCursorScreenPos(pos);
     }
     else // inner spacing controlled by ImGui
     {
@@ -264,6 +273,10 @@ ComboTag ImGuiInputCombo::getSelected()
 {
     return mCurrSelect;
 }
+void ImGuiInputCombo::setSelected(ComboTag tag)
+{
+    mCurrSelect = tag;
+}
 
 void ImGuiInputCombo::clear()
 {
@@ -287,6 +300,7 @@ bool ImGuiInputCombo::showInputItem()
             if (is_selected)
                 ImGui::SetItemDefaultFocus();
         }
+        EndCombo();
     }
 
     return mCurrSelect != lastSelect;
@@ -378,7 +392,18 @@ bool ImGuiInputGroup::showItem()
     return res;
 }
 
-void ImGuiInputGroup::updateItemStatus() {}
+void ImGuiInputGroup::updateItemStatus()
+{
+    mItemPos  = {0, 0};
+    mItemSize = {0, 0};
+    if (mInputGroup.empty())
+        return;
+    mItemPos = mInputGroup[0]->itemPos();
+    for (auto &input : mInputGroup)
+        mItemSize.x = MAX(mItemSize.x, input->itemSize().x);
+
+    mItemSize.y = mInputGroup.back()->itemPos().y + mInputGroup.back()->itemSize().y - mItemPos.y;
+}
 
 void ImGuiInputGroup::setSpacing()
 {
@@ -551,8 +576,10 @@ void ImGuiItemTable::ScrollFreezeCols(int cols)
 
 bool ImGuiItemTable::showItem()
 {
-
     size_t rowCount = 0;
+
+    if (mColumnNames.empty())
+        return false;
 
     if (mGetRowCountCallback)
         rowCount = mGetRowCountCallback();
@@ -638,4 +665,16 @@ void ImGuiItemTable::setDataCallbacks(const std::function<size_t()>             
     mGetCellCallback       = getCellCallback;
     mCellClickableCallback = cellClickableCallback;
     mCellClickedCallback   = cellClickedCallback;
+}
+void IImGuiInput::updateItemStatus()
+{
+    mItemSize = GetItemRectSize();
+    if (mLabelOnLeft)
+    {
+        mItemSize.x += CalcTextSize(mLabel.c_str(), nullptr, true).x + ImGui::GetStyle().ItemInnerSpacing.x;
+    }
+    UPDATE_STATUS(ImGuiItemHovered, IsItemHovered(mHoveredFlags));
+    UPDATE_STATUS(ImGuiItemActive, IsItemActive());
+    UPDATE_STATUS(ImGuiItemActivated, IsItemActivated());
+    UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }

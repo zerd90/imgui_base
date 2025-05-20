@@ -91,7 +91,7 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
     #include "imgui_impl_glfw.h"
-    #include "imgui_impl_common.h"
+    #include "imgui_common_tools.h"
 
     // Clang warnings with -Weverything
     #if defined(__clang__)
@@ -1699,14 +1699,23 @@ ImRect maximizeMainWindow()
 {
     auto bd = ImGui_ImplGlfw_GetBackendData();
     IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+    // glfwMaximizeWindow not working properly on MacOS, and glfwGetMonitorWorkarea not working properly on Ubuntu, so we
+    // do it like this...
+    #ifdef __linux
     glfwMaximizeWindow(bd->Window);
     glfwSwapBuffers(bd->Window);
 
     int x, y, w, h;
     glfwGetWindowPos(bd->Window, &x, &y);
     glfwGetWindowSize(bd->Window, &w, &h);
-
     return ImRect(x, y, x + w, y + h);
+    #else
+    auto rect = GetDisplayWorkArea();
+    glfwSetWindowPos(bd->Window, rect.Min.x, rect.Min.y);
+    glfwSetWindowSize(bd->Window, rect.GetWidth(), rect.GetHeight());
+
+    return rect;
+    #endif
 }
 
 void normalizeApplication(const ImRect &winRect){
