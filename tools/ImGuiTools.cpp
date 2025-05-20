@@ -690,7 +690,7 @@ void ImGuiBinaryViewer::showContent()
             if (!dstFilePath.empty())
             {
                 mSaveDataCallback(dstFilePath, mUserData);
-                mLastSaveDir = fs::path(dstFilePath).parent_path().string();
+                mLastSaveDir = fs::path(utf8ToLocal(dstFilePath)).parent_path().string();
             }
         }
     }
@@ -987,9 +987,8 @@ FontChooseWindow::FontChooseWindow(
       mConfirmWindow("Apply Font", "Restart Application To Apply New Font"), mRestartButton("Restart Now"),
       mLatterButton("Restart Latter")
 {
+    mWindowFlags |= ImGuiWindowFlags_NoResize;
     mManualSizeCond = ImGuiCond_Always;
-    mFontSizeInput.setValue(15.f);
-    mFontSizeInput.setItemWidth(150);
     mConfirmWindow.addWindowFlag(ImGuiWindowFlags_NoResize);
     mConfirmWindow.addButton("Restart Now",
                              [this]()
@@ -1012,14 +1011,22 @@ FontChooseWindow::FontChooseWindow(
     if (mSystemFontFamilies.empty())
     {
         mSystemFontFamilies = listSystemFonts();
+        sortFonts(mSystemFontFamilies);
         for (int i = 0; i < mSystemFontFamilies.size(); i++)
         {
-            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName);
+            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName + "##"
+                                                        + mSystemFontFamilies[i].name);
         }
         updateFontStyles();
     }
-    mFontFamiliesCombo.setItemWidth(150);
-    mFontStylesCombo.setItemWidth(150);
+    mFontSelect.addInput(&mFontFamiliesCombo);
+    mFontSelect.addInput(&mFontStylesCombo);
+    mFontSelect.addInput(&mFontSizeInput);
+    mFontSelect.setLabelPosition(true);
+    mFontSelect.setItemWidth(150);
+#else
+    mFontSizeInput.setValue(15.f);
+    mFontSizeInput.setItemWidth(150);
 #endif
 }
 
@@ -1032,24 +1039,22 @@ void FontChooseWindow::showContent()
 
     ImVec2 inputStartPos = GetCursorScreenPos();
 
-    mFontFamiliesCombo.show();
+    mFontSelect.show();
     if (mFontFamiliesCombo.selectChanged())
     {
         updateFontStyles();
         mFontSelectChanged = true;
     }
-    mFontStylesCombo.show();
-    if (mFontStylesCombo.selectChanged())
-    {
-        mFontSelectChanged = true;
-    }
 
-    mFontSizeInput.show();
+    if (mFontStylesCombo.selectChanged())
+        mFontSelectChanged = true;
+
     if (mFontSizeInput.isNativeActive())
     {
         mNewFont.fontSize  = mFontSizeInput.getValue();
         mFontSelectChanged = true;
     }
+
     ImVec2 inputEndPos = GetCursorScreenPos();
 
     int   fontFamilyIdx = mFontFamiliesCombo.getSelected();
@@ -1059,6 +1064,12 @@ void FontChooseWindow::showContent()
 
     mNewFont.fontPath = font.path;
     mNewFont.fontIdx  = font.index;
+
+    ImVec2 displaySize = CalcTextSize(mFontFamilyName.c_str());
+    if (displaySize.x + 50 > mFontSelect.itemSize().x)
+    {
+        mFontSelect.setItemWidth(displaySize.x + 50);
+    }
 
     if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx
         || mNewFont.fontSize != mOldFont.fontSize)
@@ -1072,8 +1083,7 @@ void FontChooseWindow::showContent()
         mFontSelectChanged = false;
     }
 
-    maxItemWidth     = std::max(mFontFamiliesCombo.itemSize().x, mFontStylesCombo.itemSize().x);
-    maxItemWidth     = std::max(maxItemWidth, mFontSizeInput.itemSize().x);
+    maxItemWidth     = mFontSelect.itemSize().x;
     ImVec2 cursorPos = GetCursorScreenPos();
 
     #define FONT_RENDER_SPACING 50
@@ -1102,11 +1112,9 @@ void FontChooseWindow::showContent()
         string initDir;
         if (!mNewFont.fontPath.empty())
         {
-            fs::path fontPath(mNewFont.fontPath);
+            fs::path fontPath(utf8ToLocal(mNewFont.fontPath));
             if (fs::exists(fontPath))
-            {
                 initDir = fontPath.parent_path().string();
-            }
         }
         string fontPath = selectFile({}, initDir);
         if (!fontPath.empty())
@@ -1289,7 +1297,10 @@ void FontChooseWindow::updateFontDisplayTexture()
     {
         err = FT_Load_Char(face, c, FT_LOAD_RENDER);
         if (err)
+        {
+            printf("load char 0x%x fail: %s\n", c, FT_Error_String(err));
             continue;
+        }
 
         totalWidth += face->glyph->advance.x >> 6;
         maxAscender  = std::max(maxAscender, face->glyph->bitmap_top);

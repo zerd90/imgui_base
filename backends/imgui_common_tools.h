@@ -118,7 +118,7 @@ bool restartApplication(const std::string &scriptPath, const std::string &progra
 
 #ifdef IMGUI_ENABLE_FREETYPE
 
-struct FontInfo
+struct FreetypeFontInfo
 {
     std::string style;
     std::string styleDisplayName;
@@ -126,15 +126,16 @@ struct FontInfo
     uint32_t    index;
 };
 
-struct FontFamilyInfo
+struct FreetypeFontFamilyInfo
 {
-    std::string           name;
-    std::string           displayName;
-    std::vector<FontInfo> fonts;
+    std::string                   name;
+    std::string                   displayName;
+    std::vector<FreetypeFontInfo> fonts;
 };
 
-std::vector<FontFamilyInfo> listSystemFonts();
+std::vector<FreetypeFontFamilyInfo> listSystemFonts();
 
+void sortFonts(std::vector<FreetypeFontFamilyInfo> &fontFamilies);
 #endif
 
 // End Platform Relative

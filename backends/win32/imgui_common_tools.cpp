@@ -527,9 +527,9 @@ std::string getStringLocalized(IDWriteLocalizedStrings *pLocalizedStrings)
     return unicodeToUtf8(fontName.get());
 }
 
-vector<FontFamilyInfo> listSystemFonts()
+vector<FreetypeFontFamilyInfo> listSystemFonts()
 {
-    vector<FontFamilyInfo> fontFamilyInfos;
+    vector<FreetypeFontFamilyInfo> fontFamilyInfos;
 
     FT_Library ftLibrary = nullptr;
 
@@ -567,7 +567,7 @@ vector<FontFamilyInfo> listSystemFonts()
 
     for (UINT32 i = 0; i < familyCount; ++i)
     {
-        FontFamilyInfo                  familyInfo;
+        FreetypeFontFamilyInfo          familyInfo;
         ComPtr<IDWriteFontFamily>       pFontFamily  = nullptr;
         ComPtr<IDWriteLocalizedStrings> pFamilyNames = nullptr;
 
@@ -592,11 +592,11 @@ vector<FontFamilyInfo> listSystemFonts()
 
         familyInfo.displayName = getStringLocalized(pFamilyNames.Get());
 
-        UINT32           fontCount = pFontFamily->GetFontCount();
-        vector<FontInfo> fontInfos;
+        UINT32                   fontCount = pFontFamily->GetFontCount();
+        vector<FreetypeFontInfo> fontInfos;
         for (UINT32 fontIdx = 0; fontIdx < fontCount; ++fontIdx)
         {
-            FontInfo fontInfo;
+            FreetypeFontInfo fontInfo;
 
             ComPtr<IDWriteFont> pFont = nullptr;
 
@@ -689,7 +689,7 @@ vector<FontFamilyInfo> listSystemFonts()
             if (!fontInfos.empty())
             {
                 if (std::find_if(fontInfos.begin(), fontInfos.end(),
-                                 [&fontInfo](FontInfo &existFont)
+                                 [&fontInfo](FreetypeFontInfo &existFont)
                                  {
                                      return (existFont.path == fontInfo.path && existFont.index == fontInfo.index)
                                          || (existFont.style == fontInfo.style);
@@ -713,8 +713,17 @@ vector<FontFamilyInfo> listSystemFonts()
             if (err)
             {
                 printf("select charmap for unicode on font %s fail: %s\n", localPath.c_str(), FT_Error_String(err));
+                FT_Done_Face(face);
                 continue;
             }
+
+            // TODO: support multi language
+            if (FT_Get_Char_Index(face, u'中') == 0 && FT_Get_Char_Index(face, u'A') == 0)
+            {
+                FT_Done_Face(face);
+                break;
+            }
+
             familyInfo.name = face->family_name;
             fontInfo.style  = face->style_name;
             FT_Done_Face(face);
@@ -723,7 +732,8 @@ vector<FontFamilyInfo> listSystemFonts()
         }
         if (fontInfos.size() > 0
             && std::find_if(fontFamilyInfos.begin(), fontFamilyInfos.end(),
-                            [&familyInfo](FontFamilyInfo &existFamily) { return existFamily.name == familyInfo.name; })
+                            [&familyInfo](FreetypeFontFamilyInfo &existFamily)
+                            { return existFamily.name == familyInfo.name; })
                    == fontFamilyInfos.end())
         {
             familyInfo.fonts = fontInfos;

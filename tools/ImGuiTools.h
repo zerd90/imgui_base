@@ -194,6 +194,9 @@ protected:
     virtual void showContent() override;
 
 #ifdef IMGUI_ENABLE_FREETYPE
+public:
+    const std::vector<FreetypeFontFamilyInfo> &getSystemFontFamilies() { return mSystemFontFamilies; }
+
 private:
     void updateFontStyles();
     void updateFontDisplayTexture();
@@ -211,11 +214,14 @@ private:
     std::function<void(const std::string &, int, float, bool)> mOnFontChanged;
 
 #ifdef IMGUI_ENABLE_FREETYPE
-    std::vector<FontFamilyInfo> mSystemFontFamilies;
-    ImGuiInputCombo             mFontFamiliesCombo;
-    ImGuiInputCombo             mFontStylesCombo;
-    TextureData                 mFontDisplayTexture;
-    std::string                 mFontFamilyName;
+    std::vector<FreetypeFontFamilyInfo> mSystemFontFamilies;
+
+    ImGuiInputGroup mFontSelect;
+    ImGuiInputCombo mFontFamiliesCombo;
+    ImGuiInputCombo mFontStylesCombo;
+
+    TextureData mFontDisplayTexture;
+    std::string mFontFamilyName;
 #endif
 
     ImGuiInputFloat mFontSizeInput;

@@ -291,6 +291,7 @@ void ImGuiApplication::loadResources()
 #elif defined(__linux)
         mAppFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
 #elif defined(__APPLE__)
+        mAppFontPath = "/System/Library/Fonts/Supplemental/Times New Roman.ttf";
 #endif
     }
     // check if font is available
@@ -322,7 +323,22 @@ void ImGuiApplication::loadResources()
             io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf)", mAppFontSize,
                                          &fontConfig, io.Fonts->GetGlyphRangesChineseFull());
     #elif defined(__APPLE__)
-                // TODO:
+            auto systemFonts = mFontChooser.getSystemFontFamilies();
+            auto familyIter =
+                std::find_if(systemFonts.begin(), systemFonts.end(),
+                             [](const FreetypeFontFamilyInfo &info) { return info.name == "PingFang SC"; });
+
+            if (familyIter != systemFonts.end())
+            {
+                auto fontIter = std::find_if(familyIter->fonts.begin(), familyIter->fonts.end(),
+                                             [](const FreetypeFontInfo &info) { return info.style == "Regular"; });
+                if (fontIter != familyIter->fonts.end())
+                {
+                    fontConfig.FontNo = fontIter->index;
+                    io.Fonts->AddFontFromFileTTF(familyIter->fonts[0].path.c_str(), mAppFontSize, &fontConfig,
+                                                 io.Fonts->GetGlyphRangesChineseFull());
+                }
+            }
     #endif
         }
 
@@ -338,7 +354,8 @@ void ImGuiApplication::loadResources()
             io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf)", mAppFontSize,
                                          &fontConfig, io.Fonts->GetGlyphRangesDefault());
     #elif defined(__APPLE__)
-                // TODO:
+            io.Fonts->AddFontFromFileTTF(R"(mAppFontPath = "/System/Library/Fonts/Supplemental/Times New Roman.ttf")",
+                                         mAppFontSize, &fontConfig, io.Fonts->GetGlyphRangesDefault());
     #endif
         }
 #endif

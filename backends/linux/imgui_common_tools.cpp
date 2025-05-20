@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <pwd.h>
+#include <iconv.h>
 
 #include "imgui_common_tools.h"
 
@@ -119,31 +120,74 @@ string localToUtf8(const string &str)
 {
     return str;
 }
+
+std::string convertEncoding(const std::string &input, const char *fromCode, const char *toCode)
+{
+    iconv_t cd = iconv_open(toCode, fromCode);
+    if (cd == (iconv_t)-1)
+    {
+        printf("iconv_open fail\n");
+        return "";
+    }
+
+    size_t      inSize  = input.size();
+    char       *inBuf   = const_cast<char *>(input.c_str());
+    size_t      outSize = inSize * 4;
+    std::string output(outSize, '\0');
+    char       *outBuf   = &output[0];
+    char       *outStart = outBuf;
+
+    if (iconv(cd, &inBuf, &inSize, &outBuf, &outSize) == (size_t)-1)
+    {
+        iconv_close(cd);
+        printf("iconv fail\n");
+        return "";
+    }
+
+    iconv_close(cd);
+    output.resize(outBuf - outStart);
+    return output;
+}
+
 string unicodeToUtf8(const wstring &wStr)
 {
-    return localToUtf8(unicodeToLocal(wStr));
+    std::string utf32Str;
+    utf32Str.reserve(wStr.size() * 2);
+
+    for (wchar_t wc : wStr)
+    {
+        utf32Str.push_back(static_cast<char>(wc & 0xFF));
+        utf32Str.push_back(static_cast<char>((wc >> 8) & 0xFF));
+        utf32Str.push_back(static_cast<char>((wc >> 16) & 0xFF));
+        utf32Str.push_back(static_cast<char>((wc >> 24) & 0xFF));
+    }
+
+    return convertEncoding(utf32Str, "UTF-32LE", "UTF-8");
 }
+
 wstring utf8ToUnicode(const string &str)
 {
-    return localToUnicode(utf8ToLocal(str));
+    std::string  utf32Str = convertEncoding(str, "UTF-8", "UTF-32LE");
+    std::wstring result;
+
+    for (size_t i = 0; i < utf32Str.size(); i += 4)
+    {
+        wchar_t wc = (static_cast<unsigned char>(utf32Str[i + 3]) << 24)
+                   | (static_cast<unsigned char>(utf32Str[i + 2]) << 16)
+                   | (static_cast<unsigned char>(utf32Str[i + 1]) << 8) | static_cast<unsigned char>(utf32Str[i]);
+        result.push_back(wc);
+    }
+    return result;
 }
 
 string unicodeToLocal(const wstring &wStr)
 {
-    char *str = new char[wStr.size() * 4 + 1];
-    wcstombs(str, wStr.c_str(), wStr.size() * 4 + 1);
-    std::string utf8_str(str);
-    delete[] str;
-    return utf8_str;
+    return utf8ToLocal(unicodeToUtf8(wStr));
 }
 
 wstring localToUnicode(const string &str)
 {
-    wchar_t *wstr = new wchar_t[str.size() + 1];
-    mbstowcs(wstr, str.c_str(), str.size() + 1);
-    std::wstring unicode_str(wstr);
-    delete[] wstr;
-    return unicode_str;
+    return utf8ToUnicode(localToUtf8(str));
 }
 
 void transformFileFilters(GtkFileDialog *fileDialog, const vector<FilterSpec> &typeFilters)
@@ -440,7 +484,7 @@ void listAllFontFiles(const std::string &dirPath, std::vector<std::string> &font
 }
 
 #ifdef IMGUI_ENABLE_FREETYPE
-vector<FontFamilyInfo> listSystemFonts()
+vector<FreetypeFontFamilyInfo> listSystemFonts()
 {
     uid_t          uid = getuid();
     struct passwd *pw  = getpwuid(uid);
@@ -455,8 +499,8 @@ vector<FontFamilyInfo> listSystemFonts()
         listAllFontFiles(dir, fontFiles);
     }
 
-    std::vector<FontFamilyInfo> fontFamilies;
-    FT_Library                  ftLibrary = nullptr;
+    std::vector<FreetypeFontFamilyInfo> fontFamilies;
+    FT_Library                          ftLibrary = nullptr;
 
     int err = FT_Init_FreeType(&ftLibrary);
     if (err)
@@ -482,6 +526,16 @@ vector<FontFamilyInfo> listSystemFonts()
             if (err)
             {
                 printf("select charmap for unicode on font %s fail: %s\n", localFontPath.c_str(), FT_Error_String(err));
+                FT_Done_Face(face);
+                idx++;
+                continue;
+            }
+
+            // TODO: support multi language
+            if (FT_Get_Char_Index(face, u'中') == 0 && FT_Get_Char_Index(face, u'A') == 0)
+            {
+                FT_Done_Face(face);
+                idx++;
                 continue;
             }
 
@@ -490,10 +544,10 @@ vector<FontFamilyInfo> listSystemFonts()
 
             auto familyIter =
                 std::find_if(fontFamilies.begin(), fontFamilies.end(),
-                             [&familyName](const FontFamilyInfo &info) { return info.name == familyName; });
+                             [&familyName](const FreetypeFontFamilyInfo &info) { return info.name == familyName; });
             if (familyIter == fontFamilies.end())
             {
-                FontFamilyInfo familyInfo;
+                FreetypeFontFamilyInfo familyInfo;
                 familyInfo.name        = familyName;
                 familyInfo.displayName = familyName;
 
@@ -501,14 +555,15 @@ vector<FontFamilyInfo> listSystemFonts()
                 familyIter = fontFamilies.end() - 1;
             }
 
-            FontInfo fontInfo;
+            FreetypeFontInfo fontInfo;
             fontInfo.style            = styleName;
             fontInfo.styleDisplayName = styleName;
             fontInfo.path             = fontFile;
             fontInfo.index            = idx;
 
             if (std::find_if(familyIter->fonts.begin(), familyIter->fonts.end(),
-                             [&fontInfo](const FontInfo &info) {
+                             [&fontInfo](const FreetypeFontInfo &info)
+                             {
                                  return info.style == fontInfo.style
                                      || (info.path == fontInfo.path && info.index == fontInfo.index);
                              })

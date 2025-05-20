@@ -223,8 +223,15 @@ bool IImGuiInput::showItem()
     {
         ImVec2 pos = GetCursorScreenPos();
         SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
-        Text("%s", mLabel.c_str());
-        pos += ImVec2(CalcTextSize(mLabel.c_str()).x + mSpacing, 0);
+        string label = mLabel;
+
+        if (label.find("##") != string::npos)
+            label = label.substr(0, label.find("##"));
+
+        if (!label.empty())
+            Text("%s", label.c_str());
+
+        pos += ImVec2(CalcTextSize(mLabel.c_str(), nullptr, true).x + mSpacing, 0);
         SetCursorScreenPos(pos);
     }
     else // inner spacing controlled by ImGui
@@ -385,7 +392,18 @@ bool ImGuiInputGroup::showItem()
     return res;
 }
 
-void ImGuiInputGroup::updateItemStatus() {}
+void ImGuiInputGroup::updateItemStatus()
+{
+    mItemPos  = {0, 0};
+    mItemSize = {0, 0};
+    if (mInputGroup.empty())
+        return;
+    mItemPos = mInputGroup[0]->itemPos();
+    for (auto &input : mInputGroup)
+        mItemSize.x = MAX(mItemSize.x, input->itemSize().x);
+
+    mItemSize.y = mInputGroup.back()->itemPos().y + mInputGroup.back()->itemSize().y - mItemPos.y;
+}
 
 void ImGuiInputGroup::setSpacing()
 {

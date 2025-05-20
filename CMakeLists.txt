@@ -10,11 +10,7 @@ execute_process(
 )
 
 option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
-
-if(CMAKE_SYSTEM_NAME MATCHES Darwin)
-	set(USING_FREETYPE OFF)
-endif()
-
+message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 if(RENDER MATCHES "")
 	if(CMAKE_SYSTEM_NAME MATCHES Windows)
 		SET(RENDER WIN32_DX11)
@@ -115,11 +111,21 @@ if(${CMAKE_SYSTEM_NAME} MATCHES Linux)
 			${PROJECT_NAME} ${GTK4_LIBRARIES}
 		)
 	endif()
+elseif(${CMAKE_SYSTEM_NAME} MATCHES Darwin
+	OR ${CMAKE_SYSTEM_NAME} MATCHES Linux)
+	set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+		iconv)
 endif()
 
-if(USING_FREETYPE AND CMAKE_SYSTEM_NAME MATCHES Windows)
-	# for font listing
-	set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES} Dwrite)
+if(USING_FREETYPE)
+	if(CMAKE_SYSTEM_NAME MATCHES Windows)
+		# for font listing
+		set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES} Dwrite)
+	elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+		set(PARENT_LINK_LIBRARIES ${PARENT_LINK_LIBRARIES}
+			"-framework CoreText"
+			"-framework CoreFoundation")
+	endif()
 endif()
 
 if(NOT PROJECT_IS_TOP_LEVEL)
