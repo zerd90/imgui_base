@@ -1,4 +1,6 @@
 
+#include <algorithm>
+
 #include "imgui_common_tools.h"
 
 using std::string;

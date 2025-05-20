@@ -289,6 +289,7 @@ void ImGuiApplication::loadResources()
         mAppFontPath = R"(C:\WINDOWS\FONTS\SEGUIVAR.TTF)";
 // TODO:
 #elif defined(__linux)
+        // not sure if these fonts is always available under any linux distribution...
         mAppFontPath = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";
 #elif defined(__APPLE__)
         mAppFontPath = "/System/Library/Fonts/Supplemental/Times New Roman.ttf";
