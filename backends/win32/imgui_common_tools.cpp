@@ -10,7 +10,7 @@ template <typename T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 #endif
-
+#include "ImGuiApplication.h"
 #include "imgui_common_tools.h"
 
 using std::string;

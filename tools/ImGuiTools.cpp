@@ -122,7 +122,8 @@ void LoggerWindow::displayTexts()
     TextColorCode curColor  = ColorNone;
     bool          newLine   = true;
     float         lineWidth = 0;
-
+    ImVec2        startPos  = GetCursorScreenPos();
+    ImVec2        endPos    = startPos;
     for (auto &log : mLogs)
     {
         if (log.color != curColor)
@@ -201,6 +202,9 @@ void LoggerWindow::displayTexts()
 
     if (colorSet)
         PopStyleColor(1);
+
+    endPos      = GetCursorScreenPos();
+    mTotalLines = endPos.y - startPos.y;
 }
 
 bool positiveDirSelection(ImVec2 start, ImVec2 end)
@@ -1090,11 +1094,11 @@ void FontChooseWindow::showContent()
 
     if (mFontDisplayTexture.textureWidth > 0)
     {
-        ImVec2 cursorPos;
-        cursorPos.x = inputStartPos.x + maxItemWidth + FONT_RENDER_SPACING;
-        cursorPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.textureHeight) / 2;
+        ImVec2 fontDisplayPos;
+        fontDisplayPos.x = inputStartPos.x + maxItemWidth + FONT_RENDER_SPACING;
+        fontDisplayPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.textureHeight) / 2;
 
-        SetCursorScreenPos(cursorPos);
+        SetCursorScreenPos(fontDisplayPos);
 
         Image(mFontDisplayTexture.texture,
               ImVec2((float)mFontDisplayTexture.textureWidth, (float)mFontDisplayTexture.textureHeight));
@@ -1163,13 +1167,13 @@ void FontChooseWindow::showContent()
     ImGui::SetCursorScreenPos(showPos);
 
     mApplyButton.showDisabled(!fontChanged);
-    if (mApplyButton.isPressed())
+    if (mApplyButton.isClicked())
     {
         mConfirmWindow.open();
     }
 
     mCancelButton.show(false);
-    if (mCancelButton.isPressed())
+    if (mCancelButton.isClicked())
     {
         mNewFont = mOldFont;
 #ifdef IMGUI_ENABLE_FREETYPE
@@ -1417,7 +1421,7 @@ void ConfirmDialog::showContent()
         }
         else
             button.pButton->show(false);
-        if (button.pButton->isPressed() && button.onPressed)
+        if (button.pButton->isClicked() && button.onPressed)
             button.onPressed();
     }
 }

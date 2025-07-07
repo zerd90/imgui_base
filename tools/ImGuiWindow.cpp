@@ -274,6 +274,16 @@ bool IImGuiWindow::isMouseLeft()
     return mMouseLeft;
 }
 
+bool IImGuiWindow::isMoved()
+{
+    return mMoved;
+}
+
+bool IImGuiWindow::isResized()
+{
+    return mResized;
+}
+
 const ImVec2 &IImGuiWindow::getContentRegion()
 {
     return mContentRegionSize;
@@ -332,8 +342,29 @@ void IImGuiWindow::showContent()
 
 void IImGuiWindow::updateWindowStatus()
 {
-    mWinPos            = GetWindowPos();
-    mWinSize           = GetWindowSize();
+
+    auto winPos  = GetWindowPos();
+    auto winSize = GetWindowSize();
+    if (mWinPos != winPos)
+    {
+        mMoved  = true;
+        mWinPos = winPos;
+    }
+    else
+    {
+        mMoved = false;
+    }
+
+    if (mWinSize != winSize)
+    {
+        mResized = true;
+        mWinSize = winSize;
+    }
+    else
+    {
+        mResized = false;
+    }
+
     mContentRegionPos  = GetCursorScreenPos();
     mContentRegionSize = GetContentRegionAvail();
 

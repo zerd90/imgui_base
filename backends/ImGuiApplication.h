@@ -8,6 +8,13 @@
 #include "ImGuiTools.h"
 #include "ImGuiWindow.h"
 #include "ApplicationSetting.h"
+#define ADD_APPLICATION_LOG(fmt, ...)                                \
+    do                                                                \
+    {                                                                 \
+        char _logBuffer[1024] = {0};                                  \
+        snprintf(_logBuffer, sizeof(_logBuffer), fmt, ##__VA_ARGS__); \
+        gUserApp->addLog(_logBuffer);                                 \
+    } while (0)
 
 class ImGuiApplication : public ImGuiMainWindow
 {
@@ -83,7 +90,7 @@ protected:
     float       mAppFontSize = 15;
     int         mAppFontIdx  = 0;
 
-private:
+protected:
     bool mGuiVSync = true;
     enum GUI_THEME
     {
@@ -93,7 +100,7 @@ private:
     } mAppTheme         = THEME_LIGHT;
     bool mShowLogWindow = false;
 
-private:
+protected:
     // Not Saving
     bool mShowUIStatus = false;
 
