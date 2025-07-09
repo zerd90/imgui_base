@@ -26,7 +26,7 @@ ImGuiApplication::ImGuiApplication()
 
     mExePath = getApplicationPath();
 
-    fs::path exeDir = fs::path(utf8ToLocal(mExePath)).parent_path();
+    fs::path exeDir = fs::u8path(mExePath).parent_path();
     mConfigPath     = localToUtf8((exeDir / "Setting.ini").string());
 
 #ifdef _WIN32
@@ -35,9 +35,9 @@ ImGuiApplication::ImGuiApplication()
     mScriptPath = localToUtf8((exeDir / "script.sh").string());
 #endif
     std::error_code ec;
-    if (fs::exists(mScriptPath, ec))
+    if (fs::exists(fs::u8path(mScriptPath), ec))
     {
-        fs::remove(mScriptPath, ec);
+        fs::remove(fs::u8path(mScriptPath), ec);
     }
 
     addSetting(
