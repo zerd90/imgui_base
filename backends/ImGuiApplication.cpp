@@ -26,7 +26,7 @@ ImGuiApplication::ImGuiApplication()
 
     mExePath = getApplicationPath();
 
-    fs::path exeDir = fs::path(utf8ToLocal(mExePath)).parent_path();
+    fs::path exeDir = fs::u8path(mExePath).parent_path();
     mConfigPath     = localToUtf8((exeDir / "Setting.ini").string());
 
 #ifdef _WIN32
@@ -35,9 +35,9 @@ ImGuiApplication::ImGuiApplication()
     mScriptPath = localToUtf8((exeDir / "script.sh").string());
 #endif
     std::error_code ec;
-    if (fs::exists(mScriptPath, ec))
+    if (fs::exists(fs::u8path(mScriptPath), ec))
     {
-        fs::remove(mScriptPath, ec);
+        fs::remove(fs::u8path(mScriptPath), ec);
     }
 
     addSetting(
@@ -309,13 +309,14 @@ void ImGuiApplication::loadResources()
         fontConfig.FontNo = mAppFontIdx;
         io.Fonts->AddFontFromFileTTF(mAppFontPath.c_str(), mAppFontSize, &fontConfig,
                                      io.Fonts->GetGlyphRangesChineseFull());
+        addLog(combineString("load font: ", mAppFontPath, " index: ", std::to_string(mAppFontIdx), "\n"));
         mFontChooser.setCurrentFont(mAppFontPath, mAppFontIdx, mAppFontSize);
 
 #ifdef IMGUI_ENABLE_FREETYPE
         if (!fontSupportFullRange)
         {
             addLog("font not support full range character, use default for chinese\n");
-            ImFontConfig fontConfig;
+            memset(&fontConfig, 0, sizeof(fontConfig));
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
@@ -346,7 +347,7 @@ void ImGuiApplication::loadResources()
         if (!fontSupportEnglish)
         {
             addLog("font not support english character, use default for english\n");
-            ImFontConfig fontConfig;
+            memset(&fontConfig, 0, sizeof(fontConfig));
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,

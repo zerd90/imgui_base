@@ -678,3 +678,20 @@ void IImGuiInput::updateItemStatus()
     UPDATE_STATUS(ImGuiItemActivated, IsItemActivated());
     UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }
+void IImGuiInput::setInputBoxSize(ImVec2 size)
+{
+    if (mSpacing < 0)
+        mSpacing = ImGui::GetStyle().ItemInnerSpacing.x;
+    size.x += mSpacing + CalcTextSize(mLabel.c_str(), nullptr, true).x;
+
+    if (mManualItemSize.x != size.x || mManualItemSize.y != size.y)
+        mManualItemSize = size;
+}
+
+void IImGuiInput::setInputBoxWidth(float width)
+{
+    if (mSpacing)
+        width += mSpacing + CalcTextSize(mLabel.c_str(), nullptr, true).x;
+    if (mManualItemSize.x != width)
+        mManualItemSize.x = width;
+}

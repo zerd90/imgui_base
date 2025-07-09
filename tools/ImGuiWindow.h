@@ -64,6 +64,8 @@ public:
     bool isHovered();
     bool isMouseEntered();
     bool isMouseLeft();
+    bool isMoved();
+    bool isResized();
 
     const ImVec2 &getContentRegion();
 
@@ -107,6 +109,8 @@ protected:
     bool   mMouseEntered = false;
     bool   mMouseLeft    = false;
     bool   mFocused      = false;
+    bool   mMoved        = false;
+    bool   mResized      = false;
     ImVec2 mWinSize;
     ImVec2 mWinPos;
     ImVec2 mContentRegionPos;

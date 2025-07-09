@@ -85,7 +85,7 @@ class ImGuiButton : public IImGuiItem
 public:
     ImGuiButton();
     ImGuiButton(const std::string &label);
-    bool isPressed() { return isNativeActive(); }
+    bool isClicked() { return isNativeActive(); }
 
 protected:
     virtual bool showItem() override;
@@ -144,6 +144,8 @@ public:
 
     void         setLabelPosition(bool labelOnLeft);
     virtual void updateItemStatus() override;
+    void         setInputBoxSize(ImVec2 size);
+    void         setInputBoxWidth(float width);
 
 protected:
     virtual bool showInputItem() = 0;
@@ -215,6 +217,7 @@ using ImGuiInputInt   = ImGuiInput<int>;
 using ImGuiInputFloat = ImGuiInput<float>;
 class ImGuiInputString : public IImGuiInput
 {
+public:
     ImGuiInputString(const std::string &label, const std::string &initalValue, bool labelOnLeft = false)
         : IImGuiInput(label, labelOnLeft)
     {

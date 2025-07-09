@@ -18,6 +18,8 @@
 // Renderer Relative
 
 struct TextureData;
+#define UPDATE_TEXTURE_FROM_CV_MAT(pTexture, mat) \
+    updateImageTexture(pTexture, (mat).data, (mat).cols, (mat).rows, (int)(mat).step[0])
 bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride);
 void freeTexture(TextureData *pTexture);
 // End for Renderer Relative
@@ -103,6 +105,11 @@ typedef struct
     std::string filter; //*.xxx;*.xxx;...
     std::string description;
 } FilterSpec;
+
+const std::vector<FilterSpec> &getImageFilter();
+const std::vector<FilterSpec> &getVideoFilter();
+const std::vector<FilterSpec> &getAudioFilter();
+const std::vector<FilterSpec> &getTextFilter();
 
 std::string              selectFile(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                     const std::string             &initDirPath = std::string());
