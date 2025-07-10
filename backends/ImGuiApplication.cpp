@@ -18,8 +18,8 @@ ImGuiApplication *gUserApp = nullptr;
 
 ImGuiApplication::ImGuiApplication()
     : mLogger("Application Log"),
-      mFontChooser("Font Chooser", std::bind(&ImGuiApplication::onFontChanged, this, std::placeholders::_1,
-                                             std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+      mFontChooser("Font Chooser", std::bind(&ImGuiApplication::onFontChanged, this, std::placeholders::_1, std::placeholders::_2,
+                                             std::placeholders::_3, std::placeholders::_4))
 {
     mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
@@ -50,19 +50,22 @@ ImGuiApplication::ImGuiApplication()
         SettingValue::SettingBool, "Show Log Window", [this](const void *val) { mShowLogWindow = *((bool *)val); },
         [this](void *val) { *((bool *)val) = mShowLogWindow; });
 
-    addSetting(
-        SettingValue::SettingStr, "GUI Font Path", [this](const void *val) { mAppFontPath = (char *)val; },
-        [this](void *val)
-        {
-            char **pStr = (char **)val;
-            *pStr       = (char *)mAppFontPath.c_str();
-        });
-    addSetting(
-        SettingValue::SettingInt, "GUI Font Index", [this](const void *val) { mAppFontIdx = *((int *)val); },
-        [this](void *val) { *((int *)val) = mAppFontIdx; });
-    addSetting(
-        SettingValue::SettingFloat, "GUI Font Size", [this](const void *val) { mAppFontSize = *((float *)val); },
-        [this](void *val) { *((float *)val) = mAppFontSize; });
+    if (!mAppFontPath.empty())
+    {
+        addSetting(
+            SettingValue::SettingStr, "GUI Font Path", [this](const void *val) { mAppFontPath = (char *)val; },
+            [this](void *val)
+            {
+                char **pStr = (char **)val;
+                *pStr       = (char *)mAppFontPath.c_str();
+            });
+        addSetting(
+            SettingValue::SettingInt, "GUI Font Index", [this](const void *val) { mAppFontIdx = *((int *)val); },
+            [this](void *val) { *((int *)val) = mAppFontIdx; });
+        addSetting(
+            SettingValue::SettingFloat, "GUI Font Size", [this](const void *val) { mAppFontSize = *((float *)val); },
+            [this](void *val) { *((float *)val) = mAppFontSize; });
+    }
 
     mFontChooser.setHasCloseButton(false);
     mFontChooser.addWindowFlag(ImGuiWindowFlags_NoScrollbar);
@@ -139,8 +142,8 @@ void ImGuiApplication::preset()
 
         addMenu({"GUI", "V-Sync"}, nullptr, &mGuiVSync);
         addMenu({"GUI", "Show Status"}, nullptr, &mShowUIStatus);
-
-        addMenu({"GUI", "Font"}, [&]() { mFontChooser.open(); });
+        if (!mAppFontPath.empty())
+            addMenu({"GUI", "Font"}, [&]() { mFontChooser.open(); });
     }
     else
     {
@@ -148,8 +151,8 @@ void ImGuiApplication::preset()
     }
 }
 
-void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name,
-                                  std::function<void(const void *)> setVal, std::function<void(void *)> getVal)
+void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name, std::function<void(const void *)> setVal,
+                                  std::function<void(void *)> getVal)
 {
     mAppSettings.emplace_back(type, name, setVal, getVal);
 }
@@ -307,8 +310,7 @@ void ImGuiApplication::loadResources()
     {
         ImFontConfig fontConfig;
         fontConfig.FontNo = mAppFontIdx;
-        io.Fonts->AddFontFromFileTTF(mAppFontPath.c_str(), mAppFontSize, &fontConfig,
-                                     io.Fonts->GetGlyphRangesChineseFull());
+        io.Fonts->AddFontFromFileTTF(mAppFontPath.c_str(), mAppFontSize, &fontConfig, io.Fonts->GetGlyphRangesChineseFull());
         addLog(combineString("load font: ", mAppFontPath, " index: ", std::to_string(mAppFontIdx), "\n"));
         mFontChooser.setCurrentFont(mAppFontPath, mAppFontIdx, mAppFontSize);
 
@@ -316,7 +318,7 @@ void ImGuiApplication::loadResources()
         if (!fontSupportFullRange)
         {
             addLog("font not support full range character, use default for chinese\n");
-            memset(&fontConfig, 0, sizeof(fontConfig));
+            fontConfig = ImFontConfig();
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
@@ -326,9 +328,8 @@ void ImGuiApplication::loadResources()
                                          &fontConfig, io.Fonts->GetGlyphRangesChineseFull());
     #elif defined(__APPLE__)
             auto systemFonts = mFontChooser.getSystemFontFamilies();
-            auto familyIter =
-                std::find_if(systemFonts.begin(), systemFonts.end(),
-                             [](const FreetypeFontFamilyInfo &info) { return info.name == "PingFang SC"; });
+            auto familyIter  = std::find_if(systemFonts.begin(), systemFonts.end(),
+                                            [](const FreetypeFontFamilyInfo &info) { return info.name == "PingFang SC"; });
 
             if (familyIter != systemFonts.end())
             {
@@ -347,14 +348,14 @@ void ImGuiApplication::loadResources()
         if (!fontSupportEnglish)
         {
             addLog("font not support english character, use default for english\n");
-            memset(&fontConfig, 0, sizeof(fontConfig));
+            fontConfig = ImFontConfig();
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
                                          io.Fonts->GetGlyphRangesDefault());
     #elif defined(__linux)
-            io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf)", mAppFontSize,
-                                         &fontConfig, io.Fonts->GetGlyphRangesDefault());
+            io.Fonts->AddFontFromFileTTF(R"(/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf)", mAppFontSize, &fontConfig,
+                                         io.Fonts->GetGlyphRangesDefault());
     #elif defined(__APPLE__)
             io.Fonts->AddFontFromFileTTF(R"(mAppFontPath = "/System/Library/Fonts/Supplemental/Times New Roman.ttf")",
                                          mAppFontSize, &fontConfig, io.Fonts->GetGlyphRangesDefault());
