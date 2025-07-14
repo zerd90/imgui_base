@@ -50,7 +50,7 @@ ImGuiApplication::ImGuiApplication()
         SettingValue::SettingBool, "Show Log Window", [this](const void *val) { mShowLogWindow = *((bool *)val); },
         [this](void *val) { *((bool *)val) = mShowLogWindow; });
 
-    if (!mAppFontPath.empty())
+    if (mAppFontPath.empty())
     {
         addSetting(
             SettingValue::SettingStr, "GUI Font Path", [this](const void *val) { mAppFontPath = (char *)val; },
@@ -142,7 +142,7 @@ void ImGuiApplication::preset()
 
         addMenu({"GUI", "V-Sync"}, nullptr, &mGuiVSync);
         addMenu({"GUI", "Show Status"}, nullptr, &mShowUIStatus);
-        if (!mAppFontPath.empty())
+        if (mAppFontPath.empty())
             addMenu({"GUI", "Font"}, [&]() { mFontChooser.open(); });
     }
     else
