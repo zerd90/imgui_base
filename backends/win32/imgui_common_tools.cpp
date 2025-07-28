@@ -10,7 +10,6 @@ template <typename T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 #endif
-#include "ImGuiApplication.h"
 #include "imgui_common_tools.h"
 
 using std::string;
@@ -88,12 +87,14 @@ bool restartApplication(const string &scriptPath, const string &programPath)
     batchFile.close();
 
     std::wstring wideBatchPath = utf8ToUnicode(scriptPath);
-    STARTUPINFOW si            = {sizeof(si)};
-    si.dwFlags                 = STARTF_USESHOWWINDOW;
-    si.wShowWindow             = SW_HIDE; // 隐藏窗口
+    STARTUPINFOW si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb          = sizeof(si);
+    si.dwFlags     = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE; // 隐藏窗口
     PROCESS_INFORMATION pi;
-    if (!CreateProcessW(nullptr, const_cast<wchar_t *>(wideBatchPath.c_str()), nullptr, nullptr, FALSE, 0, nullptr,
-                        nullptr, &si, &pi))
+    if (!CreateProcessW(nullptr, const_cast<wchar_t *>(wideBatchPath.c_str()), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
+                        &pi))
     {
         fprintf(stderr, "CreateProcessW failed: %s\n", utf8ToLocal(getSystemError()).c_str());
         return false;
@@ -126,7 +127,7 @@ bool restartApplication(const string &scriptPath, const string &programPath)
         }                                                                        \
     } while (0)
 
-#define HR_CANCELED (0x800704C7L)
+#define HR_CANCELED ((HRESULT)0x800704C7L)
 
 std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc)
 {
@@ -261,7 +262,7 @@ string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultE
     if (!initDirPath.empty())
     {
         IShellItem *folder = nullptr;
-        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        hr                 = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
             pfd->SetFolder(folder);
@@ -340,7 +341,7 @@ vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const 
     if (!initDirPath.empty())
     {
         IShellItem *folder;
-        HRESULT result = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        HRESULT     result = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(result))
         {
             pfd->SetFolder(folder);
@@ -408,7 +409,7 @@ string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPa
     if (!initDirPath.empty())
     {
         IShellItem *folder = nullptr;
-        hr = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+        hr                 = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
         if (SUCCEEDED(hr))
         {
             pfd->SetFolder(folder);
@@ -501,8 +502,7 @@ std::string getStringLocalized(IDWriteLocalizedStrings *pLocalizedStrings)
     hr = pLocalizedStrings->GetStringLength(index, &nameLength);
     if (FAILED(hr))
     {
-        gLastError =
-            combineString("Failed to get string length for font family at index %u. Error: ", index, HResultToStr(hr));
+        gLastError = combineString("Failed to get string length for font family at index %u. Error: ", index, HResultToStr(hr));
         return "";
     }
 
@@ -519,8 +519,7 @@ std::string getStringLocalized(IDWriteLocalizedStrings *pLocalizedStrings)
     hr = pLocalizedStrings->GetString(index, fontName.get(), nameLength + 1);
     if (FAILED(hr))
     {
-        gLastError =
-            combineString("Failed to get string for font family at index %u. Error: ", index, HResultToStr(hr));
+        gLastError = combineString("Failed to get string for font family at index %u. Error: ", index, HResultToStr(hr));
         return "";
     }
 
@@ -571,9 +570,6 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
         ComPtr<IDWriteFontFamily>       pFontFamily  = nullptr;
         ComPtr<IDWriteLocalizedStrings> pFamilyNames = nullptr;
 
-        UINT32 index  = 0;
-        BOOL   exists = false;
-
         hr = pFontCollection->GetFontFamily(i, &pFontFamily);
         if (FAILED(hr))
         {
@@ -585,8 +581,7 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
         hr = pFontFamily->GetFamilyNames(&pFamilyNames);
         if (FAILED(hr))
         {
-            gLastError =
-                combineString("Failed to get family names for font family at index ", i, ". Error: ", HResultToStr(hr));
+            gLastError = combineString("Failed to get family names for font family at index ", i, ". Error: ", HResultToStr(hr));
             continue;
         }
 
@@ -603,8 +598,8 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
             hr = pFontFamily->GetFont(fontIdx, &pFont);
             if (FAILED(hr))
             {
-                gLastError = combineString("Failed to get font at index ", fontIdx, " in family ", i,
-                                           ". Error: ", HResultToStr(hr));
+                gLastError =
+                    combineString("Failed to get font at index ", fontIdx, " in family ", i, ". Error: ", HResultToStr(hr));
                 continue;
             }
             ComPtr<IDWriteLocalizedStrings> pFontNames = nullptr;
@@ -618,9 +613,6 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
 
             auto fontName = getStringLocalized(pFontNames.Get());
 
-            DWRITE_FONT_STYLE style = pFont->GetStyle();
-
-            DWRITE_FONT_WEIGHT      weight      = pFont->GetWeight();
             DWRITE_FONT_SIMULATIONS simulations = pFont->GetSimulations();
 
             if (simulations != DWRITE_FONT_SIMULATIONS_NONE) // not a real font
@@ -647,8 +639,8 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
             hr                                    = pFontFace->GetFiles(&numberOfFiles, pFontFile.GetAddressOf());
             if (FAILED(hr))
             {
-                gLastError = combineString("Failed to get font files for font face at index ", fontIdx, " in family ",
-                                           i, ". Error: ", HResultToStr(hr));
+                gLastError = combineString("Failed to get font files for font face at index ", fontIdx, " in family ", i,
+                                           ". Error: ", HResultToStr(hr));
                 continue;
             }
 
@@ -656,8 +648,8 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
             hr                                            = pFontFile->GetLoader(pFontFileLoader.GetAddressOf());
             if (FAILED(hr))
             {
-                gLastError = combineString("Failed to get font file loader for font file at index ", fontIdx,
-                                           " in family ", i, ". Error: ", HResultToStr(hr));
+                gLastError = combineString("Failed to get font file loader for font file at index ", fontIdx, " in family ", i,
+                                           ". Error: ", HResultToStr(hr));
                 continue;
             }
 
@@ -665,8 +657,8 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
             hr = pFontFileLoader.As(&pLocalFileLoader);
             if (FAILED(hr))
             {
-                gLastError = combineString("Failed to get local font file loader for font file at index ", fontIdx,
-                                           " in family ", i, ". Error: ", HResultToStr(hr));
+                gLastError = combineString("Failed to get local font file loader for font file at index ", fontIdx, " in family ",
+                                           i, ". Error: ", HResultToStr(hr));
                 continue;
             }
             const void *fontFileReferenceKey     = nullptr;
@@ -675,8 +667,7 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
 
             // 获取实际文件路径
             wchar_t filePath[MAX_PATH];
-            hr = pLocalFileLoader->GetFilePathFromKey(fontFileReferenceKey, fontFileReferenceKeySize, filePath,
-                                                      MAX_PATH);
+            hr = pLocalFileLoader->GetFilePathFromKey(fontFileReferenceKey, fontFileReferenceKeySize, filePath, MAX_PATH);
             if (FAILED(hr))
             {
                 gLastError = combineString("Failed to get file path for font file at index ", fontIdx, " in family ", i,
@@ -732,8 +723,7 @@ vector<FreetypeFontFamilyInfo> listSystemFonts()
         }
         if (fontInfos.size() > 0
             && std::find_if(fontFamilyInfos.begin(), fontFamilyInfos.end(),
-                            [&familyInfo](FreetypeFontFamilyInfo &existFamily)
-                            { return existFamily.name == familyInfo.name; })
+                            [&familyInfo](FreetypeFontFamilyInfo &existFamily) { return existFamily.name == familyInfo.name; })
                    == fontFamilyInfos.end())
         {
             familyInfo.fonts = fontInfos;
