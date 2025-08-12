@@ -499,6 +499,8 @@ void ImageWindow::showContent()
     Image(mTexture, winShowSize, {imgShowPos.x / imgScaleSize.x, imgShowPos.y / imgScaleSize.y},
           {(imgShowPos.x + winShowSize.x) / imgScaleSize.x, (imgShowPos.y + winShowSize.y) / imgScaleSize.y});
 
+    // TODO DrawList
+
     mDisplayInfo.scale          = mImageScale;
     mDisplayInfo.showPos.x      = mImageShowPos.x;
     mDisplayInfo.showPos.y      = mImageShowPos.y;
@@ -639,6 +641,11 @@ void ImageWindow::unlink()
     mLinkWith->mLinkWith   = nullptr;
     mLinkWith              = nullptr;
     mUnlinkCond            = []() { return false; };
+}
+
+void ImageWindow::setDrawList(std::vector<DrawParam> drawList)
+{
+    mDrawList = drawList;
 }
 
 void ImageWindow::clear()

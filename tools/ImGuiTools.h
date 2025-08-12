@@ -87,6 +87,58 @@ struct DisplayInfo
     bool   clickedOnImage = false;
 };
 
+enum DrawType
+{
+    DRAW_TYPE_LINE,
+    DRAW_TYPE_RECT,
+    DRAW_TYPE_CIRCLE,
+    DRAW_TYPE_POLYLINE,
+    DRAW_TYPE_MAX,
+};
+
+struct DRAW_LINE_PARAM
+{
+    ImVec2  startPos;
+    ImVec2  endPos;
+    float   thickness;
+    ImColor color;
+};
+
+struct DRAW_RECT_PARAM
+{
+    ImVec2  topLeft;
+    ImVec2  bottomRight;
+    float   thickness;
+    ImColor color;
+};
+
+struct DRAW_CIRCLE_PARAM
+{
+    ImVec2  center;
+    float   radius;
+    float   thickness;
+    ImColor color;
+};
+
+struct DRAW_POLYLINE_PARAM
+{
+    std::vector<ImVec2> points;
+    float               thickness;
+    ImColor             color;
+};
+
+struct DrawParam
+{
+    DrawType type;
+    union
+    {
+        DRAW_LINE_PARAM     line;
+        DRAW_RECT_PARAM     rect;
+        DRAW_CIRCLE_PARAM   circle;
+        DRAW_POLYLINE_PARAM polyline;
+    } params;
+};
+
 class ImageWindow : public IImGuiWindow
 {
 public:
@@ -105,6 +157,8 @@ public:
 
     void linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition);
     void unlink();
+
+    void setDrawList(std::vector<DrawParam> drawList);
 
 protected:
     virtual void showContent() override;
@@ -127,6 +181,8 @@ private:
 
     ImageWindow          *mLinkWith   = nullptr;
     std::function<bool()> mUnlinkCond = []() { return false; };
+
+    std::vector<DrawParam> mDrawList;
 };
 
 class ImGuiBinaryViewer : public IImGuiWindow
@@ -182,9 +238,9 @@ private:
 class FontChooseWindow : public ImGuiPopup
 {
 public:
-    FontChooseWindow(const std::string &name,
-                     const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)>
-                         onFontChanged);
+    FontChooseWindow(
+        const std::string                                                                                 &name,
+        const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)> onFontChanged);
 
     void setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize);
 
@@ -233,7 +289,6 @@ private:
     ImGuiButton   mLatterButton;
 };
 
-void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,
-               ImGuiID *outDockOppositeDir);
+void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir);
 
 #endif
