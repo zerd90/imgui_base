@@ -922,9 +922,8 @@ static void ImGui_ImplGlfw_UpdateMouseData()
     #else
         const bool is_window_focused = glfwGetWindowAttrib(window, GLFW_FOCUSED) != 0;
     #endif
-        IM_UNUSED(is_window_focused);
-        // ** I need the mouse pos when app not focused and mouse button pressed, so I comment this line
-        // if (is_window_focused)
+
+        if (is_window_focused)
         {
             // (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when
             // io.ConfigNavMoveSetMousePos is enabled by user) When multi-viewports are enabled, all Dear ImGui

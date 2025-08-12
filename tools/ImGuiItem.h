@@ -46,6 +46,8 @@ public:
     GET_STATUS_FUNC(Deactivated)
     GET_STATUS_FUNC(NativeActive)
 
+    void setToolTip(const std::string &tip);
+
 protected:
     IImGuiItem();
     virtual bool showItem() = 0;
@@ -62,6 +64,7 @@ protected:
 protected:
     bool                  mItemStatus[ImGuiItemActionButt];
     std::function<void()> mActionCallbacks[ImGuiItemActionButt];
+    std::string           mToolTip;
 };
 
 class ImGuiCheckbox : public IImGuiItem
@@ -160,9 +163,8 @@ template <typename T>
 class ImGuiInput : public IImGuiInput
 {
 public:
-    ImGuiInput(const std::string &label, T initalValue, bool labelOnLeft = false,
-               const T &min = (std::numeric_limits<T>::min)(), const T &max = (std::numeric_limits<T>::max)(),
-               const T &step = 0, const T &stepFast = 0)
+    ImGuiInput(const std::string &label, T initalValue, bool labelOnLeft = false, const T &min = (std::numeric_limits<T>::min)(),
+               const T &max = (std::numeric_limits<T>::max)(), const T &step = 0, const T &stepFast = 0)
         : IImGuiInput(label, labelOnLeft)
     {
         mValue    = initalValue;
@@ -314,11 +316,10 @@ protected:
         std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
 
         if constexpr (sliderCount > 1)
-            return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum,
-                                 mFormat, mSliderFlags);
+            return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum, mFormat,
+                                 mSliderFlags);
         else
-            return SliderScalar(showLabel.c_str(), dataType, mValues, &mValueMinimum, &mValueMaximum, mFormat,
-                                mSliderFlags);
+            return SliderScalar(showLabel.c_str(), dataType, mValues, &mValueMinimum, &mValueMaximum, mFormat, mSliderFlags);
     }
 
 private:
@@ -414,8 +415,8 @@ public:
     void clear();
     void setDataCallbacks(const std::function<size_t()>                                  &getRowCountCallback,
                           const std::function<std::string(size_t rowIdx, size_t colIdx)> &getCellCallback,
-                          const std::function<bool(size_t rowIdx, size_t colIdx)> &cellClickableCallback = nullptr,
-                          const std::function<void(size_t rowIdx, size_t colIdx)> &cellClickedCallback   = nullptr);
+                          const std::function<bool(size_t rowIdx, size_t colIdx)>        &cellClickableCallback = nullptr,
+                          const std::function<void(size_t rowIdx, size_t colIdx)>        &cellClickedCallback   = nullptr);
 
     void ScrollFreeze(int rows, int cols);
     void ScrollFreezeRows(int rows);

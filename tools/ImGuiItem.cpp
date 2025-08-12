@@ -46,6 +46,9 @@ void IImGuiItem::show(bool newLine)
     {
         mItemStatus[ImGuiItemNativeActive] = false;
     }
+    if (!mToolTip.empty())
+        SetItemTooltip("%s", mToolTip.c_str());
+
     updateItemStatus();
 }
 
@@ -100,6 +103,12 @@ void IImGuiItem::updateItemStatus()
     UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }
 
+void IImGuiItem::setToolTip(const std::string &tip)
+{
+    if (mToolTip != tip)
+        mToolTip = tip;
+}
+
 ImGuiButton::ImGuiButton() : IImGuiItem() {}
 
 ImGuiButton::ImGuiButton(const std::string &label) : IImGuiItem(label) {}
@@ -115,8 +124,8 @@ ImGuiImageButton::ImGuiImageButton() : ImGuiButton() {}
 
 bool ImGuiImageButton::showItem()
 {
-    return ImageButton(mLabel.c_str(), mImageTexture, mManualItemSize - ImGui::GetStyle().FramePadding * 2, {0, 0},
-                       {1, 1}, mBgColor, mTintColor);
+    return ImageButton(mLabel.c_str(), mImageTexture, mManualItemSize - ImGui::GetStyle().FramePadding * 2, {0, 0}, {1, 1},
+                       mBgColor, mTintColor);
 }
 void ImGuiImageButton::setImageTexture(ImTextureID texture)
 {
@@ -315,9 +324,9 @@ void ImGuiInputGroup::addInput(IImGuiInput *input)
 
 void ImGuiInputGroup::removeInput(IImGuiInput *input)
 {
-    mInputGroup.erase(std::remove_if(mInputGroup.begin(), mInputGroup.end(),
-                                     [&input](IImGuiInput *toFind) { return input == toFind; }),
-                      mInputGroup.end());
+    mInputGroup.erase(
+        std::remove_if(mInputGroup.begin(), mInputGroup.end(), [&input](IImGuiInput *toFind) { return input == toFind; }),
+        mInputGroup.end());
 }
 
 void ImGuiInputGroup::setSpacing(float spacing)
@@ -625,14 +634,12 @@ bool ImGuiItemTable::showItem()
                     {
                         if (IsMouseClicked(ImGuiMouseButton_Left))
                         {
-                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max,
-                                                                      GetColorU32(ImGuiCol_ButtonActive));
+                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max, GetColorU32(ImGuiCol_ButtonActive));
                             if (mCellClickedCallback)
                                 mCellClickedCallback(row, col);
                         }
                         else
-                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max,
-                                                                      GetColorU32(ImGuiCol_ButtonHovered));
+                            ImGui::GetWindowDrawList()->AddRectFilled(rect.Min, rect.Max, GetColorU32(ImGuiCol_ButtonHovered));
                     }
                 }
 
