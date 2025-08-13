@@ -8,21 +8,26 @@
 #include "ImGuiTools.h"
 #include "ImGuiWindow.h"
 #include "ApplicationSetting.h"
-#define ADD_APPLICATION_LOG(fmt, ...)                                \
+#define ADD_APPLICATION_LOG(fmt, ...)                                 \
     do                                                                \
     {                                                                 \
         char _logBuffer[1024] = {0};                                  \
         snprintf(_logBuffer, sizeof(_logBuffer), fmt, ##__VA_ARGS__); \
         gUserApp->addLog(_logBuffer);                                 \
     } while (0)
+#define SET_APPLICATION_STATUS(fmt, ...)                              \
+    do                                                                \
+    {                                                                 \
+        char _logBuffer[1024] = {0};                                  \
+        snprintf(_logBuffer, sizeof(_logBuffer), fmt, ##__VA_ARGS__); \
+        gUserApp->setStatus(_logBuffer);                              \
+    } while (0)
 
 class ImGuiApplication : public ImGuiMainWindow
 {
     friend void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
-    friend void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry,
-                                             const char *line);
-    friend void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler,
-                                             ImGuiTextBuffer *buf);
+    friend void  WinSettingsHandler_ReadLine(ImGuiContext *, ImGuiSettingsHandler *handler, void *entry, const char *line);
+    friend void  WinSettingsHandler_WriteAll(ImGuiContext *imgui_ctx, ImGuiSettingsHandler *handler, ImGuiTextBuffer *buf);
 
 public:
     struct ImGuiAppRect
@@ -66,8 +71,8 @@ protected:
     void addSetting(SettingValue::SettingType type, std::string name, std::function<void(const void *)> setVal,
                     std::function<void(void *)> getVal);
 
-    void addSettingArr(SettingValue::SettingType type, std::string name, int arrLen,
-                       std::function<void(const void *)> setVal, std::function<void(void *)> getVal);
+    void addSettingArr(SettingValue::SettingType type, std::string name, int arrLen, std::function<void(const void *)> setVal,
+                       std::function<void(void *)> getVal);
 
 protected:
     // Set these in presetInternal

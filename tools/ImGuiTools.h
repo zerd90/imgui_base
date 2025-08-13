@@ -1,6 +1,7 @@
 #ifndef _IMGUI_TOOLS_H_
 #define _IMGUI_TOOLS_H_
 
+#include <variant>
 #include <vector>
 #include <string>
 #include <map>
@@ -92,11 +93,13 @@ enum DrawType
     DRAW_TYPE_LINE,
     DRAW_TYPE_RECT,
     DRAW_TYPE_CIRCLE,
-    DRAW_TYPE_POLYLINE,
+    DRAW_TYPE_POLYLINE, // not closed if the last point is not the first point
+    DRAW_TYPE_POLYGON,  // closed whether the last point is the first point
+    DRAW_TYPE_TEXT,
     DRAW_TYPE_MAX,
 };
 
-struct DRAW_LINE_PARAM
+struct DrawLineParam
 {
     ImVec2  startPos;
     ImVec2  endPos;
@@ -104,7 +107,7 @@ struct DRAW_LINE_PARAM
     ImColor color;
 };
 
-struct DRAW_RECT_PARAM
+struct DrawRectParam
 {
     ImVec2  topLeft;
     ImVec2  bottomRight;
@@ -112,7 +115,7 @@ struct DRAW_RECT_PARAM
     ImColor color;
 };
 
-struct DRAW_CIRCLE_PARAM
+struct DrawCircleParam
 {
     ImVec2  center;
     float   radius;
@@ -120,23 +123,30 @@ struct DRAW_CIRCLE_PARAM
     ImColor color;
 };
 
-struct DRAW_POLYLINE_PARAM
+struct DrawPolyParam
 {
     std::vector<ImVec2> points;
     float               thickness;
     ImColor             color;
 };
+struct DrawTextParam
+{
+    std::string text;
+    ImVec2      pos;
+    float       size;
+    ImColor     color;
+};
 
 struct DrawParam
 {
     DrawType type;
-    union
-    {
-        DRAW_LINE_PARAM     line;
-        DRAW_RECT_PARAM     rect;
-        DRAW_CIRCLE_PARAM   circle;
-        DRAW_POLYLINE_PARAM polyline;
-    } params;
+
+    std::variant<DrawLineParam, DrawRectParam, DrawCircleParam, DrawPolyParam, DrawTextParam> param;
+    DrawParam(DrawType type, const DrawLineParam &line);
+    DrawParam(DrawType type, const DrawRectParam &rect);
+    DrawParam(DrawType type, const DrawCircleParam &circle);
+    DrawParam(DrawType type, const DrawPolyParam &polyline);
+    DrawParam(DrawType type, const DrawTextParam &text);
 };
 
 class ImageWindow : public IImGuiWindow
@@ -158,7 +168,7 @@ public:
     void linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition);
     void unlink();
 
-    void setDrawList(std::vector<DrawParam> drawList);
+    void setDrawList(const std::vector<DrawParam> &drawList);
 
 protected:
     virtual void showContent() override;
