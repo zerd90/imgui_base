@@ -10,6 +10,10 @@
 #include "ImGuiTools.h"
 #include "ImGuiBaseTypes.h"
 
+#ifdef IMGUI_ENABLE_FREETYPE
+#include "ImGuiApplication.h"
+#endif
+
 using std::map;
 using std::string;
 using std::string_view;
