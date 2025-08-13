@@ -1,6 +1,7 @@
 #ifndef _IMGUI_TOOLS_H_
 #define _IMGUI_TOOLS_H_
 
+#include <variant>
 #include <vector>
 #include <string>
 #include <map>
@@ -87,6 +88,67 @@ struct DisplayInfo
     bool   clickedOnImage = false;
 };
 
+enum DrawType
+{
+    DRAW_TYPE_LINE,
+    DRAW_TYPE_RECT,
+    DRAW_TYPE_CIRCLE,
+    DRAW_TYPE_POLYLINE, // not closed if the last point is not the first point
+    DRAW_TYPE_POLYGON,  // closed whether the last point is the first point
+    DRAW_TYPE_TEXT,
+    DRAW_TYPE_MAX,
+};
+
+struct DrawLineParam
+{
+    ImVec2  startPos;
+    ImVec2  endPos;
+    float   thickness;
+    ImColor color;
+};
+
+struct DrawRectParam
+{
+    ImVec2  topLeft;
+    ImVec2  bottomRight;
+    float   thickness;
+    ImColor color;
+};
+
+struct DrawCircleParam
+{
+    ImVec2  center;
+    float   radius;
+    float   thickness;
+    ImColor color;
+};
+
+struct DrawPolyParam
+{
+    std::vector<ImVec2> points;
+    float               thickness;
+    ImColor             color;
+};
+struct DrawTextParam
+{
+    std::string text;
+    ImVec2      pos;
+    float       size;
+    ImColor     color;
+};
+
+struct DrawParam
+{
+    DrawType type;
+
+    std::variant<DrawLineParam, DrawRectParam, DrawCircleParam, DrawPolyParam, DrawTextParam> param;
+    DrawParam(DrawType type, const DrawLineParam &line);
+    DrawParam(DrawType type, const DrawRectParam &rect);
+    DrawParam(DrawType type, const DrawCircleParam &circle);
+    DrawParam(DrawType type, const DrawPolyParam &polyline);
+    DrawParam(DrawType type, const DrawTextParam &text);
+};
+
 class ImageWindow : public IImGuiWindow
 {
 public:
@@ -105,6 +167,8 @@ public:
 
     void linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition);
     void unlink();
+
+    void setDrawList(const std::vector<DrawParam> &drawList);
 
 protected:
     virtual void showContent() override;
@@ -127,6 +191,8 @@ private:
 
     ImageWindow          *mLinkWith   = nullptr;
     std::function<bool()> mUnlinkCond = []() { return false; };
+
+    std::vector<DrawParam> mDrawList;
 };
 
 class ImGuiBinaryViewer : public IImGuiWindow
@@ -182,9 +248,9 @@ private:
 class FontChooseWindow : public ImGuiPopup
 {
 public:
-    FontChooseWindow(const std::string &name,
-                     const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)>
-                         onFontChanged);
+    FontChooseWindow(
+        const std::string                                                                                 &name,
+        const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)> onFontChanged);
 
     void setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize);
 
@@ -233,7 +299,6 @@ private:
     ImGuiButton   mLatterButton;
 };
 
-void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir,
-               ImGuiID *outDockOppositeDir);
+void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir);
 
 #endif

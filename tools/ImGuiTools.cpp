@@ -9,7 +9,10 @@
 #include "imgui_internal.h"
 #include "ImGuiTools.h"
 #include "ImGuiBaseTypes.h"
+
+#ifdef IMGUI_ENABLE_FREETYPE
 #include "ImGuiApplication.h"
+#endif
 
 using std::map;
 using std::string;
@@ -105,6 +108,31 @@ int getUtf8CharSize(const char *str)
             charSize++;
     }
     return charSize;
+}
+
+DrawParam::DrawParam(DrawType type, const DrawLineParam &line) : type(type), param(line)
+{
+    IM_ASSERT(type == DRAW_TYPE_LINE);
+}
+
+DrawParam::DrawParam(DrawType type, const DrawRectParam &rect) : type(type), param(rect)
+{
+    IM_ASSERT(type == DRAW_TYPE_RECT);
+}
+
+DrawParam::DrawParam(DrawType type, const DrawCircleParam &circle) : type(type), param(circle)
+{
+    IM_ASSERT(type == DRAW_TYPE_CIRCLE);
+}
+
+DrawParam::DrawParam(DrawType type, const DrawPolyParam &polyline) : type(type), param(polyline)
+{
+    IM_ASSERT(type == DRAW_TYPE_POLYLINE || type == DRAW_TYPE_POLYGON);
+}
+
+DrawParam::DrawParam(DrawType type, const DrawTextParam &text) : type(type), param(text)
+{
+    IM_ASSERT(type == DRAW_TYPE_TEXT);
 }
 
 void LoggerWindow::displayTexts()
@@ -255,8 +283,7 @@ void LoggerWindow::showContent()
         copyToClipBoard();
     }
 
-    BeginChild("Log Text", ImVec2(0, 0), ImGuiChildFlags_None,
-               ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
+    BeginChild("Log Text", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_HorizontalScrollbar);
 
     BeginChild("Log Text Content", ImVec2(mWordWrap ? 0 : mMaxLineWidth, mTotalLines), ImGuiChildFlags_None,
                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
@@ -312,10 +339,9 @@ size_t splitString(const string &str, size_t start, const vector<string> &splitS
 }
 
 static const vector<string> gSplitStrings = {
-    "\n",         "\r\n",       "\033[0m",    "\033[30m",   "\033[0;30m", "\033[1;30m", "\033[34m",
-    "\033[0;34m", "\033[1;34m", "\033[32m",   "\033[0;32m", "\033[1;32m", "\033[36m",   "\033[0;36m",
-    "\033[1;36m", "\033[31m",   "\033[0;31m", "\033[1;31m", "\033[35m",   "\033[0;35m", "\033[1;35m",
-    "\033[33m",   "\033[0;33m", "\033[1;33m", "\033[37m",   "\033[0;37m", "\033[1;37m",
+    "\n",       "\r\n",       "\033[0m",    "\033[30m", "\033[0;30m", "\033[1;30m", "\033[34m", "\033[0;34m", "\033[1;34m",
+    "\033[32m", "\033[0;32m", "\033[1;32m", "\033[36m", "\033[0;36m", "\033[1;36m", "\033[31m", "\033[0;31m", "\033[1;31m",
+    "\033[35m", "\033[0;35m", "\033[1;35m", "\033[33m", "\033[0;33m", "\033[1;33m", "\033[37m", "\033[0;37m", "\033[1;37m",
 };
 
 string_view startWithStrings(string_view srcString, const vector<string> &cmpStrings)
@@ -454,14 +480,24 @@ void ImageWindow::showContent()
                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
 
     ImVec2 winSize;
-    ImVec2 imgScaleSize;
+    ImVec2 imgScaledSize;
 
-    ImVec2 winShowSize;
-    ImVec2 imgShowPos;
+    ImVec2 imgScaledShowSize;
+    ImVec2 imgScaledShowPos;
 
     ImVec2 winShowStartPos;
     ImVec2 mousePos;
     ImVec2 winPos;
+
+    ImVec2 imgStartPosScreen;
+    auto   transImgCoord = [&](ImVec2 pos)
+    {
+        pos.x = pos.x * imgScaledSize.x / mTextureWidth;
+        pos.y = pos.y * imgScaledSize.y / mTextureHeight;
+        pos -= imgScaledShowPos;
+        pos += imgStartPosScreen;
+        return pos;
+    };
 
     if (0 == mTexture)
         goto _CHILD_OVER_;
@@ -483,21 +519,139 @@ void ImageWindow::showContent()
     {
         mImageScale = mTextureWidth / mImgBaseSize.x;
     }
-    imgScaleSize = mImgBaseSize * mImageScale;
+    imgScaledSize = mImgBaseSize * mImageScale;
 
-    mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaleSize.x - winSize.x) * mTextureWidth / imgScaleSize.x);
-    mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaleSize.y - winSize.y) * mTextureHeight / imgScaleSize.y);
+    mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaledSize.x - winSize.x) * mTextureWidth / imgScaledSize.x);
+    mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaledSize.y - winSize.y) * mTextureHeight / imgScaledSize.y);
 
-    imgShowPos.x = mImageShowPos.x * imgScaleSize.x / mTextureWidth;
-    imgShowPos.y = mImageShowPos.y * imgScaleSize.y / mTextureHeight;
+    imgScaledShowPos.x = mImageShowPos.x * imgScaledSize.x / mTextureWidth;
+    imgScaledShowPos.y = mImageShowPos.y * imgScaledSize.y / mTextureHeight;
 
-    winShowSize.x = MIN(imgScaleSize.x - imgShowPos.x, winSize.x);
-    winShowSize.y = MIN(imgScaleSize.y - imgShowPos.y, winSize.y);
+    imgScaledShowSize.x = MIN(imgScaledSize.x - imgScaledShowPos.x, winSize.x);
+    imgScaledShowSize.y = MIN(imgScaledSize.y - imgScaledShowPos.y, winSize.y);
 
-    winShowStartPos = {(winSize.x - winShowSize.x) / 2, (winSize.y - winShowSize.y) / 2};
+    winShowStartPos = {(winSize.x - imgScaledShowSize.x) / 2, (winSize.y - imgScaledShowSize.y) / 2};
     ImGui::SetCursorPos(winShowStartPos);
-    Image(mTexture, winShowSize, {imgShowPos.x / imgScaleSize.x, imgShowPos.y / imgScaleSize.y},
-          {(imgShowPos.x + winShowSize.x) / imgScaleSize.x, (imgShowPos.y + winShowSize.y) / imgScaleSize.y});
+    imgStartPosScreen = GetCursorScreenPos();
+    Image(mTexture, imgScaledShowSize, {mImageShowPos.x / mTextureWidth, mImageShowPos.y / mTextureHeight}, // normalize to [0, 1]
+          {(imgScaledShowPos.x + imgScaledShowSize.x) / imgScaledSize.x,
+           (imgScaledShowPos.y + imgScaledShowSize.y) / imgScaledSize.y});
+
+    for (auto &param : mDrawList)
+    {
+        switch (param.type)
+        {
+            default:
+                break;
+            case DRAW_TYPE_RECT:
+            {
+                if (auto pval = std::get_if<DrawRectParam>(&param.param))
+                {
+                    ImVec2 topLeft     = transImgCoord(pval->topLeft);
+                    ImVec2 bottomRight = transImgCoord(pval->bottomRight);
+                    if (pval->thickness > 0)
+                    {
+                        float thickness = pval->thickness * mImageScale;
+                        ImGui::GetWindowDrawList()->AddRect(topLeft, bottomRight, pval->color, 1, 0, thickness);
+                    }
+                    else
+                    {
+                        ImGui::GetWindowDrawList()->AddRectFilled(topLeft, bottomRight, pval->color, 1);
+                    }
+                }
+                break;
+            }
+            case DRAW_TYPE_LINE:
+            {
+                if (auto pval = std::get_if<DrawLineParam>(&param.param))
+                {
+                    ImVec2 start     = transImgCoord(pval->startPos);
+                    ImVec2 end       = transImgCoord(pval->endPos);
+                    float  thickness = pval->thickness * mImageScale;
+                    if (thickness < 0)
+                        thickness = 1;
+                    ImGui::GetWindowDrawList()->AddLine(start, end, pval->color, thickness);
+                }
+                break;
+            }
+            case DRAW_TYPE_CIRCLE:
+            {
+                if (auto pval = std::get_if<DrawCircleParam>(&param.param))
+                {
+                    ImVec2 center = transImgCoord(pval->center);
+                    float  radius = pval->radius * mImageScale;
+                    if (pval->thickness > 0)
+                    {
+                        float thickness = pval->thickness * mImageScale;
+                        ImGui::GetWindowDrawList()->AddCircle(center, radius, pval->color, 0, thickness);
+                    }
+                    else
+                    {
+                        ImGui::GetWindowDrawList()->AddCircleFilled(center, radius, pval->color);
+                    }
+                }
+                break;
+            }
+            case DRAW_TYPE_POLYLINE:
+            {
+                if (auto pval = std::get_if<DrawPolyParam>(&param.param))
+                {
+                    vector<ImVec2> points;
+                    points.reserve(pval->points.size());
+                    for (auto &point : pval->points)
+                    {
+                        points.push_back(transImgCoord(point));
+                    }
+                    float thickness = pval->thickness * mImageScale;
+                    if (thickness < 0)
+                        thickness = 1;
+
+                    ImGui::GetWindowDrawList()->AddPolyline(points.data(), (int)points.size(), pval->color, 0, thickness);
+                }
+
+                break;
+            }
+            case DRAW_TYPE_POLYGON:
+            {
+                if (auto pval = std::get_if<DrawPolyParam>(&param.param))
+                {
+                    vector<ImVec2> points;
+                    points.reserve(pval->points.size() + 1);
+                    for (auto &point : pval->points)
+                    {
+                        points.push_back(transImgCoord(point));
+                    }
+                    if (points.back() != points.front())
+                        points.push_back(points.front());
+
+                    if (pval->thickness > 0)
+                    {
+                        float thickness = pval->thickness * mImageScale;
+                        ImGui::GetWindowDrawList()->AddPolyline(points.data(), (int)points.size(), pval->color, 0, thickness);
+                    }
+                    else
+                    {
+                        ImGui::GetWindowDrawList()->AddConvexPolyFilled(points.data(), (int)points.size(), pval->color);
+                    }
+                }
+                break;
+            }
+            case DRAW_TYPE_TEXT:
+            {
+                if (auto pval = std::get_if<DrawTextParam>(&param.param))
+                {
+                    ImVec2  pos  = transImgCoord(pval->pos);
+                    ImFont *font = ImGui::GetFont();
+                    float   size = pval->size * mImageScale;
+                    if (size < 0)
+                        size = 0;
+                    ImGui::GetWindowDrawList()->AddText(font, size, pos, pval->color, pval->text.c_str());
+                }
+                break;
+            }
+        }
+    }
+    // TODO DrawList
 
     mDisplayInfo.scale          = mImageScale;
     mDisplayInfo.showPos.x      = mImageShowPos.x;
@@ -522,12 +676,11 @@ void ImageWindow::showContent()
     {
         ImVec2 mousePosInWin        = mousePos - winPos;
         ImVec2 mousePosInImageShow  = mousePosInWin - winShowStartPos;
-        mousePosInImageShow.x       = ROUND(0, mousePosInImageShow.x, winShowSize.x);
-        mousePosInImageShow.y       = ROUND(0, mousePosInImageShow.y, winShowSize.y);
-        ImVec2 mousePosInImageScale = mousePosInImageShow + imgShowPos;
-        mDisplayInfo.mousePos.x = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaleSize.x, mTextureWidth - 1);
-        mDisplayInfo.mousePos.y =
-            ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaleSize.y, mTextureHeight - 1);
+        mousePosInImageShow.x       = ROUND(0, mousePosInImageShow.x, imgScaledShowSize.x);
+        mousePosInImageShow.y       = ROUND(0, mousePosInImageShow.y, imgScaledShowSize.y);
+        ImVec2 mousePosInImageScale = mousePosInImageShow + imgScaledShowPos;
+        mDisplayInfo.mousePos.x     = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaledSize.x, mTextureWidth - 1);
+        mDisplayInfo.mousePos.y     = ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaledSize.y, mTextureHeight - 1);
     }
 
     if (IsKeyDown(ImGuiKey_MouseWheelY))
@@ -639,6 +792,11 @@ void ImageWindow::unlink()
     mLinkWith->mLinkWith   = nullptr;
     mLinkWith              = nullptr;
     mUnlinkCond            = []() { return false; };
+}
+
+void ImageWindow::setDrawList(const std::vector<DrawParam> &drawList)
+{
+    mDrawList = drawList;
 }
 
 void ImageWindow::clear()
@@ -820,15 +978,15 @@ void ImGuiBinaryViewer::showContent()
 
         scrollMax *= 1000;
         mScrollPos *= 1000;
-        ImGui::ScrollbarEx(scrollbar_rect, scrollbar_id, (ImGuiAxis)ImGuiAxis_Y, &mScrollPos, scroll_visible_size,
-                           scrollMax, ImDrawFlags_RoundCornersAll);
+        ImGui::ScrollbarEx(scrollbar_rect, scrollbar_id, (ImGuiAxis)ImGuiAxis_Y, &mScrollPos, scroll_visible_size, scrollMax,
+                           ImDrawFlags_RoundCornersAll);
         mScrollPos /= 1000;
     }
 
     // draw header color
     ImVec2 contentStartPos = GetCursorScreenPos();
     ImVec2 startPos        = contentStartPos + ImVec2(indexLength + spaceLength / 2, 0);
-    ImVec2 endPos = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 endPos          = startPos + ImVec2(showBytes * (byteLength + spaceLength), GetTextLineHeight() + spaceSize.y / 2);
     GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
     startPos = contentStartPos + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
@@ -839,8 +997,7 @@ void ImGuiBinaryViewer::showContent()
     for (int j = 1; j < showBytes; j += 2)
     {
         startPos = contentStartPos
-                 + ImVec2(indexLength + j * (byteLength + spaceLength) + spaceLength / 2,
-                          GetTextLineHeight() + spaceSize.y / 2);
+                 + ImVec2(indexLength + j * (byteLength + spaceLength) + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
         endPos = startPos + ImVec2(byteLength + spaceLength, (GetTextLineHeight() + spaceSize.y) * showLineCount);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, oddLineColor);
     }
@@ -859,9 +1016,9 @@ void ImGuiBinaryViewer::showContent()
 
         ImS64 offLine = offsetLine - mScrollPos;
 
-        startPos = contentStartPos
-                 + ImVec2(-spaceLength / 2,
-                          GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
+        startPos =
+            contentStartPos
+            + ImVec2(-spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2 + offLine * (GetTextLineHeight() + spaceSize.y));
         endPos = startPos + ImVec2(indexLength + spaceLength, GetTextLineHeight() + spaceSize.y);
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
 
@@ -903,8 +1060,7 @@ void ImGuiBinaryViewer::showContent()
                 showText.push_back('.');
             }
         }
-        auto textPos =
-            curPos + ImVec2(TEXT_GAP + spaceLength / 2 + indexLength + (spaceLength + byteLength) * showBytes, 0);
+        auto textPos = curPos + ImVec2(TEXT_GAP + spaceLength / 2 + indexLength + (spaceLength + byteLength) * showBytes, 0);
         if (i == offsetLine && offsetByte < showText.length())
         {
             startPos = textPos + ImVec2(offsetByte * letterWidth, 0);
@@ -922,8 +1078,7 @@ void ImGuiBinaryViewer::showContent()
         }
     }
 
-    ImVec2 byteViewStartPos =
-        contentStartPos + ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
+    ImVec2 byteViewStartPos = contentStartPos + ImVec2(indexLength + spaceLength / 2, GetTextLineHeight() + spaceSize.y / 2);
     ImVec2 textViewStartPos = byteViewStartPos + ImVec2(TEXT_GAP + (spaceLength + byteLength) * showBytes, 0);
     if (IsWindowHovered())
     {
@@ -934,8 +1089,8 @@ void ImGuiBinaryViewer::showContent()
 
             ImVec2 ByteViewOffset = mousePos - byteViewStartPos;
             ImVec2 textViewOffset = mousePos - textViewStartPos;
-            if (ByteViewOffset.x >= 0 && ByteViewOffset.x < showBytes * (byteLength + spaceLength)
-                && ByteViewOffset.y >= 0 && ByteViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
+            if (ByteViewOffset.x >= 0 && ByteViewOffset.x < showBytes * (byteLength + spaceLength) && ByteViewOffset.y >= 0
+                && ByteViewOffset.y < lines * (GetTextLineHeight() + spaceSize.y))
             {
                 mSelectOffset = ((int)(ByteViewOffset.y / (GetTextLineHeight() + spaceSize.y)) + mScrollPos) * showBytes
                               + (int)(ByteViewOffset.x / (byteLength + spaceLength));
@@ -986,10 +1141,9 @@ FontChooseWindow::FontChooseWindow(
 #ifdef IMGUI_ENABLE_FREETYPE
       mFontFamiliesCombo("##font Families"), mFontStylesCombo("##font style"),
 #endif
-      mFontSizeInput("##Font Size", DEF_FONT_SIZE, false, MIN_FONT_SIZE, MAX_FONT_SIZE, 0.5, 1.0),
-      mApplyButton("Apply"), mCancelButton("Cancel"),
-      mConfirmWindow("Apply Font", "Restart Application To Apply New Font"), mRestartButton("Restart Now"),
-      mLatterButton("Restart Latter")
+      mFontSizeInput("##Font Size", DEF_FONT_SIZE, false, MIN_FONT_SIZE, MAX_FONT_SIZE, 0.5, 1.0), mApplyButton("Apply"),
+      mCancelButton("Cancel"), mConfirmWindow("Apply Font", "Restart Application To Apply New Font"),
+      mRestartButton("Restart Now"), mLatterButton("Restart Latter")
 {
     mWindowFlags |= ImGuiWindowFlags_NoResize;
     mManualSizeCond = ImGuiCond_Always;
@@ -1018,8 +1172,7 @@ FontChooseWindow::FontChooseWindow(
         sortFonts(mSystemFontFamilies);
         for (int i = 0; i < mSystemFontFamilies.size(); i++)
         {
-            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName + "##"
-                                                        + mSystemFontFamilies[i].name);
+            mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName + "##" + mSystemFontFamilies[i].name);
         }
         updateFontStyles();
     }
@@ -1075,8 +1228,7 @@ void FontChooseWindow::showContent()
         mFontSelect.setItemWidth(displaySize.x + 50);
     }
 
-    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx
-        || mNewFont.fontSize != mOldFont.fontSize)
+    if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx || mNewFont.fontSize != mOldFont.fontSize)
     {
         fontChanged = true;
     }
@@ -1361,8 +1513,7 @@ void FontChooseWindow::updateFontDisplayTexture()
     FT_Done_FreeType(ftLibrary);
 }
 #endif // IMGUI_ENABLE_FREETYPE
-ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message)
-    : ImGuiPopup(title), mMessage(message)
+ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message) : ImGuiPopup(title), mMessage(message)
 {
     mWindowFlags |= ImGuiWindowFlags_NoResize;
     mManualSizeCond = ImGuiCond_Always;

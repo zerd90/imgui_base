@@ -235,7 +235,8 @@ protected:
         std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
 
         bool res = ImGui::InputText(
-            showLabel.c_str(), (char *)mValue.c_str(), mValue.capacity() + 1, ImGuiInputTextFlags_CallbackResize,
+            showLabel.c_str(), (char *)mValue.c_str(), mValue.capacity() + 1,
+            ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
             [](ImGuiInputTextCallbackData *data)
             {
                 std::string *valueString = (std::string *)data->UserData;
