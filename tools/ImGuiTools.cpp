@@ -499,6 +499,12 @@ void ImageWindow::showContent()
         return pos;
     };
 
+    auto transThickness = [&](float thickness)
+    {
+        return thickness * imgScaledSize.x / mTextureWidth;
+    };
+
+
     if (0 == mTexture)
         goto _CHILD_OVER_;
 
@@ -551,7 +557,7 @@ void ImageWindow::showContent()
                     ImVec2 bottomRight = transImgCoord(pval->bottomRight);
                     if (pval->thickness > 0)
                     {
-                        float thickness = pval->thickness * mImageScale;
+                        float thickness = transThickness(pval->thickness);
                         ImGui::GetWindowDrawList()->AddRect(topLeft, bottomRight, pval->color, 1, 0, thickness);
                     }
                     else
@@ -567,7 +573,7 @@ void ImageWindow::showContent()
                 {
                     ImVec2 start     = transImgCoord(pval->startPos);
                     ImVec2 end       = transImgCoord(pval->endPos);
-                    float  thickness = pval->thickness * mImageScale;
+                    float  thickness = transThickness(pval->thickness);
                     if (thickness < 0)
                         thickness = 1;
                     ImGui::GetWindowDrawList()->AddLine(start, end, pval->color, thickness);
@@ -582,7 +588,7 @@ void ImageWindow::showContent()
                     float  radius = pval->radius * mImageScale;
                     if (pval->thickness > 0)
                     {
-                        float thickness = pval->thickness * mImageScale;
+                        float thickness = transThickness(pval->thickness);
                         ImGui::GetWindowDrawList()->AddCircle(center, radius, pval->color, 0, thickness);
                     }
                     else
@@ -602,7 +608,7 @@ void ImageWindow::showContent()
                     {
                         points.push_back(transImgCoord(point));
                     }
-                    float thickness = pval->thickness * mImageScale;
+                    float thickness = transThickness(pval->thickness);
                     if (thickness < 0)
                         thickness = 1;
 
@@ -626,7 +632,7 @@ void ImageWindow::showContent()
 
                     if (pval->thickness > 0)
                     {
-                        float thickness = pval->thickness * mImageScale;
+                        float thickness = transThickness(pval->thickness);
                         ImGui::GetWindowDrawList()->AddPolyline(points.data(), (int)points.size(), pval->color, 0, thickness);
                     }
                     else
