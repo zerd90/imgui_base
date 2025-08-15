@@ -648,7 +648,7 @@ void ImageWindow::showContent()
                 {
                     ImVec2  pos  = transImgCoord(pval->pos);
                     ImFont *font = ImGui::GetFont();
-                    float   size = pval->size * mImageScale;
+                    float   size = pval->size * imgScaledSize.x / mTextureWidth;
                     if (size < 0)
                         size = 0;
                     ImGui::GetWindowDrawList()->AddText(font, size, pos, pval->color, pval->text.c_str());
