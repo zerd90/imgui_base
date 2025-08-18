@@ -227,6 +227,15 @@ bool IImGuiInput::showItem()
 {
     if (mSpacing < 0)
         mSpacing = ImGui::GetStyle().ItemInnerSpacing.x;
+    if (mRefreshItemSize)
+    {
+        ImVec2 size = mManualItemSize;
+        size.x += mSpacing + CalcTextSize(mLabel.c_str(), nullptr, true).x;
+
+        if (mManualItemSize.x != size.x || mManualItemSize.y != size.y)
+            mManualItemSize = size;
+        mRefreshItemSize = false;
+    }
 
     if (mLabelOnLeft)
     {
@@ -687,6 +696,13 @@ void IImGuiInput::updateItemStatus()
 }
 void IImGuiInput::setInputBoxSize(ImVec2 size)
 {
+    if (ImGui::GetFont() == nullptr)
+    {
+        mManualItemSize  = size;
+        mRefreshItemSize = true;
+        return;
+    }
+
     if (mSpacing < 0)
         mSpacing = ImGui::GetStyle().ItemInnerSpacing.x;
     size.x += mSpacing + CalcTextSize(mLabel.c_str(), nullptr, true).x;

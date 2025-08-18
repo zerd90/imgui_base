@@ -1104,8 +1104,11 @@ static void ImGui_ImplOpenGL3_ShutdownMultiViewportSupport()
     ImGui::DestroyPlatformWindows();
 }
 
-bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
+namespace ImGui
 {
+
+    bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
+    {
     #define DO_NOTING \
         do            \
         {             \
@@ -1121,39 +1124,39 @@ bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int
             }                                                                 \
         } while (0)
 
-    GLint  last_texture;
-    GLuint texture = 0;
-    if (pTexture->texture != 0)
-        freeTexture(pTexture);
+        GLint  last_texture;
+        GLuint texture = 0;
+        if (pTexture->texture != 0)
+            freeTexture(pTexture);
 
-    GL_CALL(glGenTextures(1, &texture));
-    if (0 == texture)
-        return false;
-    GL_CALL(glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
-    GL_CALL(glBindTexture(GL_TEXTURE_2D, texture));
-    GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-    GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-    GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
-    GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
-    pTexture->textureWidth  = width;
-    pTexture->textureHeight = height;
-    pTexture->texture       = (ImTextureID)(intptr_t)texture;
+        GL_CALL(glGenTextures(1, &texture));
+        if (0 == texture)
+            return false;
+        GL_CALL(glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
+        GL_CALL(glBindTexture(GL_TEXTURE_2D, texture));
+        GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+        GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+        GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+        GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+        pTexture->textureWidth  = width;
+        pTexture->textureHeight = height;
+        pTexture->texture       = (ImTextureID)(intptr_t)texture;
 
-    GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, stride / 4, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaData));
-    ERROR_CHECK(DO_NOTING);
-    GL_CALL(glBindTexture(GL_TEXTURE_2D, last_texture));
+        GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, stride / 4, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgbaData));
+        ERROR_CHECK(DO_NOTING);
+        GL_CALL(glBindTexture(GL_TEXTURE_2D, last_texture));
 
-    return true;
-}
-void freeTexture(TextureData *pTexture)
-{
-    if (!pTexture)
-        return;
-    GLuint texture = (GLuint)pTexture->texture;
-    GL_CALL(glDeleteTextures(1, &texture));
-    ERROR_CHECK(DO_NOTING);
-}
-
+        return true;
+    }
+    void freeTexture(TextureData *pTexture)
+    {
+        if (!pTexture)
+            return;
+        GLuint texture = (GLuint)pTexture->texture;
+        GL_CALL(glDeleteTextures(1, &texture));
+        ERROR_CHECK(DO_NOTING);
+    }
+} // namespace ImGui
 //-----------------------------------------------------------------------------
 
     #if defined(__GNUC__)

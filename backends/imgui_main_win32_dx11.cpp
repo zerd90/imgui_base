@@ -14,6 +14,8 @@
 #include "imgui_impl_win32.h"
 #include "ImGuiApplication.h"
 
+using namespace ImGui;
+
 // Data
 static ID3D11Device           *g_pd3dDevice        = nullptr;
 static ID3D11DeviceContext    *g_pd3dDeviceContext = nullptr;

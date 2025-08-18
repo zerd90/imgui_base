@@ -14,6 +14,8 @@
 using std::string;
 namespace fs = std::filesystem;
 
+using namespace ImGui;
+
 ImGuiApplication *gUserApp = nullptr;
 
 ImGuiApplication::ImGuiApplication()
@@ -318,7 +320,7 @@ void ImGuiApplication::loadResources()
         if (!fontSupportFullRange)
         {
             addLog("font not support full range character, use default for chinese\n");
-            fontConfig = ImFontConfig();
+            fontConfig           = ImFontConfig();
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
@@ -348,7 +350,7 @@ void ImGuiApplication::loadResources()
         if (!fontSupportEnglish)
         {
             addLog("font not support english character, use default for english\n");
-            fontConfig = ImFontConfig();
+            fontConfig           = ImFontConfig();
             fontConfig.MergeMode = true;
     #ifdef _WIN32
             io.Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\simhei.ttf)", mAppFontSize, &fontConfig,
