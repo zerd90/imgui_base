@@ -1693,50 +1693,52 @@ static void ImGui_ImplWin32_ShutdownMultiViewportSupport()
     ImGui::DestroyPlatformWindows();
 }
 
+namespace ImGui
+{
+    ImRect getDisplayWorkArea()
+    {
+        RECT rect;
+        SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
+        int cx = rect.right - rect.left;
+        int cy = rect.bottom - rect.top;
+        printf("getDisplayWorkArea: %d %d\n", cx, cy);
+        return ImRect((float)rect.left, (float)rect.top, (float)cx, (float)cy);
+    }
+    HWND getMainWindow()
+    {
+        auto bd = ImGui_ImplWin32_GetBackendData();
+        IM_ASSERT(bd != nullptr && bd->hWnd != 0);
+        return bd->hWnd;
+    }
 
-ImRect getDisplayWorkArea()
-{
-    RECT rect;
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
-    int cx = rect.right - rect.left;
-    int cy = rect.bottom - rect.top;
-    printf("getDisplayWorkArea: %d %d\n", cx, cy);
-    return ImRect((float)rect.left, (float)rect.top, (float)cx, (float)cy);
-}
-HWND getMainWindow()
-{
-    auto bd = ImGui_ImplWin32_GetBackendData();
-    IM_ASSERT(bd != nullptr && bd->hWnd != 0);
-    return bd->hWnd;
-}
+    ImRect maximizeMainWindow()
+    {
+        HWND   hwnd     = getMainWindow();
+        ImRect wordArea = getDisplayWorkArea();
+        MoveWindow(hwnd, (int)wordArea.GetTL().x, (int)wordArea.GetTL().y, (int)wordArea.GetSize().x, (int)wordArea.GetSize().y,
+                   false);
+        return wordArea;
+    }
+    void normalizeApplication(const ImRect &winRect)
+    {
+        HWND hwnd = getMainWindow();
+        MoveWindow(hwnd, (int)winRect.GetTL().x, (int)winRect.GetTL().y, (int)winRect.GetSize().x, (int)winRect.GetSize().y,
+                   false);
+    }
 
-ImRect maximizeMainWindow()
-{
-    HWND hwnd = getMainWindow();
-    ImRect wordArea = getDisplayWorkArea();
-    MoveWindow(hwnd, (int)wordArea.GetTL().x, (int)wordArea.GetTL().y, (int)wordArea.GetSize().x,
-               (int)wordArea.GetSize().y, false);
-    return wordArea;
-}
-void normalizeApplication(const ImRect &winRect)
-{
-    HWND hwnd = getMainWindow();
-    MoveWindow(hwnd, (int)winRect.GetTL().x, (int)winRect.GetTL().y, (int)winRect.GetSize().x, (int)winRect.GetSize().y,
-               false);
-}
+    void minimizeMainWindow()
+    {
+        HWND hwnd = getMainWindow();
+        ShowWindow(hwnd, SW_MINIMIZE);
+    }
 
-void minimizeMainWindow()
-{
-    HWND hwnd = getMainWindow();
-    ShowWindow(hwnd, SW_MINIMIZE);
-}
-
-void setApplicationTitle(const std::string &title)
-{
-    ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;
-    IM_ASSERT(vd->Hwnd != 0);
-    ::SetWindowTextA(vd->Hwnd, utf8ToLocal(title).c_str());
-}
+    void setApplicationTitle(const std::string &title)
+    {
+        ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;
+        IM_ASSERT(vd->Hwnd != 0);
+        ::SetWindowTextA(vd->Hwnd, utf8ToLocal(title).c_str());
+    }
+} // namespace ImGui
 //---------------------------------------------------------------------------------------------------------
 
     #if defined(__GNUC__)

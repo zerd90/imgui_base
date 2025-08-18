@@ -56,6 +56,8 @@
         #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__);
     #endif
 
+using namespace ImGui;
+
 // DirectX11 data
 struct ImGui_ImplDX11_Data
 {
@@ -221,9 +223,9 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData *draw_data)
         float                        T               = draw_data->DisplayPos.y;
         float                        B               = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
         float                        mvp[4][4]       = {
-            {   2.0f / (R - L),              0.0f, 0.0f, 0.0f},
-            {             0.0f,    2.0f / (T - B), 0.0f, 0.0f},
-            {             0.0f,              0.0f, 0.5f, 0.0f},
+            {2.0f / (R - L),    0.0f,              0.0f, 0.0f},
+            {0.0f,              2.0f / (T - B),    0.0f, 0.0f},
+            {0.0f,              0.0f,              0.5f, 0.0f},
             {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
         };
         memcpy(&constant_buffer->mvp, mvp, sizeof(mvp));
@@ -503,9 +505,9 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
 
         // Create the input layout
         D3D11_INPUT_ELEMENT_DESC local_layout[] = {
-            {"POSITION", 0,   DXGI_FORMAT_R32G32_FLOAT, 0, (UINT)offsetof(ImDrawVert, pos), D3D11_INPUT_PER_VERTEX_DATA, 0},
-            {"TEXCOORD", 0,   DXGI_FORMAT_R32G32_FLOAT, 0, (UINT)offsetof(ImDrawVert,  uv), D3D11_INPUT_PER_VERTEX_DATA, 0},
-            {   "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, (UINT)offsetof(ImDrawVert, col), D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT,   0, (UINT)offsetof(ImDrawVert, pos), D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,   0, (UINT)offsetof(ImDrawVert, uv),  D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, (UINT)offsetof(ImDrawVert, col), D3D11_INPUT_PER_VERTEX_DATA, 0},
         };
         if (bd->pd3dDevice->CreateInputLayout(local_layout, 3, vertexShaderBlob->GetBufferPointer(),
                                               vertexShaderBlob->GetBufferSize(), &bd->pInputLayout)
@@ -937,64 +939,66 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     return 0;
 }
 
-bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
+namespace ImGui
 {
-    ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
-    if (!bd || !bd->pd3dDeviceContext || !pTexture || !rgbaData || width <= 0 || height <= 0)
+    bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
     {
-        dbg("null\n");
-        return false;
-    }
-
-    ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)pTexture->texture;
-    ID3D11Texture2D          *nativeTexture = nullptr;
-    if (texSRV)
-        texSRV->GetResource((ID3D11Resource **)&nativeTexture);
-    do
-    {
-        if (!nativeTexture)
-            break;
-
-        D3D11_TEXTURE2D_DESC desc;
-        nativeTexture->GetDesc(&desc);
-        if (desc.Width != (UINT)width || desc.Height != (UINT)height)
+        ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
+        if (!bd || !bd->pd3dDeviceContext || !pTexture || !rgbaData || width <= 0 || height <= 0)
         {
-            SAFE_RELEASE_RES(texSRV);
-            SAFE_RELEASE_RES(nativeTexture);
-        }
-    } while (0);
-
-    if (!texSRV || !nativeTexture)
-    {
-        SAFE_RELEASE_RES(texSRV);
-        SAFE_RELEASE_RES(nativeTexture);
-        if (createImageTexture(&nativeTexture, &texSRV, width, height) < 0)
-        {
-            dbg("createImageTexture fail\n");
-            SAFE_RELEASE_RES(texSRV);
-            SAFE_RELEASE_RES(nativeTexture);
-            ZeroMemory(pTexture, sizeof(*pTexture));
+            dbg("null\n");
             return false;
         }
+
+        ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)pTexture->texture;
+        ID3D11Texture2D          *nativeTexture = nullptr;
+        if (texSRV)
+            texSRV->GetResource((ID3D11Resource **)&nativeTexture);
+        do
+        {
+            if (!nativeTexture)
+                break;
+
+            D3D11_TEXTURE2D_DESC desc;
+            nativeTexture->GetDesc(&desc);
+            if (desc.Width != (UINT)width || desc.Height != (UINT)height)
+            {
+                SAFE_RELEASE_RES(texSRV);
+                SAFE_RELEASE_RES(nativeTexture);
+            }
+        } while (0);
+
+        if (!texSRV || !nativeTexture)
+        {
+            SAFE_RELEASE_RES(texSRV);
+            SAFE_RELEASE_RES(nativeTexture);
+            if (createImageTexture(&nativeTexture, &texSRV, width, height) < 0)
+            {
+                dbg("createImageTexture fail\n");
+                SAFE_RELEASE_RES(texSRV);
+                SAFE_RELEASE_RES(nativeTexture);
+                ZeroMemory(pTexture, sizeof(*pTexture));
+                return false;
+            }
+        }
+
+        bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, rgbaData, (UINT)stride, 0);
+
+        pTexture->texture       = (ImTextureID)texSRV;
+        pTexture->textureWidth  = width;
+        pTexture->textureHeight = height;
+        SAFE_RELEASE_RES(nativeTexture);
+
+        return true;
     }
 
-    bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, rgbaData, (UINT)stride, 0);
-
-    pTexture->texture       = (ImTextureID)texSRV;
-    pTexture->textureWidth  = width;
-    pTexture->textureHeight = height;
-    SAFE_RELEASE_RES(nativeTexture);
-
-    return true;
-}
-
-void freeTexture(TextureData *pTexture)
-{
-    ID3D11ShaderResourceView *texSRV = (ID3D11ShaderResourceView *)pTexture->texture;
-    SAFE_RELEASE_RES(texSRV);
-    pTexture->texture = 0;
-}
-
+    void freeTexture(TextureData *pTexture)
+    {
+        ID3D11ShaderResourceView *texSRV = (ID3D11ShaderResourceView *)pTexture->texture;
+        SAFE_RELEASE_RES(texSRV);
+        pTexture->texture = 0;
+    }
+} // namespace ImGui
 //-----------------------------------------------------------------------------
 
 #endif // #ifndef IMGUI_DISABLE
