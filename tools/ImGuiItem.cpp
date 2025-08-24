@@ -101,6 +101,34 @@ void IImGuiItem::updateItemStatus()
     UPDATE_STATUS(ImGuiItemActive, IsItemActive());
     UPDATE_STATUS(ImGuiItemActivated, IsItemActivated());
     UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
+
+    if (mItemStatus[ImGuiItemHovered])
+    {
+        if (mLastHoveredTime == 0)
+            mLastHoveredTime = GetTime();
+    }
+    else
+    {
+        mLastHoveredTime = 0;
+    }
+    if(mItemStatus[ImGuiItemActivated])
+        mLastActiveTime = GetTime();
+    if(mItemStatus[ImGuiItemDeactivated])
+        mLastDeactiveTime = GetTime();
+}
+
+bool IImGuiItem::isHoveredFor(uint32_t timeMs)
+{
+    return mItemStatus[ImGuiItemHovered] && (GetTime() - mLastHoveredTime) * 1000 >= timeMs;
+}
+
+bool IImGuiItem::isActiveFor(uint32_t timeMs)
+{
+    return mItemStatus[ImGuiItemActive] && (GetTime() - mLastActiveTime) * 1000 >= timeMs;
+}
+bool IImGuiItem::isDeactiveFor(uint32_t timeMs)
+{
+    return !mItemStatus[ImGuiItemActive] && (GetTime() - mLastDeactiveTime) * 1000 >= timeMs;
 }
 
 void IImGuiItem::setToolTip(const std::string &tip)
