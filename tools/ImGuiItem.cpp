@@ -268,7 +268,7 @@ bool IImGuiInput::showItem()
     if (mLabelOnLeft)
     {
         ImVec2 pos = GetCursorScreenPos();
-        SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
+        // SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
         string label = mLabel;
 
         if (label.find("##") != string::npos)
@@ -334,7 +334,7 @@ bool ImGuiInputCombo::showInputItem()
     ComboTag lastSelect = mCurrSelect;
 
     string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
-    if (BeginCombo(showLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str()))
+    if (BeginCombo(showLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str(), mComboFlags))
     {
         for (auto &item : mSelects)
         {
