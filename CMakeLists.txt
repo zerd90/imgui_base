@@ -14,7 +14,7 @@ option(COMPILE_DEMO "Compile Demo" OFF)
 option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
 message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 
-if(${RENDER} STREQUAL "")
+if("${RENDER}" STREQUAL "")
 	if(CMAKE_SYSTEM_NAME MATCHES Windows)
 		SET(RENDER WIN32_DX11)
 	else()
