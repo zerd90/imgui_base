@@ -19,11 +19,12 @@
 #if defined(IMGUI_IMPL_OPENGL_ES2)
     #include <GLES2/gl2.h>
 #endif
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 #if defined(_WIN32)
     #include <wtypes.h>
 #endif
+
+#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 using namespace ImGui;
 
@@ -48,9 +49,7 @@ void windowResizeCallback(int x, int y, int width, int height)
 void dropFileCallback(GLFWwindow *window, int count, const char **files)
 {
     IM_UNUSED(window);
-#if defined(_WIN32)
-    StdRMutexUniqueLock locker(glfwGetEventLock());
-#endif
+
     std::vector<std::string> wFiles;
     for (int i = 0; i < count; i++)
     {
@@ -59,7 +58,9 @@ void dropFileCallback(GLFWwindow *window, int count, const char **files)
     gUserApp->dropFile(wFiles);
 }
 
-bool doGUIRender(const char *glsl_version, GLFWwindow *window)
+const char *glsl_version = nullptr;
+
+bool doGUIRender(GLFWwindow *window)
 {
     static ImVec4   clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io          = nullptr;
@@ -89,10 +90,6 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
             glfwSwapInterval(0);
     }
 
-#if defined(_WIN32)
-    glfwPollEvents();
-#endif
-
     if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)
     {
         ImGui_ImplGlfw_Sleep(10);
@@ -102,10 +99,6 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     // Start the Dear ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
-
-#if defined(_WIN32)
-    StdRMutexUniqueLock locker(glfwGetEventLock());
-#endif
 
     gUserApp->newFramePreAction();
 
@@ -119,15 +112,10 @@ bool doGUIRender(const char *glsl_version, GLFWwindow *window)
     ImGui::Render();
     gUserApp->endFramePostAction();
 
-#if defined(_WIN32)
-    locker.unlock();
-#endif
-
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     glViewport(0, 0, display_w, display_h);
-    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w,
-                 clear_color.w);
+    glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -174,20 +162,20 @@ int main(int argc, char **argv)
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
     // GL ES 2.0 + GLSL 100
-    const char *glsl_version = "#version 100";
+    glsl_version = "#version 100";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 #elif defined(__APPLE__)
     // GL 3.2 + GLSL 150
-    const char *glsl_version = "#version 150";
+    glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // Required on Mac
 #else
     // GL 3.0 + GLSL 130
-    const char *glsl_version = "#version 130";
+    glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
@@ -202,9 +190,9 @@ int main(int argc, char **argv)
 
     ImGuiIO &io    = ImGui::GetIO();
     io.IniFilename = gUserApp->getConfigPath();
-    printf("ini file: %s\n", io.IniFilename);
+
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
-    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+
     // Create window with graphics context
     GLFWwindow *window = glfwCreateWindow(gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h,
                                           gUserApp->getAppName().c_str(), nullptr, nullptr);
@@ -212,7 +200,11 @@ int main(int argc, char **argv)
         return 1;
     glfwSetWindowPos(window, gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y);
 
-    ImGui_ImplGlfw_setWindowRectChangeNotify(windowResizeCallback);
+    glfwSetWindowPosCallback(window,
+                             []([[maybe_unused]] GLFWwindow *window, int x, int y) { windowResizeCallback(x, y, -1, -1); });
+    glfwSetWindowSizeCallback(window,
+                              []([[maybe_unused]] GLFWwindow *window, int w, int h) { windowResizeCallback(-1, -1, w, h); });
+    glfwSetWindowRefreshCallback(window, [](GLFWwindow *window) { doGUIRender(window); });
     glfwSetDropCallback(window, dropFileCallback);
 
     // Setup Dear ImGui context
@@ -261,7 +253,7 @@ int main(int argc, char **argv)
         // hide them from your application based on those two flags.
         glfwPollEvents();
 
-        if (doGUIRender(glsl_version, window))
+        if (doGUIRender(window))
             break;
     }
 

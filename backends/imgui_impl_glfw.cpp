@@ -230,21 +230,7 @@ static void ImGui_ImplGlfw_UpdateMonitors();
 static void ImGui_ImplGlfw_InitMultiViewportSupport();
 static void ImGui_ImplGlfw_ShutdownMultiViewportSupport();
 
-    // Functions
-    #if defined(_WIN32)
-StdRMutex  gEventLock;
-StdRMutex &glfwGetEventLock()
-{
-    return gEventLock;
-}
-    #endif
-
-static void (*gWindowRectChangeNotify)(int x, int y, int w, int h) = nullptr;
-
-void ImGui_ImplGlfw_setWindowRectChangeNotify(void (*func)(int, int, int, int))
-{
-    gWindowRectChangeNotify = func;
-}
+// Functions
 
 // Not static to allow third-party code to use that if they want to (but undocumented)
 ImGuiKey ImGui_ImplGlfw_KeyToImGuiKey(int keycode, int scancode)
@@ -514,9 +500,6 @@ static bool ImGui_ImplGlfw_ShouldChainCallback(GLFWwindow *window)
 
 void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackMousebutton != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackMousebutton(window, button, action, mods);
@@ -530,9 +513,6 @@ void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow *window, int button, int acti
 
 void ImGui_ImplGlfw_ScrollCallback(GLFWwindow *window, double xoffset, double yoffset)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackScroll != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackScroll(window, xoffset, yoffset);
@@ -598,9 +578,6 @@ static int ImGui_ImplGlfw_TranslateUntranslatedKey(int key, int scancode)
 
 void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, int action, int mods)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackKey != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackKey(window, keycode, scancode, action, mods);
@@ -623,9 +600,6 @@ void ImGui_ImplGlfw_KeyCallback(GLFWwindow *window, int keycode, int scancode, i
 
 void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackWindowFocus != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackWindowFocus(window, focused);
@@ -636,9 +610,6 @@ void ImGui_ImplGlfw_WindowFocusCallback(GLFWwindow *window, int focused)
 
 void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackCursorPos != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackCursorPos(window, x, y);
@@ -659,10 +630,6 @@ void ImGui_ImplGlfw_CursorPosCallback(GLFWwindow *window, double x, double y)
 // so we back it up and restore on Leave/Enter (see https://github.com/ocornut/imgui/issues/4984)
 void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
-
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackCursorEnter != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackCursorEnter(window, entered);
@@ -683,9 +650,6 @@ void ImGui_ImplGlfw_CursorEnterCallback(GLFWwindow *window, int entered)
 
 void ImGui_ImplGlfw_CharCallback(GLFWwindow *window, unsigned int c)
 {
-    #if defined(_WIN32)
-    StdRMutexUniqueLock locker(gEventLock);
-    #endif
     ImGui_ImplGlfw_Data *bd = ImGui_ImplGlfw_GetBackendData();
     if (bd->PrevUserCallbackChar != nullptr && ImGui_ImplGlfw_ShouldChainCallback(window))
         bd->PrevUserCallbackChar(window, c);
@@ -1295,7 +1259,7 @@ static void ImGui_ImplGlfw_WindowCloseCallback(GLFWwindow *window)
 // - on Linux it is queued and invoked during glfwPollEvents()
 // Because the event doesn't always fire on glfwSetWindowXXX() we use a frame counter tag to only
 // ignore recent glfwSetWindowXXX() calls.
-static void ImGui_ImplGlfw_WindowPosCallback(GLFWwindow *window, int x, int y)
+static void ImGui_ImplGlfw_WindowPosCallback(GLFWwindow *window, [[maybe_unused]] int x, [[maybe_unused]] int y)
 {
     if (ImGuiViewport *viewport = ImGui::FindViewportByPlatformHandle(window))
     {
@@ -1307,12 +1271,11 @@ static void ImGui_ImplGlfw_WindowPosCallback(GLFWwindow *window, int x, int y)
                 return;
         }
         viewport->PlatformRequestMove = true;
-        if (gWindowRectChangeNotify)
-            gWindowRectChangeNotify(x, y, -1, -1);
     }
 }
 
-static void ImGui_ImplGlfw_WindowSizeCallback(GLFWwindow *window, int w, int h)
+static void ImGui_ImplGlfw_WindowSizeCallback(GLFWwindow *window, [[maybe_unused]] int w, [[maybe_unused]] int h)
+
 {
     if (ImGuiViewport *viewport = ImGui::FindViewportByPlatformHandle(window))
     {
@@ -1324,8 +1287,6 @@ static void ImGui_ImplGlfw_WindowSizeCallback(GLFWwindow *window, int w, int h)
                 return;
         }
         viewport->PlatformRequestResize = true;
-        if (gWindowRectChangeNotify)
-            gWindowRectChangeNotify(-1, -1, w, h);
     }
 }
 
@@ -1456,10 +1417,6 @@ static void ImGui_ImplGlfw_SetWindowPos(ImGuiViewport *viewport, ImVec2 pos)
     ImGui_ImplGlfw_ViewportData *vd = (ImGui_ImplGlfw_ViewportData *)viewport->PlatformUserData;
     vd->IgnoreWindowPosEventFrame   = ImGui::GetFrameCount();
     glfwSetWindowPos(vd->Window, (int)pos.x, (int)pos.y);
-
-    auto bd = ImGui_ImplGlfw_GetBackendData();
-    if (bd->Window == vd->Window && gWindowRectChangeNotify)
-        gWindowRectChangeNotify((int)pos.x, (int)pos.y, -1, -1);
 }
 
 static ImVec2 ImGui_ImplGlfw_GetWindowSize(ImGuiViewport *viewport)
@@ -1485,10 +1442,6 @@ static void ImGui_ImplGlfw_SetWindowSize(ImGuiViewport *viewport, ImVec2 size)
     #endif
     vd->IgnoreWindowSizeEventFrame = ImGui::GetFrameCount();
     glfwSetWindowSize(vd->Window, (int)size.x, (int)size.y);
-
-    auto bd = ImGui_ImplGlfw_GetBackendData();
-    if (bd->Window == vd->Window && gWindowRectChangeNotify)
-        gWindowRectChangeNotify(-1, -1, (int)size.x, (int)size.y);
 }
 
 static void ImGui_ImplGlfw_SetWindowTitle(ImGuiViewport *viewport, const char *title)
@@ -1706,27 +1659,34 @@ namespace ImGui
             return ImRect(0, 0, 640, 360);
         int x, y, w, h;
         glfwGetMonitorWorkarea(monitor, &x, &y, &w, &h);
-        return ImRect(x, y, x + w, y + h);
+        return ImRect((float)x, (float)y, (float)x + (float)w, (float)y + (float)h);
     }
-
-    ImRect maximizeMainWindow()
+    GLFWwindow *getMainWindow()
     {
         auto bd = ImGui_ImplGlfw_GetBackendData();
-        IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+        if (!bd)
+            return nullptr;
+        return bd->Window;
+    }
+    ImRect maximizeMainWindow()
+    {
+        GLFWwindow *window = getMainWindow();
+        if (!window)
+            return ImRect();
     // glfwMaximizeWindow not working properly on MacOS, and glfwGetMonitorWorkarea not working properly on Ubuntu, so we
     // do it like this...
     #ifdef __linux
-        glfwMaximizeWindow(bd->Window);
-        glfwSwapBuffers(bd->Window);
+        glfwMaximizeWindow(window);
+        glfwSwapBuffers(window);
 
         int x, y, w, h;
-        glfwGetWindowPos(bd->Window, &x, &y);
-        glfwGetWindowSize(bd->Window, &w, &h);
+        glfwGetWindowPos(window, &x, &y);
+        glfwGetWindowSize(window, &w, &h);
         return ImRect(x, y, x + w, y + h);
     #else
         auto rect = GetDisplayWorkArea();
-        glfwSetWindowPos(bd->Window, rect.Min.x, rect.Min.y);
-        glfwSetWindowSize(bd->Window, rect.GetWidth(), rect.GetHeight());
+        glfwSetWindowPos(window, (int)rect.Min.x, (int)rect.Min.y);
+        glfwSetWindowSize(window, (int)rect.GetWidth(), (int)rect.GetHeight());
 
         return rect;
     #endif
@@ -1734,30 +1694,33 @@ namespace ImGui
 
     void normalizeApplication(const ImRect &winRect)
     {
-        auto bd = ImGui_ImplGlfw_GetBackendData();
-        IM_ASSERT(bd != nullptr && bd->Window != nullptr);
-        glfwRestoreWindow(bd->Window);
-        glfwSetWindowPos(bd->Window, (int)winRect.Min.x, (int)winRect.Min.y);
-        glfwSetWindowSize(bd->Window, (int)winRect.GetWidth(), (int)winRect.GetHeight());
+        GLFWwindow *window = getMainWindow();
+        if (!window)
+            return;
+        glfwRestoreWindow(window);
+        glfwSetWindowPos(window, (int)winRect.Min.x, (int)winRect.Min.y);
+        glfwSetWindowSize(window, (int)winRect.GetWidth(), (int)winRect.GetHeight());
     }
 
     void minimizeMainWindow()
     {
-        auto bd = ImGui_ImplGlfw_GetBackendData();
-        IM_ASSERT(bd != nullptr && bd->Window != nullptr);
-        glfwIconifyWindow(bd->Window);
-        for (auto &window : gWindows)
+        GLFWwindow *window = getMainWindow();
+        if (!window)
+            return;
+        glfwIconifyWindow(window);
+        for (auto &subWindow : gWindows)
         {
-            if (window == bd->Window)
+            if (subWindow == window)
                 continue;
-            glfwIconifyWindow(window);
+            glfwIconifyWindow(subWindow);
         }
     }
 
     void setApplicationTitle(const std::string &title)
     {
         auto bd = ImGui_ImplGlfw_GetBackendData();
-        IM_ASSERT(bd != nullptr && bd->Window != nullptr);
+        if (!bd || !bd->Window)
+            return;
         glfwSetWindowTitle(bd->Window, title.c_str());
     }
 } // namespace ImGui

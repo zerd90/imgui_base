@@ -65,6 +65,5 @@ IMGUI_IMPL_API void ImGui_ImplGlfw_MonitorCallback(GLFWmonitor *monitor, int eve
 // GLFW helpers
 IMGUI_IMPL_API void ImGui_ImplGlfw_Sleep(int milliseconds);
 
-void                  ImGui_ImplGlfw_setWindowRectChangeNotify(void (*func)(int, int, int, int));
 std::recursive_mutex &glfwGetEventLock();
 #endif // #ifndef IMGUI_DISABLE
