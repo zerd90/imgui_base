@@ -35,17 +35,9 @@ bool doGUIRender()
     static ImVec4   clear_color         = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     static ImGuiIO *io                  = nullptr;
     static bool     g_SwapChainOccluded = false;
-    MSG             msg;
 
     if (!io)
         io = &ImGui::GetIO();
-
-    // to support multi viewports, there would be Windows created in this thread
-    while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
-    {
-        ::TranslateMessage(&msg);
-        ::DispatchMessage(&msg);
-    }
 
     // Handle window being minimized or screen locked
     if (g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED)
@@ -103,6 +95,8 @@ bool doGUIRender()
 
     return false;
 }
+std::atomic<bool> g_exit = false;
+std::atomic<bool> g_resources_initialized = false;
 
 // Main code
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
@@ -145,10 +139,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       nullptr};
     ::RegisterClassExW(&wc);
 
-    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(gUserApp->getAppName()).c_str(), WS_POPUP,
+    HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(gUserApp->getAppName()).c_str(), WS_OVERLAPPEDWINDOW,
                                   gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y,
-                                  gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h, nullptr,
-                                  nullptr, wc.hInstance, nullptr);
+                                  gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h, nullptr, nullptr,
+                                  wc.hInstance, nullptr);
 
     gUserApp->setWindowHandle(hwnd);
 
@@ -207,10 +201,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // Main loop
-
+    g_resources_initialized = true;
     bool done = false;
     while (!done)
     {
+        if (g_exit)
+            break;
+
         // Poll and handle messages (inputs, window resize, etc.)
         // See the WndProc() function below for our to dispatch events to the Win32 backend.
         MSG msg;
@@ -271,15 +268,15 @@ bool CreateDeviceD3D(HWND hWnd)
         D3D_FEATURE_LEVEL_11_0,
         D3D_FEATURE_LEVEL_10_0,
     };
-    HRESULT res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
-                                                featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain,
-                                                &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
+    HRESULT res =
+        D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2,
+                                      D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
     if (res == DXGI_ERROR_UNSUPPORTED) // Try high-performance WARP software driver if hardware is
                                        // not available.
     {
-        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags,
-                                            featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice,
-                                            &featureLevel, &g_pd3dDeviceContext);
+        res = D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, createDeviceFlags, featureLevelArray, 2,
+                                            D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel,
+                                            &g_pd3dDeviceContext);
     }
     if (res != S_OK)
     {
@@ -375,8 +372,8 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 // printf("WM_DPICHANGED to %d (%.0f%%)\n", dpi, (float)dpi / 96.0f * 100.0f);
                 const RECT *suggested_rect = (RECT *)lParam;
                 ::SetWindowPos(hWnd, nullptr, suggested_rect->left, suggested_rect->top,
-                               suggested_rect->right - suggested_rect->left,
-                               suggested_rect->bottom - suggested_rect->top, SWP_NOZORDER | SWP_NOACTIVATE);
+                               suggested_rect->right - suggested_rect->left, suggested_rect->bottom - suggested_rect->top,
+                               SWP_NOZORDER | SWP_NOACTIVATE);
             }
             break;
         case WM_DROPFILES:
@@ -393,7 +390,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if (DragQueryFileW(hDrop, i, filename, MAX_PATH))
                 {
                     std::wstring wFileName = filename;
-                    auto tmpStr = unicodeToUtf8(wFileName);
+                    auto         tmpStr    = unicodeToUtf8(wFileName);
                     files.push_back(tmpStr);
                 }
             }
@@ -408,6 +405,14 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (GetWindowRect(hWnd, &win_rect))
                 gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
+            break;
+        }
+        case WM_PAINT:
+        {
+            printf("WM_PAINT\n");
+
+            if (g_resources_initialized && doGUIRender())
+                g_exit = true;
             break;
         }
     }
