@@ -35,7 +35,7 @@ namespace ImGui
 
         virtual void show();
 
-        void setTitle(const std::string &title);
+        virtual void setTitle(const std::string &title);
         void enableStatusBar(bool on);
 
         void setHasCloseButton(bool hasCloseButton);
@@ -142,18 +142,9 @@ namespace ImGui
         ImGuiMainWindow(const std::string &title);
         virtual ~ImGuiMainWindow() {}
 
+        void setTitle(const std::string &title) override;
         virtual void show() override;
 
-    protected:
-        ImVec2 mNormalPos;
-        ImVec2 mNormalSize;
-        ImVec2 mLastWinSize;
-        ImVec2 mLastWinPos;
-        bool   mMaximized = false;
-        ImVec2 mStartMoveMousePos;
-        ImVec2 mStartMoveWinPos;
-        bool   mStartMove         = false;
-        bool   mTitleBarMouseDown = false;
     };
 
     class IImGuiChildWindow : public IImGuiWindow

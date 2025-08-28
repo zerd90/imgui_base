@@ -154,6 +154,7 @@ namespace ImGui
     void setApplicationTitle(const std::string &title);
 
     ImRect getDisplayWorkArea();
+    ImRect getMainWindowRect();
     ImRect maximizeMainWindow();
     void   normalizeApplication(const ImRect &winRect);
     void   minimizeMainWindow();

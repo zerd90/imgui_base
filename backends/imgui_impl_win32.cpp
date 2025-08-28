@@ -195,7 +195,7 @@ static bool ImGui_ImplWin32_InitEx(void *hwnd, bool platform_has_own_dc)
     IM_ASSERT(io.BackendPlatformUserData == nullptr && "Already initialized a platform backend!");
 
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if(FAILED(hr))
+    if (FAILED(hr))
     {
         IM_ASSERT(0 && "Failed to initialize COM");
     }
@@ -1153,8 +1153,8 @@ static BOOL _IsWindowsVersionOrGreater(WORD major, WORD minor, WORD)
     return (RtlVerifyVersionInfoFn(&versionInfo, VER_MAJORVERSION | VER_MINORVERSION, conditionMask) == 0) ? TRUE : FALSE;
 }
 
-    #define _IsWindowsVistaOrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0600), LOBYTE(0x0600), 0)   // _WIN32_WINNT_VISTA
-    #define _IsWindows8OrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0602), LOBYTE(0x0602), 0)       // _WIN32_WINNT_WIN8
+    #define _IsWindowsVistaOrGreater()   _IsWindowsVersionOrGreater(HIBYTE(0x0600), LOBYTE(0x0600), 0) // _WIN32_WINNT_VISTA
+    #define _IsWindows8OrGreater()       _IsWindowsVersionOrGreater(HIBYTE(0x0602), LOBYTE(0x0602), 0) // _WIN32_WINNT_WIN8
     #define _IsWindows8Point1OrGreater() _IsWindowsVersionOrGreater(HIBYTE(0x0603), LOBYTE(0x0603), 0) // _WIN32_WINNT_WINBLUE
     #define _IsWindows10OrGreater() \
         _IsWindowsVersionOrGreater(HIBYTE(0x0A00), LOBYTE(0x0A00), 0) // _WIN32_WINNT_WINTHRESHOLD / _WIN32_WINNT_WIN10
@@ -1707,13 +1707,16 @@ namespace ImGui
     HWND getMainWindow()
     {
         auto bd = ImGui_ImplWin32_GetBackendData();
-        IM_ASSERT(bd != nullptr && bd->hWnd != 0);
+        if (!bd)
+            return nullptr;
         return bd->hWnd;
     }
 
     ImRect maximizeMainWindow()
     {
         HWND   hwnd     = getMainWindow();
+        if (!hwnd)
+            return ImRect();
         ImRect wordArea = getDisplayWorkArea();
         MoveWindow(hwnd, (int)wordArea.GetTL().x, (int)wordArea.GetTL().y, (int)wordArea.GetSize().x, (int)wordArea.GetSize().y,
                    false);
@@ -1722,6 +1725,8 @@ namespace ImGui
     void normalizeApplication(const ImRect &winRect)
     {
         HWND hwnd = getMainWindow();
+        if (!hwnd)
+            return;
         MoveWindow(hwnd, (int)winRect.GetTL().x, (int)winRect.GetTL().y, (int)winRect.GetSize().x, (int)winRect.GetSize().y,
                    false);
     }
@@ -1729,13 +1734,16 @@ namespace ImGui
     void minimizeMainWindow()
     {
         HWND hwnd = getMainWindow();
+        if (!hwnd)
+            return;
         ShowWindow(hwnd, SW_MINIMIZE);
     }
 
     void setApplicationTitle(const std::string &title)
     {
         ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;
-        IM_ASSERT(vd->Hwnd != 0);
+        if (!vd || !vd->Hwnd)
+            return;
         ::SetWindowTextA(vd->Hwnd, utf8ToLocal(title).c_str());
     }
 } // namespace ImGui
