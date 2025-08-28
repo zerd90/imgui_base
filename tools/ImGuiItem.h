@@ -52,6 +52,10 @@ namespace ImGui
         GET_STATUS_FUNC(Deactivated)
         GET_STATUS_FUNC(NativeActive)
 
+        bool isHoveredFor(uint32_t timeMs);
+        bool isActiveFor(uint32_t timeMs);
+        bool isDeactiveFor(uint32_t timeMs);
+
         void setToolTip(const std::string &tip);
 
     protected:
@@ -71,6 +75,11 @@ namespace ImGui
         bool                  mItemStatus[ImGuiItemActionButt];
         std::function<void()> mActionCallbacks[ImGuiItemActionButt];
         std::string           mToolTip;
+
+    private:
+        double mLastActiveTime = 0;
+        double mLastDeactiveTime = 0;
+        double mLastHoveredTime = 0;
     };
 
     class ImGuiCheckbox : public IImGuiItem
