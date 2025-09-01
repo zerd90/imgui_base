@@ -26,6 +26,9 @@ namespace ImGui
         if (!mIsChildWindow && mManualSize.x > 0 && mManualSize.y > 0)
             SetNextWindowSize(mManualSize, mManualSizeCond);
 
+        if (!mIsChildWindow && mManualPos.x >= 0 && mManualPos.y >= 0)
+            SetNextWindowPos(mManualPos, mManualPosCond);
+
         bool needShowContent = true;
 
         pushStyles();
@@ -189,6 +192,22 @@ namespace ImGui
     {
         mManualSize     = size;
         mManualSizeCond = cond;
+    }
+
+    void IImGuiWindow::setPos(ImVec2 pos, ImGuiCond cond)
+    {
+        mManualPos     = pos;
+        mManualPosCond = cond;
+    }
+
+    ImVec2 IImGuiWindow::getPos()
+    {
+        return mWinPos;
+    }
+
+    ImVec2 IImGuiWindow::getSize()
+    {
+        return mWinSize;
     }
 
     void IImGuiWindow::setStyle(IMGUI_STYLE_VAR style, ImVec2 value)
@@ -422,6 +441,8 @@ namespace ImGui
 
         if (mManualSize.x > 0 && mManualSize.y > 0)
             SetNextWindowSize(mManualSize, mManualSizeCond);
+        if (mManualPos.x >= 0 && mManualPos.y >= 0)
+            SetNextWindowPos(mManualPos, mManualPosCond);
 
         pushStyles();
 
@@ -464,9 +485,6 @@ namespace ImGui
 
     void ImGuiMainWindow::show()
     {
-        if (0 == mManualSize.x && 0 == mManualSize.y)
-            SetNextWindowSize({640, 480}, ImGuiCond_FirstUseEver);
-
         mWindowFlags |= ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar
                       | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoResize;
         mFocusedFlags |= ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_DockHierarchy;
@@ -477,7 +495,31 @@ namespace ImGui
         SetNextWindowSize(mainViewPort->WorkSize, ImGuiCond_Always);
 
         IImGuiWindow::show();
+
+        auto winRect = getWindowRect();
+        mWinPos      = winRect.Min;
+        mWinSize     = winRect.GetSize();
     }
+
+    void ImGuiMainWindow::setSize(ImVec2 size, ImGuiCond cond)
+    {
+        auto pos = getPos();
+        normalizeApplication(ImRect(pos, pos + size));
+    }
+    void ImGuiMainWindow::setPos(ImVec2 pos, ImGuiCond cond)
+    {
+        auto size = getSize();
+        normalizeApplication(ImRect(pos, pos + size));
+    }
+    ImVec2 ImGuiMainWindow::getPos()
+    {
+        return mWinPos;
+    }
+    ImVec2 ImGuiMainWindow::getSize()
+    {
+        return mWinSize;
+    }
+
     std::string IImGuiWindow::getError()
     {
         if (mErrors.empty())

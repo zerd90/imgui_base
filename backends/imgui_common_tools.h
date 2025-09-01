@@ -158,6 +158,7 @@ namespace ImGui
     ImRect maximizeMainWindow();
     void   normalizeApplication(const ImRect &winRect);
     void   minimizeMainWindow();
+    ImRect getWindowRect();
 
     // End Backend Relative
 

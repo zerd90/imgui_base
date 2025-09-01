@@ -135,6 +135,8 @@ bool doGUIRender(GLFWwindow *window)
     return false;
 }
 
+bool g_exit = false;
+
 // Main code
 #if defined(_WIN32)
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
@@ -201,10 +203,20 @@ int main(int argc, char **argv)
     glfwSetWindowPos(window, gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y);
 
     glfwSetWindowPosCallback(window,
-                             []([[maybe_unused]] GLFWwindow *window, int x, int y) { windowResizeCallback(x, y, -1, -1); });
+                             []([[maybe_unused]] GLFWwindow *window, int x, int y)
+                             {
+                                 windowResizeCallback(x, y, -1, -1);
+                                 if (doGUIRender(window))
+                                     g_exit = true;
+                             });
     glfwSetWindowSizeCallback(window,
                               []([[maybe_unused]] GLFWwindow *window, int w, int h) { windowResizeCallback(-1, -1, w, h); });
-    glfwSetWindowRefreshCallback(window, [](GLFWwindow *window) { doGUIRender(window); });
+    glfwSetWindowRefreshCallback(window,
+                                 [](GLFWwindow *window)
+                                 {
+                                     if (doGUIRender(window))
+                                         g_exit = true;
+                                 });
     glfwSetDropCallback(window, dropFileCallback);
 
     // Setup Dear ImGui context
@@ -252,6 +264,9 @@ int main(int argc, char **argv)
         // clear/overwrite your copy of the keyboard data. Generally you may always pass all inputs to dear imgui, and
         // hide them from your application based on those two flags.
         glfwPollEvents();
+
+        if (g_exit)
+            break;
 
         if (doGUIRender(window))
             break;

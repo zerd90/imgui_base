@@ -1701,7 +1701,6 @@ namespace ImGui
         SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
         int cx = rect.right - rect.left;
         int cy = rect.bottom - rect.top;
-        printf("getDisplayWorkArea: %d %d\n", cx, cy);
         return ImRect((float)rect.left, (float)rect.top, (float)cx, (float)cy);
     }
     HWND getMainWindow()
@@ -1738,7 +1737,15 @@ namespace ImGui
             return;
         ShowWindow(hwnd, SW_MINIMIZE);
     }
-
+    ImRect getWindowRect()
+    {
+        RECT rect;
+        HWND hwnd = getMainWindow();
+        if (!hwnd)
+            return ImRect();
+        GetWindowRect(hwnd, &rect);
+        return ImRect((float)rect.left, (float)rect.top, (float)rect.right, (float)rect.bottom);
+    }
     void setApplicationTitle(const std::string &title)
     {
         ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;

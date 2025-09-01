@@ -36,7 +36,7 @@ namespace ImGui
         virtual void show();
 
         virtual void setTitle(const std::string &title);
-        void enableStatusBar(bool on);
+        void         enableStatusBar(bool on);
 
         void setHasCloseButton(bool hasCloseButton);
 
@@ -45,10 +45,13 @@ namespace ImGui
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_HOVERED_FLAGS, HoveredFlag, mHoveredFlags)
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_FOCUSED_FLAGS, FocusedFlag, mFocusedFlags)
 
-        void setContent(const std::function<void()> &content);
-        void setStatus(const std::string &statusString, ImU32 color = 0);
-        void setStatusProgressBar(bool on, float fraction = 0.0f);
-        void setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
+        void           setContent(const std::function<void()> &content);
+        void           setStatus(const std::string &statusString, ImU32 color = 0);
+        void           setStatusProgressBar(bool on, float fraction = 0.0f);
+        virtual void   setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always);
+        virtual void   setPos(ImVec2 pos, ImGuiCond cond = ImGuiCond_Always);
+        virtual ImVec2 getPos();
+        virtual ImVec2 getSize();
 
         void setStyle(IMGUI_STYLE_VAR style, ImVec2 value);
         void setStyle(IMGUI_STYLE_VAR style, float value);
@@ -122,8 +125,11 @@ namespace ImGui
         std::list<std::string> mErrors;
 
     protected:
-        ImVec2      mManualSize;
-        ImGuiCond   mManualSizeCond   = ImGuiCond_Always;
+        ImVec2    mManualSize;
+        ImGuiCond mManualSizeCond = ImGuiCond_Always;
+        ImVec2    mManualPos      = {-1, -1};
+        ImGuiCond mManualPosCond  = ImGuiCond_Always;
+
         bool        mStatusBarEnabled = false;
         std::string mStatusString;
         ImU32       mStatusStringColor;
@@ -142,9 +148,13 @@ namespace ImGui
         ImGuiMainWindow(const std::string &title);
         virtual ~ImGuiMainWindow() {}
 
-        void setTitle(const std::string &title) override;
-        virtual void show() override;
+        virtual void   setSize(ImVec2 size, ImGuiCond cond = ImGuiCond_Always) override;
+        virtual void   setPos(ImVec2 pos, ImGuiCond cond = ImGuiCond_Always) override;
+        virtual ImVec2 getPos() override;
+        virtual ImVec2 getSize() override;
 
+        void         setTitle(const std::string &title) override;
+        virtual void show() override;
     };
 
     class IImGuiChildWindow : public IImGuiWindow

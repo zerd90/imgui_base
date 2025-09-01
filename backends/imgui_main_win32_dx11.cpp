@@ -95,7 +95,7 @@ bool doGUIRender()
 
     return false;
 }
-std::atomic<bool> g_exit = false;
+std::atomic<bool> g_exit                  = false;
 std::atomic<bool> g_resources_initialized = false;
 
 // Main code
@@ -202,7 +202,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // Main loop
     g_resources_initialized = true;
-    bool done = false;
+    bool done               = false;
     while (!done)
     {
         if (g_exit)
@@ -405,12 +405,13 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (GetWindowRect(hWnd, &win_rect))
                 gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
+            if (g_resources_initialized && doGUIRender())
+                g_exit = true;
+
             break;
         }
         case WM_PAINT:
         {
-            printf("WM_PAINT\n");
-
             if (g_resources_initialized && doGUIRender())
                 g_exit = true;
             break;

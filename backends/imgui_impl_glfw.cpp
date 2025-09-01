@@ -1723,6 +1723,18 @@ namespace ImGui
             return;
         glfwSetWindowTitle(bd->Window, title.c_str());
     }
+
+    ImRect getWindowRect()
+    {
+        GLFWwindow *window = getMainWindow();
+        if (!window)
+            return ImRect();
+        int x, y, w, h;
+        glfwGetWindowPos(window, &x, &y);
+        glfwGetWindowSize(window, &w, &h);
+        return ImRect(x, y, x + w, y + h);
+    }
+
 } // namespace ImGui
 
 //-----------------------------------------------------------------------------
