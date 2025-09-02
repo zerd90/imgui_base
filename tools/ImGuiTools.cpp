@@ -584,7 +584,7 @@ namespace ImGui
                     if (auto pval = std::get_if<DrawCircleParam>(&param.param))
                     {
                         ImVec2 center = transImgCoord(pval->center);
-                        float  radius = pval->radius * mImageScale;
+                        float  radius = pval->radius * imgScaledSize.x / mTextureWidth;
                         if (pval->thickness > 0)
                         {
                             float thickness = transThickness(pval->thickness);
@@ -656,7 +656,6 @@ namespace ImGui
                 }
             }
         }
-        // TODO DrawList
 
         mDisplayInfo.scale          = mImageScale;
         mDisplayInfo.showPos.x      = mImageShowPos.x;
