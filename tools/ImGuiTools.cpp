@@ -804,9 +804,15 @@ namespace ImGui
         mDrawList = drawList;
     }
 
+    void ImageWindow::clearDrawList()
+    {
+        mDrawList.clear();
+    }
+
     void ImageWindow::clear()
     {
         mTexture = mTextureWidth = mTextureHeight = 0;
+        clearDrawList();
     }
 
     void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir)

@@ -170,6 +170,7 @@ namespace ImGui
         void unlink();
 
         void setDrawList(const std::vector<DrawParam> &drawList);
+        void clearDrawList();
 
     protected:
         virtual void showContent() override;
