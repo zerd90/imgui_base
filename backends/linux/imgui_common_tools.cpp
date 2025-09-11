@@ -237,6 +237,11 @@ namespace ImGui
         g_object_unref(initialFolder);
     }
 
+    string selectDir(const string &initDirPath)
+    {
+        // TODO
+    }
+
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         gtk_init();
@@ -461,6 +466,11 @@ namespace ImGui
         }
         exePathStr[len] = '\0';
         return exePathStr;
+    }
+
+    std::string  getSystemPictureFolder()
+    {
+        //TODO
     }
 
     void listAllFontFiles(const std::string &dirPath, std::vector<std::string> &fontFiles)

@@ -392,6 +392,59 @@ namespace ImGui
         return results;
     }
 
+    string selectDir(const string &initDirPath)
+    {
+        IFileOpenDialog *pfd = NULL;
+        HRESULT          hr  = S_OK;
+        string           result;
+
+        hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_IFileOpenDialog,
+                              reinterpret_cast<void **>(&pfd));
+
+        if (FAILED(hr))
+            return result;
+
+        DWORD dwOptions;
+        pfd->GetOptions(&dwOptions);
+        pfd->SetOptions(dwOptions | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+        if (!initDirPath.empty())
+        {
+            IShellItem *folder = nullptr;
+            hr                 = SHCreateItemFromParsingName(utf8ToUnicode(initDirPath).c_str(), NULL, IID_PPV_ARGS(&folder));
+            if (SUCCEEDED(hr))
+            {
+                pfd->SetFolder(folder);
+                folder->Release();
+            }
+        }
+        hr = pfd->Show(nullptr);
+        if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
+            goto _OVER_;
+        }
+
+        IShellItem *pItem;
+        hr = pfd->GetResult(&pItem);
+        if (SUCCEEDED(hr))
+        {
+            PWSTR pszFilePath;
+            hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+
+            if (SUCCEEDED(hr))
+            {
+                result = unicodeToUtf8(pszFilePath);
+                CoTaskMemFree(pszFilePath);
+            }
+            pItem->Release();
+        }
+
+    _OVER_:
+        pfd->Release();
+
+        return result;
+    }
+
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         string                result;
@@ -472,6 +525,26 @@ namespace ImGui
         GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
         wprintf(L"current dir %s\n", cur_dir);
         return unicodeToUtf8(cur_dir);
+    }
+
+    std::string getSystemPictureFolder()
+    {
+        string result;
+        PWSTR  pszFolderPath = nullptr; // 接收文件夹路径的指针（需手动释放）
+
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Pictures, 0, NULL, &pszFolderPath);
+
+        if (SUCCEEDED(hr))
+        { // 调用成功
+            result = unicodeToUtf8(pszFolderPath);
+            CoTaskMemFree(pszFolderPath); // 释放系统分配的内存（必须！）
+        }
+        else
+        {
+            gLastError = HResultToStr(hr);
+        }
+
+        return result;
     }
 
 #ifdef IMGUI_ENABLE_FREETYPE

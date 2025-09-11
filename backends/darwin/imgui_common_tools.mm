@@ -150,6 +150,11 @@ namespace ImGui
         [pPanel setDirectoryURL:url];
     }
 
+    string selectDir(const string &initDirPath)
+    {
+        // TODO
+    }
+
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         NSOpenPanel *openPanel = [NSOpenPanel openPanel];
@@ -293,6 +298,11 @@ namespace ImGui
     wstring localToUnicode(const string &str)
     {
         return utf8ToUnicode(localToUtf8(str));
+    }
+
+    std::string  getSystemPictureFolder()
+    {
+        //TODO
     }
 
 #ifdef IMGUI_ENABLE_FREETYPE

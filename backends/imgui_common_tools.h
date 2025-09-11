@@ -114,6 +114,7 @@ namespace ImGui
     const std::vector<FilterSpec> &getAudioFilter();
     const std::vector<FilterSpec> &getTextFilter();
 
+    std::string              selectDir(const std::string &initDirPath = std::string());
     std::string              selectFile(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                         const std::string             &initDirPath = std::string());
     std::vector<std::string> selectMultipleFiles(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
@@ -121,6 +122,8 @@ namespace ImGui
     std::string              getSavePath(const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                          const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
     void                     openDebugWindow();
+
+    std::string  getSystemPictureFolder();
 
     std::string getApplicationPath();
 
