@@ -91,6 +91,21 @@ void ImGuiApplication::preset()
             mWindowRect.y = arr[1];
             mWindowRect.w = arr[2];
             mWindowRect.h = arr[3];
+
+            if (mWindowRect.w < 100)
+                mWindowRect.w = 100;
+            if (mWindowRect.h < 100)
+                mWindowRect.h = 100;
+
+            ImRect workArea = getDisplayWorkArea();
+            if (mWindowRect.x > workArea.Max.x)
+                mWindowRect.x = (int)workArea.Max.x - mWindowRect.w;
+            if (mWindowRect.x < workArea.Min.x)
+                mWindowRect.x = (int)workArea.Min.x;
+            if (mWindowRect.y > workArea.Max.y)
+                mWindowRect.y = (int)workArea.Max.y - mWindowRect.h;
+            if (mWindowRect.y < workArea.Min.y)
+                mWindowRect.y = (int)workArea.Min.y;
         },
         [this](void *val)
         {
