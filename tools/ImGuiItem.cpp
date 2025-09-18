@@ -111,9 +111,9 @@ void IImGuiItem::updateItemStatus()
     {
         mLastHoveredTime = 0;
     }
-    if(mItemStatus[ImGuiItemActivated])
+    if (mItemStatus[ImGuiItemActivated])
         mLastActiveTime = GetTime();
-    if(mItemStatus[ImGuiItemDeactivated])
+    if (mItemStatus[ImGuiItemDeactivated])
         mLastDeactiveTime = GetTime();
 }
 
@@ -267,7 +267,7 @@ bool IImGuiInput::showItem()
 
     if (mLabelOnLeft)
     {
-        ImVec2 pos = GetCursorScreenPos();
+        ImVec2 pos   = GetCursorScreenPos();
         // SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
         string label = mLabel;
 
@@ -548,6 +548,7 @@ ImGuiItemTable &ImGuiItemTable::addColumn(const std::string &name)
     if (std::find(mColumnNames.begin(), mColumnNames.end(), name) != mColumnNames.end())
         return *this;
     mColumnNames.push_back(name);
+    mHeaderTooltips.push_back("");
     return *this;
 }
 
@@ -563,6 +564,7 @@ void ImGuiItemTable::insertColumn(unsigned int index, const std::string &name)
     }
 
     mColumnNames.insert(mColumnNames.begin() + index, name);
+    mHeaderTooltips.insert(mHeaderTooltips.begin() + index, "");
 }
 
 void ImGuiItemTable::removeColumn(const std::string &name)
@@ -580,7 +582,16 @@ void ImGuiItemTable::removeColumn(const std::string &name)
 void ImGuiItemTable::clearColumns()
 {
     mColumnNames.clear();
+    mHeaderTooltips.clear();
 }
+
+void ImGuiItemTable::setHeaderTooltip(unsigned int index, const std::string &tooltip)
+{
+    if (index >= mHeaderTooltips.size())
+        return;
+    mHeaderTooltips[index] = tooltip;
+}
+
 vector<string> ImGuiItemTable::getRow(unsigned int index)
 {
     vector<string> res;
@@ -602,6 +613,7 @@ vector<string> ImGuiItemTable::getRow(unsigned int index)
 void ImGuiItemTable::removeColumn(unsigned int index)
 {
     mColumnNames.erase(mColumnNames.begin() + index);
+    mHeaderTooltips.erase(mHeaderTooltips.begin() + index);
 }
 
 void ImGuiItemTable::ScrollFreeze(int rows, int cols)
@@ -644,7 +656,19 @@ bool ImGuiItemTable::showItem()
             headerSize.y = ImGui::TableGetHeaderRowHeight();
         for (auto &headerPosition : mHeadersPosition)
             headerPosition.y = ImGui::GetCursorScreenPos().y;
-        ImGui::TableHeadersRow();
+
+        // ImGui::TableHeadersRow();
+        ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+        for (size_t col = 0; col < mColumnNames.size(); col++)
+        {
+            ImGui::TableSetColumnIndex((int)col);
+            const char *column_name = ImGui::TableGetColumnName((int)col); // Retrieve name passed to TableSetupColumn()
+            ImGui::PushID((int)col);
+            ImGui::TableHeader(column_name);
+            if (!mHeaderTooltips[col].empty())
+                SetItemTooltip("%s", mHeaderTooltips[col].c_str());
+            ImGui::PopID();
+        }
 
         ImVec2 scrollPos = {ImGui::GetScrollX(), ImGui::GetScrollY()};
 

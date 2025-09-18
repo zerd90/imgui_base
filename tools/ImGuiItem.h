@@ -77,9 +77,9 @@ namespace ImGui
         std::string           mToolTip;
 
     private:
-        double mLastActiveTime = 0;
+        double mLastActiveTime   = 0;
         double mLastDeactiveTime = 0;
-        double mLastHoveredTime = 0;
+        double mLastHoveredTime  = 0;
     };
 
     class ImGuiCheckbox : public IImGuiItem
@@ -435,6 +435,7 @@ namespace ImGui
         void                     removeColumn(unsigned int index);
         void                     removeColumn(const std::string &name);
         void                     clearColumns();
+        void                     setHeaderTooltip(unsigned int index, const std::string &tooltip);
 
         // addColumn first, data in row should be in the same order as columns, otherwise it will be ignored
         size_t                   getRowCount();
@@ -456,6 +457,7 @@ namespace ImGui
     private:
         IMGUI_TABLE_FLAGS        mTableFlags = ImGuiTableFlags_None;
         std::vector<std::string> mColumnNames;
+        std::vector<std::string> mHeaderTooltips;
         std::vector<ImVec2>      mHeadersPosition;
         std::vector<ImVec2>      mHeadersSize;
 
