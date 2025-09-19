@@ -477,10 +477,10 @@ namespace ImGui
             if (mLinkWith)
                 mLinkWith->resetScale();
         }
-
+        PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         BeginChild((mTitle + "render").c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders,
                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
-
+        PopStyleVar();
         ImVec2 winSize;
         ImVec2 imgScaledSize;
 
