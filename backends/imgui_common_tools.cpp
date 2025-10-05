@@ -84,14 +84,19 @@ namespace ImGui
             std::sort(family.fonts.begin(), family.fonts.end(),
                       [](const FreetypeFontInfo &a, const FreetypeFontInfo &b)
                       {
-                          static vector<string> commonStyles = {"Regular",   "UltraLight", "ExtraLight", "Thin",
-                                                                "Light",     "SemiLight",  "Bold",       "SemiBold",
-                                                                "ExtraBold", "UltraBold"};
+                          static vector<string> commonStyles = {"Regular", "UltraLight", "Thin",      "ExtraLight",
+                                                                "Light",   "Medium",     "SemiLight", "SemiBold",
+                                                                "Bold",    "ExtraBold",  "UltraBold"};
 
                           auto aIter = std::find_if(std::begin(commonStyles), std::end(commonStyles),
                                                     [&a](const string &s) { return a.style.find(s) != string::npos; });
                           auto bIter = std::find_if(std::begin(commonStyles), std::end(commonStyles),
                                                     [&b](const string &s) { return b.style.find(s) != string::npos; });
+
+                          if (aIter == commonStyles.end() && a.style == "Italic")
+                              aIter = commonStyles.begin();
+                          if (bIter == commonStyles.end() && b.style == "Italic")
+                              bIter = commonStyles.begin();
 
                           if (aIter != commonStyles.end() && bIter != commonStyles.end())
                           {
