@@ -346,6 +346,26 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
     switch (msg)
     {
+        case WM_GETMINMAXINFO:
+        {
+            MINMAXINFO *minmaxInfo = (MINMAXINFO *)lParam;
+
+            ImVec2 minSize, maxSize;
+            gUserApp->getWindowSizeLimit(minSize, maxSize);
+
+            if (minSize.x > 0 && minSize.y > 0)
+            {
+                minmaxInfo->ptMinTrackSize.x = (LONG)minSize.x;
+                minmaxInfo->ptMinTrackSize.y = (LONG)minSize.y;
+            }
+
+            if (maxSize.x > 0 && maxSize.y > 0)
+            {
+                minmaxInfo->ptMaxTrackSize.x = (LONG)maxSize.x;
+                minmaxInfo->ptMaxTrackSize.y = (LONG)maxSize.y;
+            }
+            break;
+        }
         case WM_SIZE:
         {
             if (wParam == SIZE_MINIMIZED)

@@ -1652,7 +1652,7 @@ static LRESULT CALLBACK ImGui_ImplGlfw_WndProc(HWND hWnd, UINT msg, WPARAM wPara
 namespace ImGui
 {
 
-    ImRect GetDisplayWorkArea()
+    ImRect getDisplayWorkArea()
     {
         auto monitor = glfwGetPrimaryMonitor();
         if (monitor == nullptr)
@@ -1684,7 +1684,7 @@ namespace ImGui
         glfwGetWindowSize(window, &w, &h);
         return ImRect(x, y, x + w, y + h);
     #else
-        auto rect = GetDisplayWorkArea();
+        auto rect = getDisplayWorkArea();
         glfwSetWindowPos(window, (int)rect.Min.x, (int)rect.Min.y);
         glfwSetWindowSize(window, (int)rect.GetWidth(), (int)rect.GetHeight());
 

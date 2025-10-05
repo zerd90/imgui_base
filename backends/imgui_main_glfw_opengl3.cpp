@@ -219,6 +219,14 @@ int main(int argc, char **argv)
                                  });
     glfwSetDropCallback(window, dropFileCallback);
 
+    ImVec2 minSize, maxSize;
+    gUserApp->getWindowSizeLimit(minSize, maxSize);
+    if (minSize.x <= 0 || minSize.y <= 0)
+        minSize = ImVec2(GLFW_DONT_CARE, GLFW_DONT_CARE);
+    if (maxSize.x <= 0 || maxSize.y <= 0)
+        maxSize = ImVec2(GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetWindowSizeLimits(window, (int)minSize.x, (int)minSize.y, (int)maxSize.x, (int)maxSize.y);
+
     // Setup Dear ImGui context
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls

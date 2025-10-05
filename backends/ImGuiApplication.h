@@ -44,6 +44,7 @@ namespace ImGui
         void         preset();
         std::string  getAppName() { return mApplicationName; };
         void         windowRectChange(ImGuiAppRect rect);
+        void         getWindowSizeLimit(ImVec2 &minSize, ImVec2 &maxSize);
 
         virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
         virtual void dropFile(const std::vector<std::string> &files) { IM_UNUSED(files); };
@@ -82,6 +83,9 @@ namespace ImGui
         std::string  mApplicationName;
         std::string  mExePath;
         std::string  mConfigPath;
+
+        ImVec2 mWindowSizeMin = ImVec2(320, 240);
+        ImVec2 mWindowSizeMax = ImVec2(0, 0); // no limit by default
 
     protected:
         std::vector<SettingValue> mAppSettings;

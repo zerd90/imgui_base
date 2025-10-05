@@ -9,9 +9,14 @@ execute_process(
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-option(COMPILE_DEMO "Compile Demo" OFF)
+option(COMPILE_DEMO "Compile Demo" ON)
 
-option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
+if(CMAKE_SYSTEM_NAME MATCHES Windows)
+    option(USING_FREETYPE "Using Freetype for font rendering and font choosing" ON)
+else()
+    option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
+endif()
+
 message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 
 if("${RENDER}" STREQUAL "")
@@ -40,13 +45,34 @@ endif()
 # 指定模块对外头文件 #
 if(PROJECT_IS_TOP_LEVEL)
     set(CMAKE_CXX_STANDARD 17)
+    if(CMAKE_SYSTEM_NAME MATCHES Windows)
+        add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+        add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+        add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
+    endif()
 else()
-    set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
-        ${PROJECT_SOURCE_DIR}/imgui-source/
-        ${PROJECT_SOURCE_DIR}/backends
-        ${PROJECT_SOURCE_DIR}/tools
-        PARENT_SCOPE
-    )
+    if(USING_FREETYPE)
+        set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
+            ${PROJECT_SOURCE_DIR}/imgui-source/
+            ${PROJECT_SOURCE_DIR}/backends
+            ${PROJECT_SOURCE_DIR}/tools
+            ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include
+            PARENT_SCOPE
+        )
+        if(CMAKE_SYSTEM_NAME MATCHES Windows)
+            set(LINK_DIRECTORIES ${LINK_DIRECTORIES}
+                ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win
+                PARENT_SCOPE
+            )
+        endif()
+    else()
+        set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
+            ${PROJECT_SOURCE_DIR}/imgui-source/
+            ${PROJECT_SOURCE_DIR}/backends
+            ${PROJECT_SOURCE_DIR}/tools
+            PARENT_SCOPE
+        )
+    endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES Windows AND ${CMAKE_CXX_COMPILER_ID} MATCHES GNU)
@@ -135,11 +161,19 @@ endif()
 
 # 使用通配符添加多个源文件
 aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source IMGUI_BASE_SRC_LIST)
-aux_source_directory(${PROJECT_SOURCE_DIR}/3rdparty IMGUI_BASE_SRC_LIST)
 aux_source_directory(${PROJECT_SOURCE_DIR}/tools IMGUI_BASE_SRC_LIST)
 
 if(USING_FREETYPE)
     aux_source_directory(${PROJECT_SOURCE_DIR}/imgui-source/misc/freetype IMGUI_BASE_SRC_LIST)
+    include_directories(${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include)
+    if(CMAKE_SYSTEM_NAME MATCHES Windows)
+        set(CURRENT_DLL_LIST ${CURRENT_DLL_LIST} ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/bin/freetype.dll)
+        link_directories(${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win)
+    endif()
+endif()
+
+if(NOT PROJECT_IS_TOP_LEVEL)
+    set(DLL_LIST ${DLL_LIST} ${CURRENT_DLL_LIST} PARENT_SCOPE)
 endif()
 
 set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
@@ -198,4 +232,10 @@ if(COMPILE_DEMO)
         add_executable(imguiDemo demo.cpp)
     endif()
     target_link_libraries(imguiDemo ${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES} ${EXE_LINK_LIBRARIES})
+    install(TARGETS imguiDemo
+        DESTINATION ${PROJECT_SOURCE_DIR}/bin
+    )
+    install(FILES ${CURRENT_DLL_LIST}
+        DESTINATION ${PROJECT_SOURCE_DIR}/bin
+    )
 endif()

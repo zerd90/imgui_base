@@ -92,11 +92,7 @@ void ImGuiApplication::preset()
             mWindowRect.w = arr[2];
             mWindowRect.h = arr[3];
 
-            if (mWindowRect.w < 100)
-                mWindowRect.w = 100;
-            if (mWindowRect.h < 100)
-                mWindowRect.h = 100;
-
+            // Make sure the window is in the display area
             ImRect workArea = getDisplayWorkArea();
             if (mWindowRect.x > workArea.Max.x)
                 mWindowRect.x = (int)workArea.Max.x - mWindowRect.w;
@@ -218,6 +214,12 @@ void ImGuiApplication::windowRectChange(ImGuiAppRect rect)
         mWindowRect.w = rect.w;
     if (rect.h > 0)
         mWindowRect.h = rect.h;
+}
+
+void ImGuiApplication::getWindowSizeLimit(ImVec2 &minSize, ImVec2 &maxSize)
+{
+    minSize = mWindowSizeMin;
+    maxSize = mWindowSizeMax;
 }
 
 #ifdef IMGUI_ENABLE_FREETYPE
