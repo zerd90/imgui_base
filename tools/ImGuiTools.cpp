@@ -1557,11 +1557,7 @@ namespace ImGui
 
     void ConfirmDialog::showContent()
     {
-        ImGui::Text("%s", mMessage.c_str());
-
-        ImVec2 pos         = GetCursorScreenPos();
         ImVec2 buttonsSize = ImVec2(0, 0);
-
         for (size_t i = 0; i < mButtons.size(); i++)
         {
             auto &button = mButtons[i];
@@ -1570,8 +1566,17 @@ namespace ImGui
                 buttonsSize.x += GetStyle().ItemSpacing.x;
             buttonsSize.y = std::max(buttonsSize.y, button.pButton->itemSize().y);
         }
+        ImVec2 pos    = GetCursorScreenPos();
+        mManualSize.x = buttonsSize.x + 100;
 
-        mManualSize = pos + buttonsSize + ImVec2(100, 50) - mWinPos;
+        ImVec2 textSize = CalcTextSize(mMessage.c_str()) + ImVec2(50, 0);
+        if (textSize.x > mManualSize.x)
+            mManualSize.x = textSize.x;
+
+        ImGui::Text("%s", mMessage.c_str());
+
+        pos           = GetCursorScreenPos();
+        mManualSize.y = pos.y + buttonsSize.y + 50 - mWinPos.y;
 
         SetCursorScreenPos(mWinPos + mWinSize - buttonsSize - GetStyle().WindowPadding);
 
@@ -1588,4 +1593,9 @@ namespace ImGui
                 button.onPressed();
         }
     }
+    void ConfirmDialog::setMessage(const std::string &message)
+    {
+        mMessage = message;
+    }
+
 } // namespace ImGui

@@ -26,6 +26,7 @@ namespace ImGui
     {
     public:
         IImGuiItem(const std::string &label);
+        virtual ~IImGuiItem() {}
         void               setLabel(const std::string &_label);
         const std::string &getLabel();
 
@@ -157,6 +158,7 @@ namespace ImGui
     public:
         IImGuiInput() : IImGuiItem() {}
         IImGuiInput(const std::string &label, bool labelOnLeft);
+        virtual ~IImGuiInput() {}
         // spacing between label and input box
         void setSpacing(float spacing);
 
@@ -288,6 +290,7 @@ namespace ImGui
     {
     public:
         ImGuiInputCombo(const std::string &title, bool labelOnLeft = false);
+        virtual ~ImGuiInputCombo() {}
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_COMBO_FLAGS, ComboFlag, mComboFlags)
 
         void     addSelectableItem(ComboTag tag, const std::string &itemDisplayStr);

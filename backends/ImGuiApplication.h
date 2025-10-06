@@ -25,6 +25,75 @@
 
 namespace ImGui
 {
+    enum SettingWindowItemType
+    {
+        SettingWindowItemTypeBool,
+        SettingWindowItemTypeInt,
+        SettingWindowItemTypeFloat,
+        SettingWindowItemTypeString,
+        SettingWindowItemTypeCombo,
+        SettingWindowItemTypePath,
+        SettingWindowItemTypeButton,
+    };
+
+// Create the path when it does not exist, otherwise refuse the selection
+#define SettingPathFlags_CreateWhenNotExist (0x1)
+// Select directory instead of file
+#define SettingPathFlags_SelectDir          (0x2)
+// Select for save, otherwise select for load
+#define SettingPathFlags_SelectForSave      (0x4)
+
+    union SettingWindowItemData
+    {
+        struct
+        {
+            bool *boolData;
+        } boolItem;
+        struct
+        {
+            int *intData;
+            int  minValue;
+            int  maxValue;
+            bool stepEnable;
+        } intItem;
+        struct
+        {
+            float *floatData;
+            float  minValue;
+            float  maxValue;
+            bool   stepEnable;
+        } floatItem;
+        struct
+        {
+            std::string *stringData;
+        } stringItem;
+        struct
+        {
+            ComboTag *comboData;
+        } comboItem;
+        struct
+        {
+            std::string *pathData;
+            uint32_t     flags;
+        } pathItem;
+    };
+    struct SettingWindowItem
+    {
+        std::string                  label;
+        SettingWindowItemType        type = SettingWindowItemTypeBool;
+        SettingWindowItemData        data;
+        std::function<void()>        onChange;
+        std::shared_ptr<IImGuiInput> settingInput;
+        std::vector<FilterSpec>      typeFilters; // filters for file dialog
+    };
+    struct SettingWindowCategory
+    {
+        std::string                        label;
+        std::string                        categoryPath;
+        std::vector<SettingWindowItem>     items;
+        std::vector<SettingWindowCategory> subCategories;
+    };
+
     class ImGuiApplication : public ImGui::ImGuiMainWindow
     {
         friend void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
@@ -77,6 +146,31 @@ namespace ImGui
         void addSettingArr(SettingValue::SettingType type, std::string name, int arrLen, std::function<void(const void *)> setVal,
                            std::function<void(void *)> getVal);
 
+        void addSettingWindowItemBool(const std::vector<std::string> &categoryPath, const std::string &label, bool *data,
+                                      const std::function<void()> &onChange = nullptr);
+        void addSettingWindowItemInt(const std::vector<std::string> &categoryPath, const std::string &label, int *data,
+                                     int minValue = INT_MIN, int maxValue = INT_MAX, bool stepEnable = false,
+                                     const std::function<void()> &onChange = nullptr);
+        void addSettingWindowItemFloat(const std::vector<std::string> &categoryPath, const std::string &label, float *data,
+                                       float minValue = FLT_MIN, float maxValue = FLT_MAX, bool stepEnable = false,
+                                       const std::function<void()> &onChange = nullptr);
+        void addSettingWindowItemString(const std::vector<std::string> &categoryPath, const std::string &label, std::string *data,
+                                        const std::function<void()> &onChange = nullptr);
+        void addSettingWindowItemCombo(const std::vector<std::string> &categoryPath, const std::string &label, ComboTag *data,
+                                       const std::vector<std::pair<ComboTag, std::string>> &comboItems,
+                                       const std::function<void()>                         &onChange = nullptr);
+        void addSettingWindowItemPath(const std::vector<std::string> &categoryPath, const std::string &label, std::string *data,
+                                      uint32_t flags = 0, const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
+                                      const std::function<void()> &onChange = nullptr);
+        void addSettingWindowItemButton(const std::vector<std::string> &categoryPath, const std::string &label,
+                                        const std::function<void()> &onChange);
+
+    private:
+        void                   showSettingWindow();
+        void                   showSettingWindowItem(SettingWindowItem &item);
+        void                   showSettingWindowCategory(SettingWindowCategory *category);
+        SettingWindowCategory *findCategory(std::vector<std::string> categoryPath);
+
     protected:
         // Set these in presetInternal
         ImGuiAppRect mWindowRect;
@@ -103,7 +197,7 @@ namespace ImGui
 
     protected:
         bool mGuiVSync = true;
-        enum GUI_THEME
+        enum GUI_THEME : int
         {
             THEME_DARK,
             THEME_LIGHT,
@@ -119,8 +213,15 @@ namespace ImGui
         void onFontChanged(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow);
 
     private:
-        ImGui::LoggerWindow     mLogger;
-        ImGui::FontChooseWindow mFontChooser;
+        ImGui::LoggerWindow                mLogger;
+        ImGui::FontChooseWindow            mFontChooser;
+        IImGuiWindow                       mSettingsWindow;
+        std::vector<SettingWindowCategory> mSettingCategories;
+        SettingWindowCategory             *mCurrentSettingCategory = nullptr;
+
+        SettingWindowItem *mCreateFilePathItem = nullptr;
+        std::string        mCreateFilePath;
+        ConfirmDialog      mCreateFileConfirmDialog;
     };
 
 } // namespace ImGui

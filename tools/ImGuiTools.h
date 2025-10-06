@@ -237,6 +237,7 @@ namespace ImGui
         virtual ~ConfirmDialog() {}
         void addButton(const std::string &name, std::function<void()> onPressed);
         void removeButton(const std::string &name);
+        void setMessage(const std::string &message);
 
     protected:
         virtual void showContent() override;

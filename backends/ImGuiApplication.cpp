@@ -12,7 +12,11 @@
 #include "ApplicationSetting.h"
 
 using std::string;
+using std::vector;
 namespace fs = std::filesystem;
+
+#define SETTING_WINDOW_WIDTH  720
+#define SETTING_WINDOW_HEIGHT 540
 
 using namespace ImGui;
 
@@ -21,7 +25,8 @@ ImGuiApplication *gUserApp = nullptr;
 ImGuiApplication::ImGuiApplication()
     : mLogger("Application Log"),
       mFontChooser("Font Chooser", std::bind(&ImGuiApplication::onFontChanged, this, std::placeholders::_1, std::placeholders::_2,
-                                             std::placeholders::_3, std::placeholders::_4))
+                                             std::placeholders::_3, std::placeholders::_4)),
+      mSettingsWindow("Settings"), mCreateFileConfirmDialog("Create File", "Are you sure to create the file?")
 {
     mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
@@ -71,6 +76,71 @@ ImGuiApplication::ImGuiApplication()
 
     mFontChooser.setHasCloseButton(false);
     mFontChooser.addWindowFlag(ImGuiWindowFlags_NoScrollbar);
+
+    mSettingsWindow.addWindowFlag(ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    mSettingsWindow.setSize(ImVec2(SETTING_WINDOW_WIDTH, SETTING_WINDOW_HEIGHT));
+    mSettingsWindow.setContent([this]() { showSettingWindow(); });
+
+    mCreateFileConfirmDialog.addButton(
+        "Yes",
+        [this]()
+        {
+            mCreateFileConfirmDialog.close();
+
+            if (!mCreateFilePathItem || mCreateFilePath.empty()
+                || !(mCreateFilePathItem->data.pathItem.flags & SettingPathFlags_CreateWhenNotExist))
+                return;
+
+            bool createDir = false;
+            if (mCreateFilePathItem->data.pathItem.flags & SettingPathFlags_SelectDir
+                || mCreateFilePathItem->data.pathItem.flags & SettingPathFlags_SelectForSave)
+                createDir = true;
+
+            string createPath = mCreateFilePath;
+            if (mCreateFilePathItem->data.pathItem.flags & SettingPathFlags_SelectForSave)
+                createPath = fs::u8path(mCreateFilePath).parent_path().u8string();
+
+            std::error_code ec;
+            vector<string>  parentPaths;
+            string          filePath = createPath;
+            while (filePath != fs::u8path(filePath).parent_path().u8string())
+            {
+                filePath = fs::u8path(filePath).parent_path().u8string();
+                parentPaths.push_back(filePath);
+            }
+            for (auto it = parentPaths.rbegin(); it != parentPaths.rend(); it++)
+            {
+                if (fs::exists(fs::u8path(*it), ec))
+                    continue;
+                fs::create_directories(fs::u8path(*it), ec);
+            }
+            if (createDir)
+            {
+                fs::create_directories(fs::u8path(createPath), ec);
+            }
+            else
+            {
+                FILE *fp = fopen(utf8ToLocal(createPath).c_str(), "w");
+                if (fp)
+                    fclose(fp);
+            }
+
+            *(mCreateFilePathItem->data.pathItem.pathData) = mCreateFilePath;
+            if (mCreateFilePathItem->onChange)
+                mCreateFilePathItem->onChange();
+            auto pathInput = std::dynamic_pointer_cast<ImGuiInputString>(mCreateFilePathItem->settingInput);
+            pathInput->setValue(mCreateFilePath);
+
+            mCreateFilePath.clear();
+            mCreateFilePathItem = nullptr;
+        });
+    mCreateFileConfirmDialog.addButton("No",
+                                       [this]()
+                                       {
+                                           mCreateFilePath.clear();
+                                           mCreateFilePathItem = nullptr;
+                                           mCreateFileConfirmDialog.close();
+                                       });
 
     gUserApp = this;
 }
@@ -125,43 +195,54 @@ void ImGuiApplication::preset()
     // Menu
     if (mMenuEnable)
     {
-        addMenu({"Settings", "Show Log"}, [this]() { mLogger.open(); }, &mShowLogWindow);
-        addMenu(
-            {"GUI", "Theme", "Dark"},
-            [this]()
-            {
-                mAppTheme = THEME_DARK;
-                ImGui::StyleColorsDark();
-            },
-            [this]() { return mAppTheme == THEME_DARK; });
-
-        addMenu(
-            {"GUI", "Theme", "Light"},
-            [this]()
-            {
-                mAppTheme = THEME_LIGHT;
-                ImGui::StyleColorsLight();
-            },
-            [this]() { return mAppTheme == THEME_LIGHT; });
-
-        addMenu(
-            {"GUI", "Theme", "Classic"},
-            [this]()
-            {
-                mAppTheme = THEME_CLASSIC;
-                ImGui::StyleColorsClassic();
-            },
-            [this]() { return mAppTheme == THEME_CLASSIC; });
-
-        addMenu({"GUI", "V-Sync"}, nullptr, &mGuiVSync);
-        addMenu({"GUI", "Show Status"}, nullptr, &mShowUIStatus);
-        if (mAppFontPath.empty())
-            addMenu({"GUI", "Font"}, [&]() { mFontChooser.open(); });
+        addMenu({"Menu", "Settings"}, [this]() { mSettingsWindow.open(); });
     }
     else
     {
         removeWindowFlag(ImGuiWindowFlags_MenuBar);
     }
+
+    vector<string> settingPath;
+    settingPath.push_back("GUI");
+    vector<std::pair<ComboTag, string>> themeItems = {
+        {THEME_DARK,    "Dark"   },
+        {THEME_LIGHT,   "Light"  },
+        {THEME_CLASSIC, "Classic"}
+    };
+
+    addSettingWindowItemCombo(settingPath, "Theme", (ComboTag *)&mAppTheme, themeItems,
+                              [this]()
+                              {
+                                  switch (mAppTheme)
+                                  {
+                                      case THEME_DARK:
+                                          ImGui::StyleColorsDark();
+                                          break;
+                                      case THEME_LIGHT:
+                                          ImGui::StyleColorsLight();
+                                          break;
+                                      case THEME_CLASSIC:
+                                          ImGui::StyleColorsClassic();
+                                          break;
+                                      default:
+                                          break;
+                                  }
+                              });
+
+    addSettingWindowItemBool(settingPath, "V-Sync", &mGuiVSync);
+    addSettingWindowItemBool(settingPath, "Show UI Status", &mShowUIStatus);
+    if (mAppFontPath.empty())
+    {
+        addSettingWindowItemButton(settingPath, "Font", [this]() { mFontChooser.open(); });
+    }
+    addSettingWindowItemBool({"Debug"}, "Show Application Log", &mShowLogWindow,
+                             [this]()
+                             {
+                                 if (mShowLogWindow)
+                                     mLogger.open();
+                                 else
+                                     mLogger.close();
+                             });
 }
 
 void ImGuiApplication::addSetting(SettingValue::SettingType type, std::string name, std::function<void(const void *)> setVal,
@@ -184,12 +265,12 @@ void ImGuiApplication::showContent()
     if (mShowUIStatus)
         ImGui::ShowMetricsWindow(&mShowUIStatus);
 
-    if (mShowLogWindow)
-    {
-        mLogger.show();
-        if (mLogger.justClosed())
-            mShowLogWindow = false;
-    }
+    mLogger.show();
+    if (mLogger.justClosed())
+        mShowLogWindow = false;
+
+    mSettingsWindow.show();
+
     mFontChooser.show();
 }
 
@@ -400,4 +481,393 @@ void ImGuiApplication::onFontChanged(const std::string &fontPath, int fontIdx, f
 
     if (applyNow)
         restart();
+}
+
+SettingWindowCategory *ImGuiApplication::findCategory(vector<std::string> categoryPath)
+{
+    auto                  *subCategorys = &mSettingCategories;
+    SettingWindowCategory *category     = nullptr;
+    for (int i = 0; i < categoryPath.size(); i++)
+    {
+        std::string categoryLabel = categoryPath[i];
+        auto        categoryIter =
+            std::find_if(subCategorys->begin(), subCategorys->end(),
+                         [&categoryLabel](const SettingWindowCategory &cat) { return cat.label == categoryLabel; });
+        if (categoryIter == subCategorys->end())
+        {
+            SettingWindowCategory subCategory;
+            subCategory.label = categoryLabel;
+            for (int j = 0; j < i; j++)
+            {
+                subCategory.categoryPath += categoryPath[j] + "/";
+            }
+            subCategory.categoryPath += categoryLabel;
+            subCategorys->push_back(subCategory);
+            category     = &subCategorys->back();
+            subCategorys = &category->subCategories;
+        }
+        else
+        {
+            category     = &(*categoryIter);
+            subCategorys = &category->subCategories;
+        }
+    }
+    return category;
+}
+
+void ImGuiApplication::addSettingWindowItemBool(const vector<std::string> &categoryPath, const std::string &label, bool *data,
+                                                const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.label    = label;
+    item.type     = SettingWindowItemTypeBool;
+    item.onChange = onChange;
+
+    item.data.boolItem.boolData = data;
+
+    category->items.push_back(item);
+}
+
+void ImGuiApplication::addSettingWindowItemInt(const vector<std::string> &categoryPath, const std::string &label, int *data,
+                                               int minValue, int maxValue, bool stepEnable, const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypeInt;
+    item.label    = label;
+    item.onChange = onChange;
+
+    item.data.intItem.minValue   = minValue;
+    item.data.intItem.maxValue   = maxValue;
+    item.data.intItem.stepEnable = stepEnable;
+    item.data.intItem.intData    = data;
+
+    auto intInput = std::make_shared<ImGuiInputInt>(label, *data, true);
+    intInput->setSyncValue(data);
+    intInput->setMinValue(minValue);
+    intInput->setMaxValue(maxValue);
+    if (stepEnable)
+        intInput->setStep(1, 100);
+
+    item.settingInput = intInput;
+
+    category->items.push_back(item);
+}
+
+void ImGuiApplication::addSettingWindowItemFloat(const vector<std::string> &categoryPath, const std::string &label, float *data,
+                                                 float minValue, float maxValue, bool stepEnable,
+                                                 const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypeFloat;
+    item.label    = label;
+    item.onChange = onChange;
+
+    item.data.floatItem.minValue   = minValue;
+    item.data.floatItem.maxValue   = maxValue;
+    item.data.floatItem.stepEnable = stepEnable;
+    item.data.floatItem.floatData  = data;
+
+    auto floatInput = std::make_shared<ImGuiInputFloat>(label, *data, true);
+    floatInput->setSyncValue(data);
+    floatInput->setMinValue(minValue);
+    floatInput->setMaxValue(maxValue);
+    if (stepEnable)
+        floatInput->setStep(0.1f, 100.0f);
+
+    item.settingInput = floatInput;
+
+    category->items.push_back(item);
+}
+
+void ImGuiApplication::addSettingWindowItemString(const vector<std::string> &categoryPath, const std::string &label,
+                                                  std::string *data, const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypeString;
+    item.label    = label;
+    item.onChange = onChange;
+
+    item.data.stringItem.stringData = data;
+
+    auto stringInput  = std::make_shared<ImGuiInputString>(label, *data, true);
+    item.settingInput = stringInput;
+
+    category->items.push_back(item);
+}
+
+void ImGuiApplication::addSettingWindowItemCombo(const vector<std::string> &categoryPath, const std::string &label,
+                                                 ComboTag *data, const vector<std::pair<ComboTag, std::string>> &comboItems,
+                                                 const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypeCombo;
+    item.label    = label;
+    item.onChange = onChange;
+
+    item.data.comboItem.comboData = data;
+    auto comboInput               = std::make_shared<ImGuiInputCombo>(label, true);
+    for (auto &comboItem : comboItems)
+        comboInput->addSelectableItem(comboItem.first, comboItem.second);
+    comboInput->setSelected(*data);
+    item.settingInput = comboInput;
+
+    category->items.push_back(item);
+}
+void ImGuiApplication::addSettingWindowItemPath(const vector<std::string> &categoryPath, const std::string &label,
+                                                std::string *data, uint32_t flags, const std::vector<FilterSpec> &typeFilters,
+                                                const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypePath;
+    item.label    = label;
+    item.onChange = onChange;
+
+    item.data.pathItem.pathData = data;
+    item.data.pathItem.flags    = flags;
+
+    auto pathInput    = std::make_shared<ImGuiInputString>(label, *data, true);
+    item.settingInput = pathInput;
+    item.typeFilters  = typeFilters;
+
+    category->items.push_back(item);
+}
+
+void ImGuiApplication::addSettingWindowItemButton(const vector<std::string> &categoryPath, const std::string &label,
+                                                  const std::function<void()> &onChange)
+{
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type     = SettingWindowItemTypeButton;
+    item.label    = label;
+    item.onChange = onChange;
+
+    category->items.push_back(item);
+}
+
+#define TREE_NODE_FLAGS \
+    (ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth)
+#define TREE_LEAF_FLAGS (TREE_NODE_FLAGS | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen)
+
+void ImGuiApplication::showSettingWindowCategory(SettingWindowCategory *category)
+{
+    int nodeFlags = category->subCategories.empty() ? TREE_LEAF_FLAGS : TREE_NODE_FLAGS;
+
+    if (mCurrentSettingCategory == category)
+        nodeFlags |= ImGuiTreeNodeFlags_Selected;
+
+    ImGui::TreeNodeEx(category->label.c_str(), nodeFlags);
+    if (!category->subCategories.empty())
+    {
+        for (auto &subCategory : category->subCategories)
+            showSettingWindowCategory(&subCategory);
+        ImGui::TreePop();
+    }
+
+    if (IsItemClicked())
+    {
+        mCurrentSettingCategory = category;
+    }
+}
+
+void ImGuiApplication::showSettingWindowItem(SettingWindowItem &item)
+{
+    switch (item.type)
+    {
+        default:
+            break;
+        case SettingWindowItemTypeBool:
+        {
+            ImGui::Checkbox(item.label.c_str(), item.data.boolItem.boolData);
+            if (IsItemDeactivated())
+            {
+                if (item.onChange)
+                    item.onChange();
+            }
+            break;
+        }
+        case SettingWindowItemTypeInt:
+        case SettingWindowItemTypeFloat:
+        case SettingWindowItemTypeString:
+        {
+            item.settingInput->show();
+            if (item.settingInput->isDeactivated())
+            {
+                if (item.onChange)
+                    item.onChange();
+            }
+            break;
+        }
+        case SettingWindowItemTypeCombo:
+        {
+            auto comboInput = std::dynamic_pointer_cast<ImGuiInputCombo>(item.settingInput);
+            comboInput->show();
+            if (comboInput->selectChanged())
+            {
+                *(item.data.comboItem.comboData) = comboInput->getSelected();
+                if (item.onChange)
+                    item.onChange();
+            }
+            break;
+        }
+        case SettingWindowItemTypePath:
+        {
+            auto pathInput = std::dynamic_pointer_cast<ImGuiInputString>(item.settingInput);
+            pathInput->show();
+            string tmpResult;
+            string curPath       = *(item.data.pathItem.pathData);
+            bool   isPathChanged = false;
+            if (pathInput->isDeactivated())
+            {
+                tmpResult = pathInput->getValue();
+                if (!tmpResult.empty() && tmpResult != curPath)
+                    isPathChanged = true;
+            }
+            SameLine();
+            string btnLabel = "Browse##";
+            btnLabel += item.label;
+
+            if (ImGui::Button(btnLabel.c_str()))
+            {
+                string dlgResult;
+                string initPath;
+                if (!curPath.empty())
+                {
+                    fs::path curPathPath = fs::u8path(curPath);
+                    if (fs::exists(curPathPath))
+                        initPath = curPathPath.parent_path().u8string();
+                }
+                else
+                {
+                    initPath = fs::u8path(mExePath).parent_path().u8string();
+                }
+                if (item.data.pathItem.flags & SettingPathFlags_SelectDir)
+                {
+                    dlgResult = selectDir(initPath);
+                }
+                else if (item.data.pathItem.flags & SettingPathFlags_SelectForSave)
+                {
+                    dlgResult = getSavePath(item.typeFilters, "", initPath);
+                }
+                else
+                {
+                    dlgResult = selectFile(item.typeFilters, initPath);
+                }
+
+                if (!dlgResult.empty())
+                {
+                    tmpResult     = dlgResult;
+                    isPathChanged = true;
+                }
+            }
+
+            if (isPathChanged)
+            {
+                std::error_code ec;
+
+                // Check if the path is valid
+                string checkPath = tmpResult;
+                if (item.data.pathItem.flags & SettingPathFlags_SelectForSave)
+                    checkPath = fs::u8path(tmpResult).parent_path().u8string();
+
+
+                bool isPathValid = fs::exists(fs::u8path(checkPath), ec);
+                if (!isPathValid)
+                {
+                    if (item.data.pathItem.flags & SettingPathFlags_CreateWhenNotExist)
+                    {
+                        mCreateFileConfirmDialog.setMessage(combineString("Path ", tmpResult, " does not exist, Create it?"));
+                        mCreateFileConfirmDialog.open();
+                        mCreateFilePath     = tmpResult;
+                        mCreateFilePathItem = &item;
+                    }
+                    else
+                    {
+                        mCreateFileConfirmDialog.setMessage(combineString("Path ", tmpResult, " does not exist!"));
+                        mCreateFileConfirmDialog.open();
+                        pathInput->setValue(curPath);
+                    }
+                }
+                else
+                {
+                    *item.data.pathItem.pathData = tmpResult;
+                    if (item.onChange)
+                        item.onChange();
+                    pathInput->setValue(tmpResult);
+                }
+            }
+
+            // TODO
+            break;
+        }
+        case SettingWindowItemTypeButton:
+        {
+            if (ImGui::Button(item.label.c_str()))
+            {
+                if (item.onChange)
+                    item.onChange();
+            }
+            break;
+        }
+    }
+}
+
+void ImGuiApplication::showSettingWindow()
+{
+    if (!mCurrentSettingCategory)
+    {
+        mCurrentSettingCategory = &mSettingCategories[0];
+    }
+
+    ImGui::BeginChild("Setting Category", ImVec2(SETTING_WINDOW_WIDTH / 4.f, 0), ImGuiChildFlags_Borders);
+
+    for (auto &category : mSettingCategories)
+        showSettingWindowCategory(&category);
+
+    ImGui::EndChild();
+    SameLine();
+    ImGui::BeginChild("Setting Options", ImVec2(0, 0), ImGuiChildFlags_Borders);
+    Text(">> %s", mCurrentSettingCategory->label.c_str());
+    Separator();
+    for (auto &item : mCurrentSettingCategory->items)
+        showSettingWindowItem(item);
+
+    ImGui::EndChild();
+    mCreateFileConfirmDialog.show();
+    if (mCreateFileConfirmDialog.justClosed())
+    {
+        if (mCreateFilePathItem)
+        {
+            auto pathInput = std::dynamic_pointer_cast<ImGuiInputString>(mCreateFilePathItem->settingInput);
+            pathInput->setValue(*(mCreateFilePathItem->data.pathItem.pathData));
+        }
+        mCreateFilePath.clear();
+        mCreateFilePathItem = nullptr;
+    }
 }

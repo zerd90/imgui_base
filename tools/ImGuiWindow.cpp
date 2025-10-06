@@ -437,7 +437,10 @@ namespace ImGui
         }
 
         if (!mOpened)
+        {
+            mJustClosed = false;
             return;
+        }
 
         if (mManualSize.x > 0 && mManualSize.y > 0)
             SetNextWindowSize(mManualSize, mManualSizeCond);
@@ -454,6 +457,10 @@ namespace ImGui
             updateWindowStatus();
             showContent();
             EndPopup();
+        }
+        else
+        {
+            mJustClosed = true;
         }
     }
 

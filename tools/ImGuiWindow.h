@@ -36,8 +36,11 @@ namespace ImGui
         virtual void show();
 
         virtual void setTitle(const std::string &title);
-        void         enableStatusBar(bool on);
 
+        // default is false
+        void enableStatusBar(bool on);
+
+        // default is true
         void setHasCloseButton(bool hasCloseButton);
 
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_WINDOW_FLAGS, WindowFlag, mWindowFlags)
