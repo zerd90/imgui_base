@@ -1632,8 +1632,10 @@ static LRESULT CALLBACK ImGui_ImplWin32_WndProcHandler_PlatformWindow(HWND hWnd,
                 break;
         }
     }
+
+    LRESULT ret = DefWindowProcW(hWnd, msg, wParam, lParam);
     if (result == 0)
-        result = DefWindowProc(hWnd, msg, wParam, lParam);
+        result = ret;
     if (hwnd_ctx != prev_ctx && hwnd_ctx != NULL)
         ImGui::SetCurrentContext(prev_ctx);
     return result;
@@ -1713,7 +1715,7 @@ namespace ImGui
 
     ImRect maximizeMainWindow()
     {
-        HWND   hwnd     = getMainWindow();
+        HWND hwnd = getMainWindow();
         if (!hwnd)
             return ImRect();
         ImRect wordArea = getDisplayWorkArea();

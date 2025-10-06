@@ -822,8 +822,6 @@ void ImGuiApplication::showSettingWindowItem(SettingWindowItem &item)
                     pathInput->setValue(tmpResult);
                 }
             }
-
-            // TODO
             break;
         }
         case SettingWindowItemTypeButton:
