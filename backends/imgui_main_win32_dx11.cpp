@@ -123,6 +123,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     io.IniFilename = gUserApp->getConfigPath();
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
+    gUserApp->initSettingsWindow();
+
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEXW wc = {sizeof(wc),

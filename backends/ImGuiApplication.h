@@ -79,12 +79,13 @@ namespace ImGui
     };
     struct SettingWindowItem
     {
-        std::string                  label;
-        SettingWindowItemType        type = SettingWindowItemTypeBool;
-        SettingWindowItemData        data;
-        std::function<void()>        onChange;
-        std::shared_ptr<IImGuiInput> settingInput;
-        std::vector<FilterSpec>      typeFilters; // filters for file dialog
+        std::string                 label;
+        SettingWindowItemType       type = SettingWindowItemTypeBool;
+        SettingWindowItemData       data;
+        std::function<void()>       onChange;
+        std::shared_ptr<IImGuiItem> settingInput;
+        std::function<bool()>       isDisabled;
+        std::vector<FilterSpec>     typeFilters; // filters for file dialog
     };
     struct SettingWindowCategory
     {
@@ -111,6 +112,7 @@ namespace ImGui
         const char  *getConfigPath() { return mConfigPath.c_str(); };
         ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
         void         preset();
+        void         initSettingsWindow();
         std::string  getAppName() { return mApplicationName; };
         void         windowRectChange(ImGuiAppRect rect);
         void         getWindowSizeLimit(ImVec2 &minSize, ImVec2 &maxSize);
@@ -138,6 +140,7 @@ namespace ImGui
         virtual void showContent() override final;
 
         virtual void presetInternal() {}
+        virtual void initSettingsWindowInternal() {}
 
         // call addSetting in presetInternal or the constructor of derived class
         void addSetting(SettingValue::SettingType type, std::string name, std::function<void(const void *)> setVal,
@@ -146,24 +149,35 @@ namespace ImGui
         void addSettingArr(SettingValue::SettingType type, std::string name, int arrLen, std::function<void(const void *)> setVal,
                            std::function<void(void *)> getVal);
 
+        // call these addSettingWindowItem* in initSettingsWindowInternal
         void addSettingWindowItemBool(const std::vector<std::string> &categoryPath, const std::string &label, bool *data,
-                                      const std::function<void()> &onChange = nullptr);
+                                      const std::function<void()> &onChange = nullptr, const std::string &tooltip = std::string(),
+                                      const std::function<bool()> isDisabled = nullptr);
         void addSettingWindowItemInt(const std::vector<std::string> &categoryPath, const std::string &label, int *data,
                                      int minValue = INT_MIN, int maxValue = INT_MAX, bool stepEnable = false,
-                                     const std::function<void()> &onChange = nullptr);
+                                     const std::function<void()> &onChange = nullptr, const std::string &tooltip = std::string(),
+                                     const std::function<bool()> isDisabled = nullptr);
         void addSettingWindowItemFloat(const std::vector<std::string> &categoryPath, const std::string &label, float *data,
                                        float minValue = FLT_MIN, float maxValue = FLT_MAX, bool stepEnable = false,
-                                       const std::function<void()> &onChange = nullptr);
+                                       const std::function<void()> &onChange   = nullptr,
+                                       const std::string           &tooltip    = std::string(),
+                                       const std::function<bool()>  isDisabled = nullptr);
         void addSettingWindowItemString(const std::vector<std::string> &categoryPath, const std::string &label, std::string *data,
-                                        const std::function<void()> &onChange = nullptr);
+                                        const std::function<void()> &onChange   = nullptr,
+                                        const std::string           &tooltip    = std::string(),
+                                        const std::function<bool()>  isDisabled = nullptr);
         void addSettingWindowItemCombo(const std::vector<std::string> &categoryPath, const std::string &label, ComboTag *data,
                                        const std::vector<std::pair<ComboTag, std::string>> &comboItems,
-                                       const std::function<void()>                         &onChange = nullptr);
+                                       const std::function<void()>                         &onChange   = nullptr,
+                                       const std::string                                   &tooltip    = std::string(),
+                                       const std::function<bool()>                          isDisabled = nullptr);
         void addSettingWindowItemPath(const std::vector<std::string> &categoryPath, const std::string &label, std::string *data,
                                       uint32_t flags = 0, const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
-                                      const std::function<void()> &onChange = nullptr);
+                                      const std::function<void()> &onChange = nullptr, const std::string &tooltip = std::string(),
+                                      const std::function<bool()> isDisabled = nullptr);
         void addSettingWindowItemButton(const std::vector<std::string> &categoryPath, const std::string &label,
-                                        const std::function<void()> &onChange);
+                                        const std::function<void()> &onChange, const std::string &tooltip = std::string(),
+                                        const std::function<bool()> isDisabled = nullptr);
 
     private:
         void                   showSettingWindow();
@@ -222,6 +236,7 @@ namespace ImGui
         SettingWindowItem *mCreateFilePathItem = nullptr;
         std::string        mCreateFilePath;
         ConfirmDialog      mCreateFileConfirmDialog;
+        bool mEnableFontChanging = true;
     };
 
 } // namespace ImGui

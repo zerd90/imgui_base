@@ -195,6 +195,8 @@ int main(int argc, char **argv)
 
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
+    gUserApp->initSettingsWindow();
+
     // Create window with graphics context
     GLFWwindow *window = glfwCreateWindow(gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h,
                                           gUserApp->getAppName().c_str(), nullptr, nullptr);
