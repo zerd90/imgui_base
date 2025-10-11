@@ -713,6 +713,7 @@ void ImGuiApplication::showSettingWindowItem(SettingWindowItem &item)
             boolInput->show();
             if (boolInput->isStateChanged())
             {
+                *(item.data.boolItem.boolData) = boolInput->isChecked();
                 if (item.onChange)
                     item.onChange();
             }
