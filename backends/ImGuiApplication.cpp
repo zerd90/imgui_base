@@ -458,7 +458,7 @@ SettingWindowCategory *ImGuiApplication::findCategory(vector<std::string> catego
 {
     auto                  *subCategorys = &mSettingCategories;
     SettingWindowCategory *category     = nullptr;
-    for (int i = 0; i < categoryPath.size(); i++)
+    for (size_t i = 0; i < categoryPath.size(); i++)
     {
         std::string categoryLabel = categoryPath[i];
         auto        categoryIter =
@@ -468,7 +468,7 @@ SettingWindowCategory *ImGuiApplication::findCategory(vector<std::string> catego
         {
             SettingWindowCategory subCategory;
             subCategory.label = categoryLabel;
-            for (int j = 0; j < i; j++)
+            for (size_t j = 0; j < i; j++)
             {
                 subCategory.categoryPath += categoryPath[j] + "/";
             }
@@ -490,6 +490,7 @@ void ImGuiApplication::addSettingWindowItemBool(const vector<std::string> &categ
                                                 const std::function<void()> &onChange, const std::string &tooltip,
                                                 const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
@@ -503,6 +504,7 @@ void ImGuiApplication::addSettingWindowItemBool(const vector<std::string> &categ
     item.data.boolItem.boolData = data;
 
     auto checkBox = std::make_shared<ImGuiCheckbox>(label);
+    checkBox->setChecked(*data);
     checkBox->setToolTip(tooltip);
     item.settingInput = checkBox;
 
@@ -513,6 +515,7 @@ void ImGuiApplication::addSettingWindowItemInt(const vector<std::string> &catego
                                                int minValue, int maxValue, bool stepEnable, const std::function<void()> &onChange,
                                                const std::string &tooltip, const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
@@ -546,6 +549,7 @@ void ImGuiApplication::addSettingWindowItemFloat(const vector<std::string> &cate
                                                  const std::function<void()> &onChange, const std::string &tooltip,
                                                  const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
@@ -578,6 +582,7 @@ void ImGuiApplication::addSettingWindowItemString(const vector<std::string> &cat
                                                   std::string *data, const std::function<void()> &onChange,
                                                   const std::string &tooltip, const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
@@ -602,6 +607,7 @@ void ImGuiApplication::addSettingWindowItemCombo(const vector<std::string> &cate
                                                  const std::function<void()> &onChange, const std::string &tooltip,
                                                  const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
@@ -627,6 +633,7 @@ void ImGuiApplication::addSettingWindowItemPath(const vector<std::string> &categ
                                                 const std::function<void()> &onChange, const std::string &tooltip,
                                                 const std::function<bool()> isDisabled)
 {
+    IM_ASSERT(data != nullptr);
     auto *category = findCategory(categoryPath);
     if (category == nullptr)
         return;
