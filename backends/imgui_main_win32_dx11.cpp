@@ -22,6 +22,7 @@ static ID3D11DeviceContext    *g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain         *g_pSwapChain        = nullptr;
 static UINT                    g_ResizeWidth = 0, g_ResizeHeight = 0;
 static ID3D11RenderTargetView *g_mainRenderTargetView = nullptr;
+static std::atomic_bool        gRendering             = false;
 
 // Forward declarations of helper functions
 bool           CreateDeviceD3D(HWND hWnd);
@@ -170,7 +171,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
     // io.ConfigViewportsNoAutoMerge = true;
-    io.ConfigViewportsNoTaskBarIcon = true;
+    io.ConfigViewportsNoTaskBarIcon = false;
     // io.ConfigViewportsNoDefaultParent = true;
     // io.ConfigDockingAlwaysTabBar = true;
     // io.ConfigDockingTransparentPayload = true;
@@ -223,8 +224,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (done)
             break;
 
-        if (doGUIRender())
+        gRendering = true;
+        bool quit  = doGUIRender();
+        gRendering = false;
+        if (quit)
+        {
             break;
+        }
     }
 
     gUserApp->exit();
@@ -427,14 +433,14 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (GetWindowRect(hWnd, &win_rect))
                 gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
-            if (g_resources_initialized && doGUIRender())
+            if (g_resources_initialized && !gRendering && doGUIRender())
                 g_exit = true;
 
             break;
         }
         case WM_PAINT:
         {
-            if (g_resources_initialized && doGUIRender())
+            if (g_resources_initialized && !gRendering && doGUIRender())
                 g_exit = true;
             break;
         }

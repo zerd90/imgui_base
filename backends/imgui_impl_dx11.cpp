@@ -1,45 +1,8 @@
-// dear imgui: Renderer Backend for DirectX11
-// This needs to be used along with a Platform Backend (e.g. Win32)
-
-// Implemented features:
-//  [X] Renderer: User texture binding. Use 'ID3D11ShaderResourceView*' as ImTextureID. Read the FAQ about ImTextureID!
-//  [X] Renderer: Large meshes support (64k+ vertices) with 16-bit indices.
-//  [X] Renderer: Expose selected render state for draw callbacks to use. Access in '(ImGui_ImplXXXX_RenderState*)GetPlatformIO().Renderer_RenderState'.
-//  [X] Renderer: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable'.
-
-// You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
-// Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
-// Learn about Dear ImGui:
-// - FAQ                  https://dearimgui.com/faq
-// - Getting Started      https://dearimgui.com/getting-started
-// - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
-// - Introduction, links and more at the top of imgui.cpp
-
-// CHANGELOG
-// (minor and older changes stripped away, please see git history for details)
-//  2024-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
-//  2024-10-07: DirectX11: Changed default texture sampler to Clamp instead of Repeat/Wrap.
-//  2024-10-07: DirectX11: Expose selected render state in ImGui_ImplDX11_RenderState, which you can access in 'void* platform_io.Renderer_RenderState' during draw callbacks.
-//  2022-10-11: Using 'nullptr' instead of 'NULL' as per our switch to C++11.
-//  2021-06-29: Reorganized backend to pull data from a single structure to facilitate usage with multiple-contexts (all g_XXXX access changed to bd->XXXX).
-//  2021-05-19: DirectX11: Replaced direct access to ImDrawCmd::TextureId with a call to ImDrawCmd::GetTexID(). (will become a requirement)
-//  2021-02-18: DirectX11: Change blending equation to preserve alpha in output buffer.
-//  2019-08-01: DirectX11: Fixed code querying the Geometry Shader state (would generally error with Debug layer enabled).
-//  2019-07-21: DirectX11: Backup, clear and restore Geometry Shader is any is bound when calling ImGui_ImplDX10_RenderDrawData. Clearing Hull/Domain/Compute shaders without backup/restore.
-//  2019-05-29: DirectX11: Added support for large mesh (64K+ vertices), enable ImGuiBackendFlags_RendererHasVtxOffset flag.
-//  2019-04-30: DirectX11: Added support for special ImDrawCallback_ResetRenderState callback to reset render state.
-//  2018-12-03: Misc: Added #pragma comment statement to automatically link with d3dcompiler.lib when using D3DCompile().
-//  2018-11-30: Misc: Setting up io.BackendRendererName so it can be displayed in the About Window.
-//  2018-08-01: DirectX11: Querying for IDXGIFactory instead of IDXGIFactory1 to increase compatibility.
-//  2018-07-13: DirectX11: Fixed unreleased resources in Init and Shutdown functions.
-//  2018-06-08: Misc: Extracted imgui_impl_dx11.cpp/.h away from the old combined DX11+Win32 example.
-//  2018-06-08: DirectX11: Use draw_data->DisplayPos and draw_data->DisplaySize to setup projection matrix and clipping rectangle.
-//  2018-02-16: Misc: Obsoleted the io.RenderDrawListsFn callback and exposed ImGui_ImplDX11_RenderDrawData() in the .h file so you can call it yourself.
-//  2018-02-06: Misc: Removed call to ImGui::Shutdown() which is not available from 1.60 WIP, user needs to call CreateContext/DestroyContext themselves.
-//  2016-05-07: DirectX11: Disabling depth-write.
-
-#include "imgui.h"
 #ifndef IMGUI_DISABLE
+
+    #include "imgui.h"
+    #include "imgui_common_tools.h"
+    #include "imgui_image_render.h"
     #include "imgui_impl_dx11.h"
 
     // DirectX
@@ -48,12 +11,6 @@
     #include <d3dcompiler.h>
     #ifdef _MSC_VER
         #pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
-    #endif
-
-    #include "imgui_common_tools.h"
-
-    #ifndef dbg
-        #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__);
     #endif
 
 using namespace ImGui;
@@ -72,11 +29,15 @@ struct ImGui_ImplDX11_Data
     ID3D11PixelShader        *pPixelShader;
     ID3D11SamplerState       *pFontSampler;
     ID3D11ShaderResourceView *pFontTextureView;
+    RenderSource              fontRenderSource;
     ID3D11RasterizerState    *pRasterizerState;
     ID3D11BlendState         *pBlendState;
     ID3D11DepthStencilState  *pDepthStencilState;
     int                       VertexBufferSize;
     int                       IndexBufferSize;
+
+    ID3D11Buffer       *pPixelConstantBuffer;
+    ID3D11SamplerState *pNearestSampler;
 
     ImGui_ImplDX11_Data()
     {
@@ -90,6 +51,18 @@ struct VERTEX_CONSTANT_BUFFER_DX11
 {
     float mvp[4][4];
 };
+
+struct PS_CONSTANT_BUFFER
+{
+    int32_t format;
+    int32_t useAreaSample;
+    int32_t textureColorRange;
+    float   textureSize[2];
+    float   textureShowingSize[2];
+    float   renderSize[2];
+    uint8_t padding[12];
+};
+static_assert(sizeof(PS_CONSTANT_BUFFER) % 16 == 0, "PS_CONSTANT_BUFFER size must be multiple of 16");
 
 // Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
 // It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple
@@ -290,6 +263,12 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData *draw_data)
     render_state.SamplerDefault      = bd->pFontSampler;
     platform_io.Renderer_RenderState = &render_state;
 
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    device->Map(bd->pPixelConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+    PS_CONSTANT_BUFFER *constantBuffer = (PS_CONSTANT_BUFFER *)mappedResource.pData;
+    constantBuffer->format             = -1;
+    device->Unmap(bd->pPixelConstantBuffer, 0);
+
     // Render command lists
     // (Because we merged all buffers into a single one, we maintain our own offset into them)
     int    global_idx_offset = 0;
@@ -324,9 +303,79 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData *draw_data)
                 device->RSSetScissorRects(1, &r);
 
                 // Bind texture, Draw
-                ID3D11ShaderResourceView *texture_srv = (ID3D11ShaderResourceView *)pcmd->GetTexID();
+
+                RenderSource             *render_source = (RenderSource *)pcmd->GetTexID();
+                ID3D11ShaderResourceView *texture_srv   = nullptr;
+                if (render_source)
+                    texture_srv = (ID3D11ShaderResourceView *)(render_source->textureID[0]);
                 device->PSSetShaderResources(0, 1, &texture_srv);
+                ID3D11SamplerState *currentSampler  = nullptr;
+                bool                needRenderImage = false;
+                if (pcmd->ElemCount == 6) // maybe is a picture
+                {
+                    ImDrawVert vertices[6];
+                    auto      *pVertices = draw_list->VtxBuffer.Data + pcmd->VtxOffset;
+                    auto      *indices   = draw_list->IdxBuffer.Data + pcmd->IdxOffset;
+                    for (int i = 0; i < 6; i++)
+                    {
+                        int idx     = indices[i];
+                        vertices[i] = pVertices[idx];
+                    }
+                    ImVec2 texturePos, textureSize;
+                    ImVec2 renderPos, renderSize;
+                    if (checkTextureRect(vertices, texturePos, textureSize, renderPos, renderSize)
+                        && (render_source->sampleType != ImGuiImageSampleType_Linear
+                            || render_source->imageFormat != ImGuiImageFormat_RGBA))
+                    {
+                        needRenderImage = true;
+
+                        ID3D11ShaderResourceView *srvs[IMGUI_IMAGE_MAX_PLANES];
+                        unsigned int              planes = getPlaneCount(render_source->imageFormat);
+                        for (unsigned int i = 0; i < planes; i++)
+                        {
+                            srvs[i] = (ID3D11ShaderResourceView *)render_source->textureID[i];
+                        }
+
+                        device->PSSetShaderResources(0, planes, srvs);
+
+                        ZeroMemory(&mappedResource, sizeof(mappedResource));
+                        device->Map(bd->pPixelConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+                        constantBuffer                    = (PS_CONSTANT_BUFFER *)mappedResource.pData;
+                        constantBuffer->format            = getTextureFormat(render_source->imageFormat);
+                        constantBuffer->textureColorRange = render_source->colorRange;
+                        constantBuffer->useAreaSample     = (render_source->sampleType == ImGuiImageSampleType_Area ? 1 : 0);
+                        // printf("format: %d, colorRange: %d, useAreaSample: %d\n", constantBuffer->format,
+                        //        constantBuffer->textureColorRange, constantBuffer->useAreaSample);
+
+                        constantBuffer->textureSize[0]        = (float)render_source->width;
+                        constantBuffer->textureSize[1]        = (float)render_source->height;
+                        constantBuffer->textureShowingSize[0] = render_source->width * textureSize.x;
+                        constantBuffer->textureShowingSize[1] = render_source->height * textureSize.y;
+                        constantBuffer->renderSize[0]         = renderSize.x;
+                        constantBuffer->renderSize[1]         = renderSize.y;
+
+                        device->Unmap(bd->pPixelConstantBuffer, 0);
+
+                        if (render_source->sampleType == ImGuiImageSampleType_Nearest)
+                        {
+                            device->PSGetSamplers(0, 1, &currentSampler);
+                            device->PSSetSamplers(0, 1, &bd->pNearestSampler);
+                        }
+                    }
+                }
                 device->DrawIndexed(pcmd->ElemCount, pcmd->IdxOffset + global_idx_offset, pcmd->VtxOffset + global_vtx_offset);
+                if (currentSampler != nullptr)
+                {
+                    device->PSSetSamplers(0, 1, &currentSampler);
+                }
+                if (needRenderImage)
+                {
+                    ZeroMemory(&mappedResource, sizeof(mappedResource));
+                    device->Map(bd->pPixelConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+                    constantBuffer         = (PS_CONSTANT_BUFFER *)mappedResource.pData;
+                    constantBuffer->format = -1;
+                    device->Unmap(bd->pPixelConstantBuffer, 0);
+                }
             }
         }
         global_idx_offset += draw_list->IdxBuffer.Size;
@@ -425,7 +474,8 @@ static void ImGui_ImplDX11_CreateFontsTexture()
     }
 
     // Store our identifier
-    io.Fonts->SetTexID((ImTextureID)bd->pFontTextureView);
+    bd->fontRenderSource.textureID[0] = (uintptr_t)bd->pFontTextureView;
+    io.Fonts->SetTexID((ImTextureID)&bd->fontRenderSource);
 
     // Create texture sampler
     // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or
@@ -444,6 +494,8 @@ static void ImGui_ImplDX11_CreateFontsTexture()
         bd->pd3dDevice->CreateSamplerState(&desc, &bd->pFontSampler);
     }
 }
+
+    #include "imgui_impl_dx11_pixel_shader.inl"
 
 bool ImGui_ImplDX11_CreateDeviceObjects()
 {
@@ -532,23 +584,8 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
 
     // Create the pixel shader
     {
-        static const char *pixelShader = "struct PS_INPUT\
-            {\
-            float4 pos : SV_POSITION;\
-            float4 col : COLOR0;\
-            float2 uv  : TEXCOORD0;\
-            };\
-            sampler sampler0;\
-            Texture2D texture0;\
-            \
-            float4 main(PS_INPUT input) : SV_Target\
-            {\
-            float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-            return out_col; \
-            }";
-
         ID3DBlob *pixelShaderBlob;
-        if (FAILED(D3DCompile(pixelShader, strlen(pixelShader), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
+        if (FAILED(D3DCompile(Dx11_PixelShader, strlen(Dx11_PixelShader), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
                               &pixelShaderBlob, nullptr)))
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const
                           // char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
@@ -561,6 +598,31 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
         }
         pixelShaderBlob->Release();
     }
+
+    D3D11_BUFFER_DESC constantBufferDesc;
+    ZeroMemory(&constantBufferDesc, sizeof(constantBufferDesc));
+    constantBufferDesc.ByteWidth      = sizeof(PS_CONSTANT_BUFFER);
+    constantBufferDesc.Usage          = D3D11_USAGE_DYNAMIC;
+    constantBufferDesc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    constantBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    constantBufferDesc.MiscFlags      = 0;
+
+    bd->pd3dDevice->CreateBuffer(&constantBufferDesc, nullptr, &bd->pPixelConstantBuffer);
+
+    bd->pd3dDeviceContext->PSSetConstantBuffers(0, 1, &bd->pPixelConstantBuffer);
+
+    D3D11_SAMPLER_DESC samplerDesc;
+
+    ZeroMemory(&samplerDesc, sizeof(samplerDesc));
+    samplerDesc.Filter         = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    samplerDesc.AddressU       = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV       = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW       = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.MinLOD         = 0;
+    samplerDesc.MaxLOD         = D3D11_FLOAT32_MAX;
+
+    bd->pd3dDevice->CreateSamplerState(&samplerDesc, &bd->pNearestSampler);
 
     // Create the blending setup
     {
@@ -623,6 +685,7 @@ void ImGui_ImplDX11_InvalidateDeviceObjects()
     {
         bd->pFontTextureView->Release();
         bd->pFontTextureView = nullptr;
+        bd->fontRenderSource = RenderSource();
         ImGui::GetIO().Fonts->SetTexID(0);
     } // We copied data->pFontTextureView to io.Fonts->TexID so let's clear that as well.
     if (bd->pIB)
@@ -891,7 +954,7 @@ static void ImGui_ImplDX11_ShutdownMultiViewportSupport()
             }                     \
         } while (0)
 
-int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, int imgWidth, int imgHeight)
+int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, int texWidth, int texHeight, DXGI_FORMAT format)
 {
     ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
     if (!bd || !bd->pd3dDevice || !bd->pd3dDeviceContext)
@@ -903,11 +966,12 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     SAFE_RELEASE_RES(*psrv);
     SAFE_RELEASE_RES(*ptex);
 
-    D3D11_TEXTURE2D_DESC textureDesc = {0};
+    D3D11_TEXTURE2D_DESC textureDesc;
+    ZeroMemory(&textureDesc, sizeof(textureDesc));
 
-    textureDesc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
-    textureDesc.Width            = imgWidth;
-    textureDesc.Height           = imgHeight;
+    textureDesc.Format           = format;
+    textureDesc.Width            = texWidth;
+    textureDesc.Height           = texHeight;
     textureDesc.MipLevels        = 1;
     textureDesc.ArraySize        = 1;
     textureDesc.SampleDesc.Count = 1;
@@ -919,21 +983,21 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
     HRESULT hr = bd->pd3dDevice->CreateTexture2D(&textureDesc, 0, ptex);
     if (FAILED(hr))
     {
-        dbg("failed %#lx\n", hr);
+        dbg("CreateTexture2D failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
         return -1;
     }
 
     // Create texture view
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
     ZeroMemory(&srvDesc, sizeof(srvDesc));
-    srvDesc.Format                    = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.Format                    = format;
     srvDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels       = 0xFFFFFFFF;
     srvDesc.Texture2D.MostDetailedMip = 0;
     hr                                = bd->pd3dDevice->CreateShaderResourceView(*ptex, &srvDesc, psrv);
     if (FAILED(hr))
     {
-        dbg("failed %#lx\n", hr);
+        dbg("CreateShaderResourceView failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
         return -1;
     }
     return 0;
@@ -941,62 +1005,97 @@ int createImageTexture(ID3D11Texture2D **ptex, ID3D11ShaderResourceView **psrv, 
 
 namespace ImGui
 {
-    bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride)
+    bool updateImageTexture(ImageData &image, TextureSource &texture)
     {
         ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
-        if (!bd || !bd->pd3dDeviceContext || !pTexture || !rgbaData || width <= 0 || height <= 0)
+        if (!bd || !bd->pd3dDeviceContext || image.width <= 0 || image.height <= 0)
         {
             dbg("null\n");
             return false;
         }
-
-        ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)pTexture->texture;
-        ID3D11Texture2D          *nativeTexture = nullptr;
-        if (texSRV)
-            texSRV->GetResource((ID3D11Resource **)&nativeTexture);
-        do
+        unsigned int planeCount = getPlaneCount(image.format);
+        if (planeCount <= 0)
         {
-            if (!nativeTexture)
-                break;
-
-            D3D11_TEXTURE2D_DESC desc;
-            nativeTexture->GetDesc(&desc);
-            if (desc.Width != (UINT)width || desc.Height != (UINT)height)
-            {
-                SAFE_RELEASE_RES(texSRV);
-                SAFE_RELEASE_RES(nativeTexture);
-            }
-        } while (0);
-
-        if (!texSRV || !nativeTexture)
-        {
-            SAFE_RELEASE_RES(texSRV);
-            SAFE_RELEASE_RES(nativeTexture);
-            if (createImageTexture(&nativeTexture, &texSRV, width, height) < 0)
-            {
-                dbg("createImageTexture fail\n");
-                SAFE_RELEASE_RES(texSRV);
-                SAFE_RELEASE_RES(nativeTexture);
-                ZeroMemory(pTexture, sizeof(*pTexture));
-                return false;
-            }
+            dbg("unsupported format %d\n", image.format);
+            return false;
         }
+        for (unsigned int i = 0; i < planeCount; i++)
+        {
+            ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)texture.textureID[i];
+            ID3D11Texture2D          *nativeTexture = nullptr;
 
-        bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, rgbaData, (UINT)stride, 0);
+            unsigned int bytesPerPixel = 0;
+            unsigned int width         = 0;
+            unsigned int height        = 0;
+            getPlaneInfo(image.format, image.width, image.height, i, &bytesPerPixel, &width, &height);
 
-        pTexture->texture       = (ImTextureID)texSRV;
-        pTexture->textureWidth  = width;
-        pTexture->textureHeight = height;
-        SAFE_RELEASE_RES(nativeTexture);
+            DXGI_FORMAT dxgiFormat;
+            switch (bytesPerPixel)
+            {
+                case 1:
+                    dxgiFormat = DXGI_FORMAT_R8_UNORM;
+                    break;
+                case 2:
+                    dxgiFormat = DXGI_FORMAT_R8G8_UNORM;
+                    break;
+                case 4:
+                    dxgiFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+                    break;
+                default:
+                    dbg("unsupported bytesPerPixel %d\n", bytesPerPixel);
+                    return false;
+            }
 
+            if (texSRV)
+                texSRV->GetResource((ID3D11Resource **)&nativeTexture);
+            do
+            {
+                if (!nativeTexture)
+                    break;
+
+                D3D11_TEXTURE2D_DESC desc;
+                nativeTexture->GetDesc(&desc);
+                if (desc.Width != (UINT)width || desc.Height != (UINT)height || desc.Format != dxgiFormat)
+                {
+                    SAFE_RELEASE_RES(texSRV);
+                    SAFE_RELEASE_RES(nativeTexture);
+                }
+            } while (0);
+
+            if (!texSRV || !nativeTexture)
+            {
+                SAFE_RELEASE_RES(texSRV);
+                SAFE_RELEASE_RES(nativeTexture);
+                if (createImageTexture(&nativeTexture, &texSRV, width, height, dxgiFormat) < 0)
+                {
+                    dbg("createImageTexture fail\n");
+                    SAFE_RELEASE_RES(texSRV);
+                    SAFE_RELEASE_RES(nativeTexture);
+                    return false;
+                }
+            }
+
+            bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, image.plane[i], (UINT)image.stride[i], 0);
+
+            texture.textureID[i] = (uintptr_t)texSRV;
+            SAFE_RELEASE_RES(nativeTexture);
+            printf("create srv %p\n", texSRV);
+        }
+        texture.imageFormat = image.format;
+        texture.width       = image.width;
+        texture.height      = image.height;
+        texture.colorRange  = image.colorRange;
         return true;
     }
 
-    void freeTexture(TextureData *pTexture)
+    void freeTexture(TextureSource &texture)
     {
-        ID3D11ShaderResourceView *texSRV = (ID3D11ShaderResourceView *)pTexture->texture;
-        SAFE_RELEASE_RES(texSRV);
-        pTexture->texture = 0;
+        for (int i = 0; i < IMGUI_IMAGE_MAX_PLANES; i++)
+        {
+            ID3D11ShaderResourceView *texSRV = (ID3D11ShaderResourceView *)texture.textureID[i];
+            SAFE_RELEASE_RES(texSRV);
+            texture.textureID[i] = 0;
+        }
     }
 } // namespace ImGui
 //-----------------------------------------------------------------------------

@@ -468,9 +468,9 @@ namespace ImGui
         return exePathStr;
     }
 
-    std::string  getSystemPictureFolder()
+    std::string getSystemPictureFolder()
     {
-        //TODO
+        // TODO
     }
 
     void listAllFontFiles(const std::string &dirPath, std::vector<std::string> &fontFiles)

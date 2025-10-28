@@ -11,6 +11,13 @@ execute_process(
 
 option(COMPILE_DEMO "Compile Demo" ON)
 
+set(IMGUI_WINDOW_API_WIN32 0)
+set(IMGUI_WINDOW_API_GLFW 1)
+
+set(IMGUI_RENDER_API_DX11 0)
+set(IMGUI_RENDER_API_OPENGL 1)
+
+
 if(CMAKE_SYSTEM_NAME MATCHES Windows)
     option(USING_FREETYPE "Using Freetype for font rendering and font choosing" ON)
 else()
@@ -19,17 +26,18 @@ endif()
 
 message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 
-if("${RENDER}" STREQUAL "")
+if("${BACKEND_TYPE}" STREQUAL "")
     if(CMAKE_SYSTEM_NAME MATCHES Windows)
-        set(RENDER WIN32_DX11)
+        set(BACKEND_TYPE WIN32_DX11)
     else()
-        set(RENDER GLFW_OPENGL3)
+        set(BACKEND_TYPE GLFW_OPENGL3)
     endif()
 
-    message(STATUS "RENDER not Set, Using Default ${RENDER}")
+    # set(BACKEND_TYPE GLFW_OPENGL3)
+    message(STATUS "BACKEND_TYPE not Set, Using Default ${BACKEND_TYPE}")
 endif()
 
-if(RENDER MATCHES GLFW_OPENGL3)
+if(BACKEND_TYPE MATCHES GLFW_OPENGL3)
     find_package(glfw3 QUIET)
 
     if(glfw3_FOUND)
@@ -87,9 +95,9 @@ if(USING_MINGW)
     set(EXE_LINK_LIBRARIES mingw32)
 endif()
 
-if(RENDER MATCHES WIN32_DX11)
+if(BACKEND_TYPE MATCHES WIN32_DX11)
     set(EXE_LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
-        ${PROJECT_NAME} d3d11
+        d3d11
     )
 
     if(USING_MINGW)
@@ -98,23 +106,22 @@ if(RENDER MATCHES WIN32_DX11)
         )
     endif()
 
-    set(PLATFORM "WIN32")
+    set(WINDOW_API "WIN32")
     set(RENDER_API "D3D11")
-elseif(RENDER MATCHES GLFW_OPENGL3)
-    set(PLATFORM "GLFW")
+elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
+    set(WINDOW_API "GLFW")
     set(RENDER_API "OPENGL3")
 
     if(${CMAKE_SYSTEM_NAME} MATCHES Windows)
         set(EXE_LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
-            ${PROJECT_NAME} opengl32
+            opengl32
         )
     elseif(${CMAKE_SYSTEM_NAME} MATCHES Linux)
         set(EXE_LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
-            ${PROJECT_NAME} ${LINK_GLFW_LIBRARY} GL
+            ${LINK_GLFW_LIBRARY} GL
         )
     elseif(${CMAKE_SYSTEM_NAME} MATCHES Darwin)
         set(EXE_LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
-            ${PROJECT_NAME}
             "-framework OpenGL"
             "-framework Cocoa"
             "-framework UniformTypeIdentifiers"
@@ -131,7 +138,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES Linux)
     )
 
     set(EXE_LINK_LIBRARIES ${EXE_LINK_LIBRARIES}
-        ${PROJECT_NAME} ${GTK4_LIBRARIES}
+        ${GTK4_LIBRARIES}
     )
 elseif(${CMAKE_SYSTEM_NAME} MATCHES Darwin
     OR ${CMAKE_SYSTEM_NAME} MATCHES Linux)
@@ -152,10 +159,10 @@ endif()
 
 if(NOT PROJECT_IS_TOP_LEVEL)
     set(LINK_LIBRARIES ${LINK_LIBRARIES}
-        ${EXE_LINK_LIBRARIES}
+        ${PROJECT_NAME}
         PARENT_SCOPE
     )
-    set(PLATFORM ${PLATFORM} PARENT_SCOPE)
+    set(WINDOW_API ${WINDOW_API} PARENT_SCOPE)
     set(RENDER_API ${RENDER_API} PARENT_SCOPE)
 endif()
 
@@ -178,6 +185,7 @@ endif()
 
 set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
     ${PROJECT_SOURCE_DIR}/backends/imgui_common_tools.cpp
+    ${PROJECT_SOURCE_DIR}/backends/imgui_image_render.cpp
     ${PROJECT_SOURCE_DIR}/backends/ImGuiApplication.cpp
     ${PROJECT_SOURCE_DIR}/backends/ApplicationSetting.cpp
 )
@@ -190,12 +198,51 @@ elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
     aux_source_directory(${PROJECT_SOURCE_DIR}/backends/darwin IMGUI_BASE_SRC_LIST)
 endif()
 
-if(RENDER MATCHES WIN32_DX11)
-    file(GLOB SRC_RENDER "backends/imgui_impl_dx11.cpp" "backends/imgui_impl_win32.cpp" "backends/imgui_main_win32_dx11.cpp")
-elseif(RENDER MATCHES GLFW_OPENGL3)
-    file(GLOB SRC_RENDER "backends/imgui_impl_opengl3.cpp" "backends/imgui_impl_glfw.cpp" "backends/imgui_main_glfw_opengl3.cpp")
+if(BACKEND_TYPE MATCHES WIN32_DX11)
+    set(BACKEND_SRC_LIST ${BACKEND_SRC_LIST}
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_win32.cpp
+        ${PROJECT_SOURCE_DIR}/backends/imgui_main_win32_dx11.cpp
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.inl
+    )
+    add_custom_command(
+        OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.inl
+        COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.bat
+        ARGS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\Dx11_PixelShader.hlsl
+        ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_dx11_pixel_shader.inl
+        DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Dx11_PixelShader.hlsl
+    )
+elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
+    set(BACKEND_SRC_LIST ${BACKEND_SRC_LIST}
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${PROJECT_SOURCE_DIR}/backends/imgui_main_glfw_opengl3.cpp
+        ${PROJECT_SOURCE_DIR}/backends/glad/src/glad.c
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+    )
+    set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
+        backends/glad/include
+    )
+    if(${CMAKE_SYSTEM_NAME} MATCHES Windows)
+        message(STATUS add custom command for imgui_impl_opengl3_fragment_shader.inl)
+        add_custom_command(
+            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.bat
+            ARGS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\OpenGL_FragmentShader.glsl
+            ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_opengl3_fragment_shader.inl
+            DEPENDS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\OpenGL_FragmentShader.glsl
+        )
+    else()
+        add_custom_command(
+            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.sh
+            ARGS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/OpenGL_FragmentShader.glsl
+            ARGS ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/OpenGL_FragmentShader.glsl
+        )
+    endif()
 else()
-    message(FATAL_ERROR "RENDER not Available, Available Options:\n\
+    message(FATAL_ERROR "BACKEND_TYPE not Available, Available Options:\n\
 				WIN32_DX11\n\
 				GLFW_OPENGL3"
     )
@@ -212,7 +259,8 @@ set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
 include_directories(${INCLUDE_DIRECTORIES})
 
 if(NOT TARGET ${PROJECT_NAME})
-    add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${SRC_RENDER})
+    message(STATUS "BACKEND_SRC_LIST: ${BACKEND_SRC_LIST}")
+    add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${BACKEND_SRC_LIST})
 
     if(USING_FREETYPE)
         set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES} freetype)
@@ -222,7 +270,19 @@ if(NOT TARGET ${PROJECT_NAME})
         )
     endif()
 
-    target_link_libraries(${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES})
+    if(WINDOW_API MATCHES "WIN32")
+        target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_WINDOW_API=${IMGUI_WINDOW_API_WIN32})
+    elseif(WINDOW_API MATCHES "GLFW")
+        target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_WINDOW_API=${IMGUI_WINDOW_API_GLFW})
+    endif()
+
+    if(RENDER_API MATCHES "D3D11")
+        target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_RENDER_API=${IMGUI_RENDER_API_DX11})
+    elseif(RENDER_API MATCHES "OPENGL3")
+        target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_RENDER_API=${IMGUI_RENDER_API_OPENGL})
+    endif()
+
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${CURRENT_LINK_LIBRARIES} ${EXE_LINK_LIBRARIES})
 endif()
 
 if(COMPILE_DEMO)

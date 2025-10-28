@@ -12,32 +12,26 @@
     #include FT_FREETYPE_H
 #endif
 
-#include "imgui.h"
 #include "imgui_internal.h"
+
+#if defined(_WIN32)
+    #include <Windows.h>
+    #undef min
+    #undef max
+#endif
+
+#ifndef dbg
+    #define dbg(fmt, ...) fprintf(stderr, "[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__);
+#endif
 
 namespace ImGui
 {
 
-    // Renderer Relative
+#define IMGUI_WINDOW_API_WIN32 0
+#define IMGUI_WINDOW_API_GLFW  1
 
-    struct TextureData;
-#define UPDATE_TEXTURE_FROM_CV_MAT(pTexture, mat) \
-    updateImageTexture(pTexture, (mat).data, (mat).cols, (mat).rows, (int)(mat).step[0])
-    bool updateImageTexture(TextureData *pTexture, uint8_t *rgbaData, int width, int height, int stride);
-    void freeTexture(TextureData *pTexture);
-    // End for Renderer Relative
-
-    // will be automatically freed in destructor
-    struct TextureData
-    {
-        ~TextureData() { freeTexture(this); }
-        TextureData &operator=(const TextureData) = delete;
-
-        ImTextureID texture       = 0;
-        int         textureWidth  = 0;
-        int         textureHeight = 0;
-        void       *opaque        = nullptr; // used by renderer
-    };
+#define IMGUI_RENDER_API_DX11   0
+#define IMGUI_RENDER_API_OPENGL 1
 
     template <typename _T>
     static inline auto arrayMakeSharedPtr(size_t length)
@@ -57,7 +51,7 @@ namespace ImGui
 
 #if defined(_WIN32)
     std::shared_ptr<std::shared_ptr<char[]>[]> CommandLineToArgvA(int *argc);
-
+    std::string                                HResultToStr(HRESULT hr);
 #endif
 
     std::string utf8ToLocal(const std::string &str);
@@ -123,7 +117,7 @@ namespace ImGui
                                          const std::string &defaultExt = std::string(), const std::string &initDirPath = std::string());
     void                     openDebugWindow();
 
-    std::string  getSystemPictureFolder();
+    std::string getSystemPictureFolder();
 
     std::string getApplicationPath();
 
@@ -162,6 +156,7 @@ namespace ImGui
     void   normalizeApplication(const ImRect &winRect);
     void   minimizeMainWindow();
     ImRect getWindowRect();
+    ImRect getWindowWithoutDecorationRect();
 
     // End Backend Relative
 

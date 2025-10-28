@@ -438,44 +438,47 @@ namespace ImGui
     }
 
 #define SCALE_SPEED (1.2f)
-#define SCALE_MAX   (20.f)
+#define SCALE_MAX   (500.f)
 #define SCALE_MIN   (0.2f)
 
     void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
     {
         ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
 
-        ImVec2 cursorPosOnImage = mImageShowPos + (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
+        ImVec2 cursorPosOnImage = mImageShowPos + (mouseInWindow * (float)mTexture.width / imgScaleSize.x);
         mImageScale             = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
         mImageScale             = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
 
         imgScaleSize = mImgBaseSize * mImageScale;
 
-        mImageShowPos = cursorPosOnImage - (mouseInWindow * (float)mTextureWidth / imgScaleSize.x);
+        mImageShowPos = cursorPosOnImage - (mouseInWindow * (float)mTexture.width / imgScaleSize.x);
     }
 
     void ImageWindow::handleDrag(ImVec2 &mouseMove)
     {
         ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
-        mImageShowPos.x     = mImageShowPos.x + (-(int)((mouseMove.x) * mTextureWidth / imgScaleSize.x));
-        mImageShowPos.y     = mImageShowPos.y + (-(int)((mouseMove.y) * mTextureHeight / imgScaleSize.y));
+        mImageShowPos.x     = mImageShowPos.x + (-(int)((mouseMove.x) * mTexture.width / imgScaleSize.x));
+        mImageShowPos.y     = mImageShowPos.y + (-(int)((mouseMove.y) * mTexture.height / imgScaleSize.y));
     }
 
     void ImageWindow::showContent()
     {
         bool oneOnOne = false;
-        if (Button("1:1"))
+        if (mControlButtonEnable)
         {
-            oneOnOne = true;
-            if (mLinkWith)
-                mLinkWith->setOneOnOne();
-        }
-        SameLine();
-        if (Button("Full"))
-        {
-            mImageScale = 1;
-            if (mLinkWith)
-                mLinkWith->resetScale();
+            if (Button("1:1"))
+            {
+                oneOnOne = true;
+                if (mLinkWith)
+                    mLinkWith->setOneOnOne();
+            }
+            SameLine();
+            if (Button("Full"))
+            {
+                mImageScale = 1;
+                if (mLinkWith)
+                    mLinkWith->resetScale();
+            }
         }
         PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         BeginChild((mTitle + "render").c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders,
@@ -494,42 +497,42 @@ namespace ImGui
         ImVec2 imgStartPosScreen;
         auto   transImgCoord = [&](ImVec2 pos)
         {
-            pos.x = pos.x * imgScaledSize.x / mTextureWidth;
-            pos.y = pos.y * imgScaledSize.y / mTextureHeight;
+            pos.x = pos.x * imgScaledSize.x / mTexture.width;
+            pos.y = pos.y * imgScaledSize.y / mTexture.height;
             pos -= imgScaledShowPos;
             pos += imgStartPosScreen;
             return pos;
         };
 
-        auto transThickness = [&](float thickness) { return thickness * imgScaledSize.x / mTextureWidth; };
+        auto transThickness = [&](float thickness) { return thickness * imgScaledSize.x / mTexture.width; };
 
-        if (0 == mTexture)
+        if (0 == mTexture.textureID[0])
             goto _CHILD_OVER_;
 
         winSize      = GetWindowSize();
         mImgBaseSize = winSize;
-        if (winSize.x > mTextureWidth * winSize.y / mTextureHeight)
+        if (winSize.x > mTexture.width * winSize.y / mTexture.height)
         {
-            mImgBaseSize.x = mTextureWidth * winSize.y / mTextureHeight;
+            mImgBaseSize.x = mTexture.width * winSize.y / mTexture.height;
             mImgBaseSize.y = winSize.y;
         }
-        else if (winSize.y > mTextureHeight * winSize.x / mTextureWidth)
+        else if (winSize.y > mTexture.height * winSize.x / mTexture.width)
         {
             mImgBaseSize.x = winSize.x;
-            mImgBaseSize.y = mTextureHeight * winSize.x / mTextureWidth;
+            mImgBaseSize.y = mTexture.height * winSize.x / mTexture.width;
         }
 
         if (oneOnOne)
         {
-            mImageScale = mTextureWidth / mImgBaseSize.x;
+            mImageScale = mTexture.width / mImgBaseSize.x;
         }
         imgScaledSize = mImgBaseSize * mImageScale;
 
-        mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaledSize.x - winSize.x) * mTextureWidth / imgScaledSize.x);
-        mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaledSize.y - winSize.y) * mTextureHeight / imgScaledSize.y);
+        mImageShowPos.x = ROUND(0, mImageShowPos.x, (imgScaledSize.x - winSize.x) * mTexture.width / imgScaledSize.x);
+        mImageShowPos.y = ROUND(0, mImageShowPos.y, (imgScaledSize.y - winSize.y) * mTexture.height / imgScaledSize.y);
 
-        imgScaledShowPos.x = mImageShowPos.x * imgScaledSize.x / mTextureWidth;
-        imgScaledShowPos.y = mImageShowPos.y * imgScaledSize.y / mTextureHeight;
+        imgScaledShowPos.x = mImageShowPos.x * imgScaledSize.x / mTexture.width;
+        imgScaledShowPos.y = mImageShowPos.y * imgScaledSize.y / mTexture.height;
 
         imgScaledShowSize.x = MIN(imgScaledSize.x - imgScaledShowPos.x, winSize.x);
         imgScaledShowSize.y = MIN(imgScaledSize.y - imgScaledShowPos.y, winSize.y);
@@ -537,8 +540,8 @@ namespace ImGui
         winShowStartPos = {(winSize.x - imgScaledShowSize.x) / 2, (winSize.y - imgScaledShowSize.y) / 2};
         ImGui::SetCursorPos(winShowStartPos);
         imgStartPosScreen = GetCursorScreenPos();
-        Image(mTexture, imgScaledShowSize,
-              {mImageShowPos.x / mTextureWidth, mImageShowPos.y / mTextureHeight}, // normalize to [0, 1]
+        Image((ImTextureID)(uintptr_t)&mTexture, imgScaledShowSize,
+              {mImageShowPos.x / mTexture.width, mImageShowPos.y / mTexture.height}, // normalize to [0, 1]
               {(imgScaledShowPos.x + imgScaledShowSize.x) / imgScaledSize.x,
                (imgScaledShowPos.y + imgScaledShowSize.y) / imgScaledSize.y});
 
@@ -584,7 +587,7 @@ namespace ImGui
                     if (auto pval = std::get_if<DrawCircleParam>(&param.param))
                     {
                         ImVec2 center = transImgCoord(pval->center);
-                        float  radius = pval->radius * imgScaledSize.x / mTextureWidth;
+                        float  radius = pval->radius * imgScaledSize.x / mTexture.width;
                         if (pval->thickness > 0)
                         {
                             float thickness = transThickness(pval->thickness);
@@ -647,7 +650,7 @@ namespace ImGui
                     {
                         ImVec2  pos  = transImgCoord(pval->pos);
                         ImFont *font = ImGui::GetFont();
-                        float   size = pval->size * imgScaledSize.x / mTextureWidth;
+                        float   size = pval->size * imgScaledSize.x / mTexture.width;
                         if (size < 0)
                             size = 0;
                         ImGui::GetWindowDrawList()->AddText(font, size, pos, pval->color, pval->text.c_str());
@@ -683,8 +686,8 @@ namespace ImGui
             mousePosInImageShow.x       = ROUND(0, mousePosInImageShow.x, imgScaledShowSize.x);
             mousePosInImageShow.y       = ROUND(0, mousePosInImageShow.y, imgScaledShowSize.y);
             ImVec2 mousePosInImageScale = mousePosInImageShow + imgScaledShowPos;
-            mDisplayInfo.mousePos.x     = ROUND(0, mousePosInImageScale.x * mTextureWidth / imgScaledSize.x, mTextureWidth - 1);
-            mDisplayInfo.mousePos.y     = ROUND(0, mousePosInImageScale.y * mTextureHeight / imgScaledSize.y, mTextureHeight - 1);
+            mDisplayInfo.mousePos.x     = ROUND(0, mousePosInImageScale.x * mTexture.width / imgScaledSize.x, mTexture.width - 1);
+            mDisplayInfo.mousePos.y = ROUND(0, mousePosInImageScale.y * mTexture.height / imgScaledSize.y, mTexture.height - 1);
         }
 
         if (IsKeyDown(ImGuiKey_MouseWheelY))
@@ -724,11 +727,22 @@ namespace ImGui
             mOpened = true;
     }
 
-    void ImageWindow::setTexture(TextureData &texture)
+    void ImageWindow::setControlButtonEnable(bool enable)
     {
-        mTexture       = texture.texture;
-        mTextureWidth  = texture.textureWidth;
-        mTextureHeight = texture.textureHeight;
+        mControlButtonEnable = enable;
+    }
+
+    void ImageWindow::setTexture(TextureSource &texture)
+    {
+        mTexture = RenderSource(texture, mTexture.sampleType);
+    }
+    void ImageWindow::setSampleType(ImGuiImageSampleType sampleType)
+    {
+        mTexture.sampleType = sampleType;
+    }
+    ImGuiImageSampleType ImageWindow::getSampleType()
+    {
+        return mTexture.sampleType;
     }
 
     const DisplayInfo &ImageWindow::getDisplayInfo()
@@ -770,7 +784,7 @@ namespace ImGui
     }
     void ImageWindow::setOneOnOne()
     {
-        mImageScale = mTextureWidth / mImgBaseSize.x;
+        mImageScale = mTexture.width / mImgBaseSize.x;
     }
 
     void ImageWindow::linkWith(ImageWindow *other, std::function<bool()> temporallyUnlinkCondition)
@@ -810,7 +824,7 @@ namespace ImGui
 
     void ImageWindow::clear()
     {
-        mTexture = mTextureWidth = mTextureHeight = 0;
+        mTexture = RenderSource();
         clearDrawList();
     }
 
@@ -901,10 +915,10 @@ namespace ImGui
         ImVec2 regionSize = GetContentRegionAvail();
         regionSize.y += GetStyle().ScrollbarSize + spaceSize.y;
 
-        float showRegionLength = regionSize.x;
-        int   showBytes        = 0;
+        float  showRegionLength = regionSize.x;
+        size_t showBytes        = 0;
         if (showRegionLength > indexLength)
-            showBytes = (int)((showRegionLength - indexLength - TEXT_GAP) / (byteLength + spaceLength + letterWidth));
+            showBytes = (size_t)((showRegionLength - indexLength - TEXT_GAP) / (byteLength + spaceLength + letterWidth));
 
         if (showBytes >= 32)
             showBytes = 32;
@@ -1004,7 +1018,7 @@ namespace ImGui
         GetWindowDrawList()->AddRectFilled(startPos, endPos, headerColor);
 
         // draw odd line color
-        for (int j = 1; j < showBytes; j += 2)
+        for (size_t j = 1; j < showBytes; j += 2)
         {
             startPos =
                 contentStartPos
@@ -1017,7 +1031,7 @@ namespace ImGui
         ImS64 offsetLine = mSelectOffset / showBytes;
         if (offsetLine >= lines)
             offsetLine = lines - 1;
-        int offsetByte = mSelectOffset % showBytes;
+        size_t offsetByte = mSelectOffset % showBytes;
 
         if (offsetLine >= mScrollPos && offsetLine < mScrollPos + showLineCount)
         {
@@ -1042,10 +1056,10 @@ namespace ImGui
 
         // show Texts
         Text("%08llx", mSelectOffset);
-        for (int i = 0; i < showBytes; i++)
+        for (size_t i = 0; i < showBytes; i++)
         {
             SameLine();
-            Text("%02X", i);
+            Text("%02zX", i);
         }
 
         // not showing all for big amount of data
@@ -1055,9 +1069,9 @@ namespace ImGui
             Text("%08llx", i * showBytes);
 
             string showText;
-            for (ImS64 j = 0; j < showBytes; j++)
+            for (ImS64 j = 0; j < (ImS64)showBytes; j++)
             {
-                if (i * showBytes + j >= dataSize)
+                if (i * (ImS64)showBytes + j >= dataSize)
                     break;
                 SameLine();
                 uint8_t data = mGetDataCallback(i * showBytes + j, mUserData);
@@ -1078,7 +1092,7 @@ namespace ImGui
                 endPos   = startPos + ImVec2(letterWidth, GetTextLineHeight());
                 GetWindowDrawList()->AddRectFilled(startPos, endPos, headerHighlightColor);
             }
-            for (int j = 0; j < showBytes; j++)
+            for (size_t j = 0; j < showBytes; j++)
             {
                 if (j >= showText.length())
                     break;
@@ -1181,9 +1195,10 @@ namespace ImGui
         {
             mSystemFontFamilies = listSystemFonts();
             sortFonts(mSystemFontFamilies);
-            for (int i = 0; i < mSystemFontFamilies.size(); i++)
+            for (size_t i = 0; i < mSystemFontFamilies.size(); i++)
             {
-                mFontFamiliesCombo.addSelectableItem(i, mSystemFontFamilies[i].displayName + "##" + mSystemFontFamilies[i].name);
+                mFontFamiliesCombo.addSelectableItem((ComboTag)i,
+                                                     mSystemFontFamilies[i].displayName + "##" + mSystemFontFamilies[i].name);
             }
             updateFontStyles();
         }
@@ -1256,18 +1271,18 @@ namespace ImGui
 
     #define FONT_RENDER_SPACING 50
 
-        if (mFontDisplayTexture.textureWidth > 0)
+        if (mFontDisplayTexture.width > 0)
         {
             ImVec2 fontDisplayPos;
             fontDisplayPos.x = inputStartPos.x + maxItemWidth + FONT_RENDER_SPACING;
-            fontDisplayPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.textureHeight) / 2;
+            fontDisplayPos.y = (inputStartPos.y + inputEndPos.y - mFontDisplayTexture.height) / 2;
 
             SetCursorScreenPos(fontDisplayPos);
 
-            Image(mFontDisplayTexture.texture,
-                  ImVec2((float)mFontDisplayTexture.textureWidth, (float)mFontDisplayTexture.textureHeight));
+            Image((uintptr_t)&mFontDisplayRenderSource,
+                  ImVec2((float)mFontDisplayTexture.width, (float)mFontDisplayTexture.height));
 
-            maxItemWidth += FONT_RENDER_SPACING + mFontDisplayTexture.textureWidth;
+            maxItemWidth += FONT_RENDER_SPACING + mFontDisplayTexture.width;
         }
         SetCursorScreenPos(cursorPos);
 
@@ -1347,6 +1362,10 @@ namespace ImGui
         }
 
         mConfirmWindow.show();
+        if (mHovered && IsKeyReleased(ImGuiKey_Escape))
+        {
+            close();
+        }
     }
     void FontChooseWindow::setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize)
     {
@@ -1378,11 +1397,11 @@ namespace ImGui
         FT_Done_FreeType(ftLibrary);
 
         int fontFamilyIdx = -1;
-        for (int i = 0; i < mSystemFontFamilies.size(); i++)
+        for (size_t i = 0; i < mSystemFontFamilies.size(); i++)
         {
             if (mSystemFontFamilies[i].name == fontName)
             {
-                fontFamilyIdx = i;
+                fontFamilyIdx = (int)i;
                 break;
             }
         }
@@ -1392,11 +1411,11 @@ namespace ImGui
             return;
         }
         int fontStyleIdx = -1;
-        for (int i = 0; i < mSystemFontFamilies[fontFamilyIdx].fonts.size(); i++)
+        for (size_t i = 0; i < mSystemFontFamilies[fontFamilyIdx].fonts.size(); i++)
         {
             if (mSystemFontFamilies[fontFamilyIdx].fonts[i].style == style)
             {
-                fontStyleIdx = i;
+                fontStyleIdx = (int)i;
                 break;
             }
         }
@@ -1418,13 +1437,13 @@ namespace ImGui
 #ifdef IMGUI_ENABLE_FREETYPE
     void FontChooseWindow::updateFontStyles()
     {
-        ComboTag idx = mFontFamiliesCombo.getSelected();
+        size_t idx = mFontFamiliesCombo.getSelected();
         if (idx >= 0 && idx < mSystemFontFamilies.size())
         {
             mFontStylesCombo.clear();
-            for (int i = 0; i < mSystemFontFamilies[idx].fonts.size(); i++)
+            for (size_t i = 0; i < mSystemFontFamilies[idx].fonts.size(); i++)
             {
-                mFontStylesCombo.addSelectableItem(i, mSystemFontFamilies[idx].fonts[i].styleDisplayName);
+                mFontStylesCombo.addSelectableItem((ComboTag)i, mSystemFontFamilies[idx].fonts[i].styleDisplayName);
             }
         }
     }
@@ -1480,7 +1499,7 @@ namespace ImGui
 
         size_t imgSize = imageWidth * imageHeight * 4;
         auto   image   = std::make_unique<uint8_t[]>(imgSize);
-        for (int i = 0; i < imgSize; i += 4)
+        for (size_t i = 0; i < imgSize; i += 4)
         {
             image[i + 0] = 255;
             image[i + 1] = 255;
@@ -1504,7 +1523,7 @@ namespace ImGui
             {
                 for (unsigned int col = 0; col < bitmap.width; ++col)
                 {
-                    int idx = ((y + row) * imageWidth + (x + col)) * 4;
+                    size_t idx = ((y + row) * imageWidth + (x + col)) * 4;
                     if (idx < imgSize && idx >= 0)
                     {
                         if (bitmap.buffer[row * bitmap.width + col] > 0)
@@ -1518,13 +1537,26 @@ namespace ImGui
 
             xOffset += face->glyph->advance.x >> 6;
         }
+        ImageData imageData;
+        imageData.plane[0]  = image.get();
+        imageData.width     = imageWidth;
+        imageData.height    = imageHeight;
+        imageData.stride[0] = imageWidth * 4;
+        imageData.format    = ImGuiImageFormat_RGBA;
 
-        updateImageTexture(&mFontDisplayTexture, image.get(), imageWidth, imageHeight, imageWidth * 4);
+        updateImageTexture(imageData, mFontDisplayTexture);
+        mFontDisplayRenderSource = RenderSource(mFontDisplayTexture, ImGuiImageSampleType_Linear);
 
         FT_Done_Face(face);
         FT_Done_FreeType(ftLibrary);
     }
 #endif // IMGUI_ENABLE_FREETYPE
+
+    void FontChooseWindow::exit()
+    {
+        freeTexture(mFontDisplayTexture);
+    }
+
     ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message) : ImGuiPopup(title), mMessage(message)
     {
         mWindowFlags |= ImGuiWindowFlags_NoResize;

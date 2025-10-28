@@ -1748,6 +1748,17 @@ namespace ImGui
         GetWindowRect(hwnd, &rect);
         return ImRect((float)rect.left, (float)rect.top, (float)rect.right, (float)rect.bottom);
     }
+    ImRect getWindowWithoutDecorationRect()
+    {
+        RECT rect;
+        HWND hwnd = getMainWindow();
+        if (!hwnd)
+            return ImRect();
+        GetClientRect(hwnd, &rect);
+        ClientToScreen(hwnd, (POINT *)&rect.left);
+        ClientToScreen(hwnd, (POINT *)&rect.right);
+        return ImRect((float)rect.left, (float)rect.top, (float)rect.right, (float)rect.bottom);
+    }
     void setApplicationTitle(const std::string &title)
     {
         ImGui_ImplWin32_ViewportData *vd = (ImGui_ImplWin32_ViewportData *)ImGui::GetMainViewport()->PlatformUserData;

@@ -25,6 +25,10 @@
 #endif
 
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#ifdef _WIN32
+    #define GLFW_EXPOSE_NATIVE_WIN32
+    #include <GLFW/glfw3native.h>
+#endif
 
 using namespace ImGui;
 
@@ -162,26 +166,20 @@ int main(int argc, char **argv)
         return 1;
 
     // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-    // GL ES 2.0 + GLSL 100
-    glsl_version = "#version 100";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     // GL 3.2 + GLSL 150
     glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // Required on Mac
 #else
     // GL 3.0 + GLSL 130
     glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // 3.0+ only
 #endif
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -202,6 +200,11 @@ int main(int argc, char **argv)
                                           gUserApp->getAppName().c_str(), nullptr, nullptr);
     if (window == nullptr)
         return 1;
+
+#ifdef _WIN32
+    gUserApp->setWindowHandle(glfwGetWin32Window(window));
+#endif
+
     glfwSetWindowPos(window, gUserApp->getWindowInitialRect().x, gUserApp->getWindowInitialRect().y);
 
     glfwSetWindowPosCallback(window,
@@ -235,7 +238,7 @@ int main(int argc, char **argv)
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
     // io.ConfigViewportsNoAutoMerge = true;
-    io.ConfigViewportsNoTaskBarIcon = true;
+    io.ConfigViewportsNoTaskBarIcon = false;
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular
     // ones.

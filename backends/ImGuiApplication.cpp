@@ -241,8 +241,6 @@ void ImGuiApplication::showContent()
         mShowLogWindow = false;
 
     mSettingsWindow.show();
-
-    mFontChooser.show();
 }
 
 void ImGuiApplication::addLog(const std::string &logString)
@@ -884,6 +882,7 @@ void ImGuiApplication::showSettingWindow()
         mCreateFilePath.clear();
         mCreateFilePathItem = nullptr;
     }
+    mFontChooser.show();
 }
 
 void ImGuiApplication::initSettingsWindow()
@@ -931,4 +930,10 @@ void ImGuiApplication::initSettingsWindow()
                                  else
                                      mLogger.close();
                              });
+}
+
+void ImGuiApplication::exit()
+{
+    exitInternal();
+    mFontChooser.exit();
 }

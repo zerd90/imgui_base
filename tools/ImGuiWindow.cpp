@@ -508,12 +508,12 @@ namespace ImGui
         mWinSize     = winRect.GetSize();
     }
 
-    void ImGuiMainWindow::setSize(ImVec2 size, ImGuiCond cond)
+    void ImGuiMainWindow::setSize(ImVec2 size, [[maybe_unused]] ImGuiCond cond)
     {
         auto pos = getPos();
         normalizeApplication(ImRect(pos, pos + size));
     }
-    void ImGuiMainWindow::setPos(ImVec2 pos, ImGuiCond cond)
+    void ImGuiMainWindow::setPos(ImVec2 pos, [[maybe_unused]] ImGuiCond cond)
     {
         auto size = getSize();
         normalizeApplication(ImRect(pos, pos + size));

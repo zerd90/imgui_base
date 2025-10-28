@@ -19,7 +19,7 @@ public:
     virtual void transferCmdArgs(std::vector<std::string> &args) override;
     virtual void dropFile(const std::vector<std::string> &files) override;
 
-    void exit() override { printf(">>>>>>>>exit\n"); }
+    void exitInternal() override { printf(">>>>>>>>exit\n"); }
 
 private:
 };
@@ -54,10 +54,12 @@ bool Application::renderUI()
 
 void Application::transferCmdArgs(std::vector<std::string> &args)
 {
+    IM_UNUSED(args);
     // Process Command Line Arguments
 }
 
 void Application::dropFile(const std::vector<std::string> &files)
 {
+    IM_UNUSED(files);
     // Process Drop File
 }

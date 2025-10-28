@@ -1,6 +1,7 @@
 #ifndef _IMGUI_APPLICATION_H_
 #define _IMGUI_APPLICATION_H_
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <string>
 #include <vector>
 #include "imgui.h"
@@ -117,14 +118,16 @@ namespace ImGui
         void         windowRectChange(ImGuiAppRect rect);
         void         getWindowSizeLimit(ImVec2 &minSize, ImVec2 &maxSize);
 
+        void exit();
+
         virtual void transferCmdArgs(std::vector<std::string> &args) { IM_UNUSED(args); };
         virtual void dropFile(const std::vector<std::string> &files) { IM_UNUSED(files); };
 
         virtual void setWindowHandle(void *handle) { IM_UNUSED(handle); };
         virtual void newFramePreAction() {}
         virtual void endFramePostAction() {}
-        // anything ned to be done before program exit, such as waiting thread exit
-        virtual void exit() {}
+        // anything need to be done before program exit, such as waiting thread exit/free textures
+        virtual void exitInternal() {}
 
         // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
         void loadResources();
@@ -236,7 +239,7 @@ namespace ImGui
         SettingWindowItem *mCreateFilePathItem = nullptr;
         std::string        mCreateFilePath;
         ConfirmDialog      mCreateFileConfirmDialog;
-        bool mEnableFontChanging = true;
+        bool               mEnableFontChanging = true;
     };
 
 } // namespace ImGui

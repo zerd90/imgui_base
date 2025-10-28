@@ -1734,6 +1734,16 @@ namespace ImGui
         glfwGetWindowSize(window, &w, &h);
         return ImRect(x, y, x + w, y + h);
     }
+    ImRect getWindowWithoutDecorationRect()
+    {
+        GLFWwindow *window = getMainWindow();
+        if (!window)
+            return ImRect();
+        auto rect = getWindowRect();
+        int  frameRect[4];
+        glfwGetWindowFrameSize(window, &frameRect[0], &frameRect[1], &frameRect[2], &frameRect[3]);
+        return ImRect(rect.Min.x + frameRect[0], rect.Min.y + frameRect[1], rect.Max.x - frameRect[2], rect.Max.y - frameRect[3]);
+    }
 
 } // namespace ImGui
 

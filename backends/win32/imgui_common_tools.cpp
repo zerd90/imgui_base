@@ -22,25 +22,24 @@ namespace fs = std::filesystem;
 #include <Windows.h>
 #include <Winerror.h>
 #include <shlwapi.h>
-#define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                            \
-    do                                                                           \
-    {                                                                            \
-        size_t filterLength = inFilters.size();                                  \
-        if (filterLength > 0)                                                    \
-        {                                                                        \
-            COMDLG_FILTERSPEC *tmpFilters = new COMDLG_FILTERSPEC[filterLength]; \
-            vector<wstring>    filterStrings(filterLength);                      \
-            vector<wstring>    descStrings(filterLength);                        \
-            for (size_t i = 0; i < filterLength; i++)                            \
-            {                                                                    \
-                filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);      \
-                descStrings[i]        = utf8ToUnicode(inFilters[i].description); \
-                tmpFilters[i].pszSpec = filterStrings[i].c_str();                \
-                tmpFilters[i].pszName = descStrings[i].c_str();                  \
-            }                                                                    \
-            dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters);          \
-            delete[] tmpFilters;                                                 \
-        }                                                                        \
+#define TRANSFORM_FILTERSPEC(inFilters, dialogHandle)                                         \
+    do                                                                                        \
+    {                                                                                         \
+        size_t filterLength = inFilters.size();                                               \
+        if (filterLength > 0)                                                                 \
+        {                                                                                     \
+            auto            tmpFilters = std::make_unique<COMDLG_FILTERSPEC[]>(filterLength); \
+            vector<wstring> filterStrings(filterLength);                                      \
+            vector<wstring> descStrings(filterLength);                                        \
+            for (size_t i = 0; i < filterLength; i++)                                         \
+            {                                                                                 \
+                filterStrings[i]      = utf8ToUnicode(inFilters[i].filter);                   \
+                descStrings[i]        = utf8ToUnicode(inFilters[i].description);              \
+                tmpFilters[i].pszSpec = filterStrings[i].c_str();                             \
+                tmpFilters[i].pszName = descStrings[i].c_str();                               \
+            }                                                                                 \
+            dialogHandle->SetFileTypes((UINT)filterLength, tmpFilters.get());                 \
+        }                                                                                     \
     } while (0)
 
 #define HR_CANCELED ((HRESULT)0x800704C7L)
@@ -248,7 +247,10 @@ namespace ImGui
         IFileSaveDialog *pfd = NULL;
         HRESULT          hr  = CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
         if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
             return result;
+        }
 
         FILEOPENDIALOGOPTIONS dwFlags;
         IShellItem           *pSelResult;
@@ -333,7 +335,10 @@ namespace ImGui
         IFileOpenDialog *pfd = NULL;
         HRESULT          hr  = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
         if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
             return results;
+        }
 
         FILEOPENDIALOGOPTIONS dwFlags;
         DWORD                 dwNumItems = 0; // number of items in multiple selection
@@ -456,7 +461,10 @@ namespace ImGui
 
         hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
         if (FAILED(hr))
+        {
+            gLastError = HResultToStr(hr);
             return result;
+        }
 
         hr = pfd->GetOptions(&dwFlags);
         hr = pfd->SetOptions(dwFlags | FOS_FORCEFILESYSTEM);

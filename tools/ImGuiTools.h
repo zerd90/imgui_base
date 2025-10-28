@@ -11,6 +11,7 @@
 #include "ImGuiItem.h"
 
 #include "ImGuiWindow.h"
+#include "imgui_image_render.h"
 
 #define MOUSE_IN_WINDOW(mousePos, winPos, winSize)                                                             \
     (((mousePos).x >= (winPos).x) && ((mousePos).x < (winPos).x + (winSize).x) && ((mousePos).y >= (winPos).y) \
@@ -155,10 +156,14 @@ namespace ImGui
     public:
         ImageWindow(std::string title, bool embed = false);
 
+        void setControlButtonEnable(bool enable);
+
         // texture must be available since show() called utill ImGui::Render() Called!!
-        void               setTexture(TextureData &texture);
-        void               clear();
-        const DisplayInfo &getDisplayInfo();
+        void                 setTexture(TextureSource &texture);
+        void                 setSampleType(ImGuiImageSampleType sampleType);
+        ImGuiImageSampleType getSampleType();
+        void                 clear();
+        const DisplayInfo   &getDisplayInfo();
 
         void pushScale(const DisplayInfo &input);
         void popScale();
@@ -178,10 +183,8 @@ namespace ImGui
         void         handleDrag(ImVec2 &mouseMove);
 
     private:
-        ImTextureID mTexture       = 0;
-        int         mTextureWidth  = 0;
-        int         mTextureHeight = 0;
-        DisplayInfo mDisplayInfo;
+        RenderSource mTexture;
+        DisplayInfo  mDisplayInfo;
 
         std::vector<DisplayInfo> mScaleStack;
 
@@ -195,6 +198,8 @@ namespace ImGui
         std::function<bool()> mUnlinkCond = []() { return false; };
 
         std::vector<DrawParam> mDrawList;
+
+        bool mControlButtonEnable = true;
     };
 
     class ImGuiBinaryViewer : public IImGuiWindow
@@ -256,6 +261,7 @@ namespace ImGui
             const std::function<void(const std::string &fontPath, int fontIdx, float fontSize, bool applyNow)> onFontChanged);
 
         void setCurrentFont(const std::string &fontPath, int fontIdx, float fontSize);
+        void exit();
 
         ~FontChooseWindow() {}
 
@@ -289,8 +295,9 @@ namespace ImGui
         ImGuiInputCombo mFontFamiliesCombo;
         ImGuiInputCombo mFontStylesCombo;
 
-        TextureData mFontDisplayTexture;
-        std::string mFontFamilyName;
+        TextureSource mFontDisplayTexture;
+        RenderSource  mFontDisplayRenderSource;
+        std::string   mFontFamilyName;
 #endif
 
         ImGuiInputFloat mFontSizeInput;

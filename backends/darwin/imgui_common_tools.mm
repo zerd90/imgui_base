@@ -300,9 +300,9 @@ namespace ImGui
         return utf8ToUnicode(localToUtf8(str));
     }
 
-    std::string  getSystemPictureFolder()
+    std::string getSystemPictureFolder()
     {
-        //TODO
+        // TODO
     }
 
 #ifdef IMGUI_ENABLE_FREETYPE
