@@ -1013,78 +1013,248 @@ namespace ImGui
             dbg("null\n");
             return false;
         }
-        unsigned int planeCount = getPlaneCount(image.format);
-        if (planeCount <= 0)
+        if (image.format == ImGuiImageFormat_Dx11) // DX11 texture create
         {
-            dbg("unsupported format %d\n", image.format);
-            return false;
-        }
-        for (unsigned int i = 0; i < planeCount; i++)
-        {
-            ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)texture.textureID[i];
-            ID3D11Texture2D          *nativeTexture = nullptr;
+            ID3D11ShaderResourceView *texSRV[2]        = {(ID3D11ShaderResourceView *)texture.textureID[0],
+                                                          (ID3D11ShaderResourceView *)texture.textureID[1]};
+            ID3D11Texture2D          *nativeTexture[2] = {nullptr};
 
-            unsigned int bytesPerPixel = 0;
-            unsigned int width         = 0;
-            unsigned int height        = 0;
-            getPlaneInfo(image.format, image.width, image.height, i, &bytesPerPixel, &width, &height);
+            HRESULT hr = S_OK;
 
-            DXGI_FORMAT dxgiFormat;
-            switch (bytesPerPixel)
-            {
-                case 1:
-                    dxgiFormat = DXGI_FORMAT_R8_UNORM;
-                    break;
-                case 2:
-                    dxgiFormat = DXGI_FORMAT_R8G8_UNORM;
-                    break;
-                case 4:
-                    dxgiFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-                    break;
-                default:
-                    dbg("unsupported bytesPerPixel %d\n", bytesPerPixel);
-                    return false;
-            }
-
-            if (texSRV)
-                texSRV->GetResource((ID3D11Resource **)&nativeTexture);
+            bool   needRebuild = true;
+            HANDLE shareHandle = 0;
+            // TODO: assume it's DXGI_FORMAT_NV12 here, need to support DXGI_FORMAT_YUY2 and DXGI_FORMAT_P010
             do
             {
-                if (!nativeTexture)
+                if (!texSRV[0] || !texSRV[1])
+                    break;
+
+                texSRV[0]->GetResource((ID3D11Resource **)&nativeTexture[0]);
+                texSRV[1]->GetResource((ID3D11Resource **)&nativeTexture[1]);
+
+                if (nativeTexture[0] != nativeTexture[1])
                     break;
 
                 D3D11_TEXTURE2D_DESC desc;
-                nativeTexture->GetDesc(&desc);
-                if (desc.Width != (UINT)width || desc.Height != (UINT)height || desc.Format != dxgiFormat)
-                {
-                    SAFE_RELEASE_RES(texSRV);
-                    SAFE_RELEASE_RES(nativeTexture);
-                }
+                nativeTexture[0]->GetDesc(&desc);
+                if (desc.Width != (UINT)image.width || desc.Height != (UINT)image.height || desc.Format != DXGI_FORMAT_NV12
+                    || 0 == (desc.MiscFlags & D3D11_RESOURCE_MISC_SHARED))
+                    break;
+
+                SAFE_RELEASE_RES(nativeTexture[1]);
+                needRebuild = false;
             } while (0);
 
-            if (!texSRV || !nativeTexture)
+            if (needRebuild)
             {
-                SAFE_RELEASE_RES(texSRV);
-                SAFE_RELEASE_RES(nativeTexture);
-                if (createImageTexture(&nativeTexture, &texSRV, width, height, dxgiFormat) < 0)
+                SAFE_RELEASE_RES(nativeTexture[0]);
+                SAFE_RELEASE_RES(nativeTexture[1]);
+                SAFE_RELEASE_RES(texSRV[0]);
+                SAFE_RELEASE_RES(texSRV[1]);
+                bool error = true;
+                do
                 {
-                    dbg("createImageTexture fail\n");
-                    SAFE_RELEASE_RES(texSRV);
-                    SAFE_RELEASE_RES(nativeTexture);
+                    D3D11_TEXTURE2D_DESC textureDesc;
+                    ZeroMemory(&textureDesc, sizeof(textureDesc));
+
+                    textureDesc.Format           = DXGI_FORMAT_NV12;
+                    textureDesc.Width            = image.width;
+                    textureDesc.Height           = image.height;
+                    textureDesc.MipLevels        = 1;
+                    textureDesc.ArraySize        = 1;
+                    textureDesc.SampleDesc.Count = 1;
+                    textureDesc.Usage            = D3D11_USAGE_DEFAULT;
+                    textureDesc.BindFlags        = D3D11_BIND_SHADER_RESOURCE;
+                    textureDesc.CPUAccessFlags   = 0;
+                    textureDesc.MiscFlags        = D3D11_RESOURCE_MISC_SHARED;
+
+                    hr = bd->pd3dDevice->CreateTexture2D(&textureDesc, 0, &nativeTexture[0]);
+                    if (FAILED(hr))
+                    {
+                        dbg("CreateTexture2D failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                        break;
+                    }
+
+                    // Create texture view
+                    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+                    ZeroMemory(&srvDesc, sizeof(srvDesc));
+                    srvDesc.Format                    = DXGI_FORMAT_R8_UNORM;
+                    srvDesc.ViewDimension             = D3D11_SRV_DIMENSION_TEXTURE2D;
+                    srvDesc.Texture2D.MipLevels       = 0xFFFFFFFF;
+                    srvDesc.Texture2D.MostDetailedMip = 0;
+                    hr = bd->pd3dDevice->CreateShaderResourceView(nativeTexture[0], &srvDesc, &texSRV[0]);
+                    if (FAILED(hr))
+                    {
+                        dbg("CreateShaderResourceView failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                        break;
+                    }
+                    srvDesc.Format = DXGI_FORMAT_R8G8_UNORM;
+                    hr             = bd->pd3dDevice->CreateShaderResourceView(nativeTexture[0], &srvDesc, &texSRV[1]);
+                    if (FAILED(hr))
+                    {
+                        dbg("CreateShaderResourceView failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                        break;
+                    }
+
+                    error = false;
+                } while (0);
+
+                if (error)
+                {
+                    SAFE_RELEASE_RES(nativeTexture[0]);
+                    SAFE_RELEASE_RES(texSRV[0]);
+                    SAFE_RELEASE_RES(texSRV[1]);
                     return false;
                 }
+                texture.textureID[0] = (uintptr_t)texSRV[0];
+                texture.textureID[1] = (uintptr_t)texSRV[1];
             }
 
-            bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, image.plane[i], (UINT)image.stride[i], 0);
+            // Get shared handle
+            IDXGIResource *dxgiResource = nullptr;
+            hr                          = nativeTexture[0]->QueryInterface(__uuidof(IDXGIResource), (void **)&dxgiResource);
+            SAFE_RELEASE_RES(nativeTexture[0]);
+            if (FAILED(hr))
+            {
+                dbg("QueryInterface IDXGIResource failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                return false;
+            }
+            hr = dxgiResource->GetSharedHandle(&shareHandle);
+            SAFE_RELEASE_RES(dxgiResource);
+            if (FAILED(hr))
+            {
+                dbg("GetSharedHandle failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                return false;
+            }
 
-            texture.textureID[i] = (uintptr_t)texSRV;
-            SAFE_RELEASE_RES(nativeTexture);
-            printf("create srv %p\n", texSRV);
+            ID3D11Texture2D *t_frame = (ID3D11Texture2D *)image.plane[0];
+            int              t_index = (int)(intptr_t)image.plane[1];
+
+            ID3D11Device *device = nullptr;
+            t_frame->GetDevice(&device);
+            if (nullptr == device)
+            {
+                dbg("GetDevice Fail\n");
+                return false;
+            }
+
+            ID3D11DeviceContext *deviceCtx = nullptr;
+            device->GetImmediateContext(&deviceCtx);
+            if (nullptr == deviceCtx)
+            {
+                dbg("Get Context Fail\n");
+                device->Release();
+                return false;
+            }
+
+            ID3D11Texture2D *videoTexture = nullptr;
+            hr = device->OpenSharedResource(shareHandle, __uuidof(ID3D11Texture2D), (void **)&videoTexture);
+            if (FAILED(hr))
+            {
+                dbg("OpenSharedResource failed %s\n", utf8ToLocal(HResultToStr(hr)).c_str());
+                device->Release();
+                deviceCtx->Release();
+                return false;
+            }
+
+            deviceCtx->CopySubresourceRegion(videoTexture, 0, 0, 0, 0, t_frame, t_index, 0);
+            videoTexture->Release();
+            deviceCtx->Flush();
+
+            // ID3D11Query     *query;
+            // D3D11_QUERY_DESC desc = {D3D11_QUERY_EVENT, 0};
+            // device->CreateQuery(&desc, &query);
+            // deviceCtx->End(query);
+            // int waitCount = 100;
+            // while (S_OK != deviceCtx->GetData(query, nullptr, 0, 0))
+            // {
+            //     if (waitCount-- <= 0)
+            //     {
+            //         dbg("Wait for texture copy timeout\n");
+            //         break;
+            //     }
+            //     std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // }
+            // query->Release();
+            device->Release();
+            deviceCtx->Release();
+            printf("copy done\n");
+            texture.imageFormat = ImGuiImageFormat_NV12;
         }
-        texture.imageFormat = image.format;
-        texture.width       = image.width;
-        texture.height      = image.height;
-        texture.colorRange  = image.colorRange;
+        else
+        {
+            unsigned int planeCount = getPlaneCount(image.format);
+            if (planeCount <= 0)
+            {
+                dbg("unsupported format %d\n", image.format);
+                return false;
+            }
+            for (unsigned int i = 0; i < planeCount; i++)
+            {
+                ID3D11ShaderResourceView *texSRV        = (ID3D11ShaderResourceView *)texture.textureID[i];
+                ID3D11Texture2D          *nativeTexture = nullptr;
+
+                unsigned int bytesPerPixel = 0;
+                unsigned int width         = 0;
+                unsigned int height        = 0;
+                getPlaneInfo(image.format, image.width, image.height, i, &bytesPerPixel, &width, &height);
+
+                DXGI_FORMAT dxgiFormat;
+                switch (bytesPerPixel)
+                {
+                    case 1:
+                        dxgiFormat = DXGI_FORMAT_R8_UNORM;
+                        break;
+                    case 2:
+                        dxgiFormat = DXGI_FORMAT_R8G8_UNORM;
+                        break;
+                    case 4:
+                        dxgiFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+                        break;
+                    default:
+                        dbg("unsupported bytesPerPixel %d\n", bytesPerPixel);
+                        return false;
+                }
+
+                if (texSRV)
+                    texSRV->GetResource((ID3D11Resource **)&nativeTexture);
+                do
+                {
+                    if (!nativeTexture)
+                        break;
+
+                    D3D11_TEXTURE2D_DESC desc;
+                    nativeTexture->GetDesc(&desc);
+                    if (desc.Width != (UINT)width || desc.Height != (UINT)height || desc.Format != dxgiFormat)
+                    {
+                        SAFE_RELEASE_RES(texSRV);
+                        SAFE_RELEASE_RES(nativeTexture);
+                    }
+                } while (0);
+
+                if (!texSRV || !nativeTexture)
+                {
+                    SAFE_RELEASE_RES(texSRV);
+                    SAFE_RELEASE_RES(nativeTexture);
+                    if (createImageTexture(&nativeTexture, &texSRV, width, height, dxgiFormat) < 0)
+                    {
+                        dbg("createImageTexture fail\n");
+                        SAFE_RELEASE_RES(texSRV);
+                        SAFE_RELEASE_RES(nativeTexture);
+                        return false;
+                    }
+                }
+
+                bd->pd3dDeviceContext->UpdateSubresource(nativeTexture, 0, 0, image.plane[i], (UINT)image.stride[i], 0);
+
+                texture.textureID[i] = (uintptr_t)texSRV;
+                SAFE_RELEASE_RES(nativeTexture);
+            }
+            texture.imageFormat = image.format;
+        }
+        texture.width      = image.width;
+        texture.height     = image.height;
+        texture.colorRange = image.colorRange;
         return true;
     }
 

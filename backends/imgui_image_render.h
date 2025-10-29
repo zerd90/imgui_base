@@ -19,8 +19,10 @@ namespace ImGui
 
     enum ImGuiImageFormat
     {
-        ImGuiImageFormat_RGBA, // packed RGBA, 32bpp
-        ImGuiImageFormat_BGRA, // packed BGRA, 32bpp
+        ImGuiImageFormat_None = -1,
+
+        ImGuiImageFormat_RGBA = 0, // packed RGBA, 32bpp
+        ImGuiImageFormat_BGRA,     // packed BGRA, 32bpp
 
         ImGuiImageFormat_YUV444P, // planar YUV 4:4:4, 24bpp, (1 Cr & Cb sample per 1x1 Y samples)
         ImGuiImageFormat_YUV422P, // planar YUV 4:2:2, 16bpp, (1 Cr & Cb sample per 2x1 Y samples)

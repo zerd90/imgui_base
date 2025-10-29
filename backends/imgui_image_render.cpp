@@ -106,6 +106,7 @@ namespace ImGui
                 return 3;
             case ImGuiImageFormat_NV12:
             case ImGuiImageFormat_NV21:
+            case ImGuiImageFormat_Dx11:
                 return 2;
             case ImGuiImageFormat_RGBA:
             case ImGuiImageFormat_BGRA:
