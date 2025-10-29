@@ -130,6 +130,7 @@ namespace ImGui
     };
 
     bool checkTextureRect(ImDrawVert vertices[6], ImVec2 &texturePos, ImVec2 &textureSize, ImVec2 &renderPos, ImVec2 &renderSize);
+    const char *getShaderCode();
 
 } // namespace ImGui
 

@@ -689,8 +689,6 @@ bool CheckProgram(GLuint handle, const char *desc)
     return (GLboolean)status == GL_TRUE;
 }
 
-    #include "imgui_impl_opengl3_fragment_shader.inl"
-
 bool ImGui_ImplOpenGL3_CreateDeviceObjects()
 {
     ImGui_ImplOpenGL3_Data *bd = ImGui_ImplOpenGL3_GetBackendData();
@@ -737,7 +735,7 @@ void main()
     const GLchar *fragment_shader = nullptr;
 
     vertex_shader   = vertex_shader_glsl_130;
-    fragment_shader = OpenGL_FragmentShader;
+    fragment_shader = getShaderCode();
 
     // Create shaders
     GLuint vert_handle = glCreateShader(GL_VERTEX_SHADER);

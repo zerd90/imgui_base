@@ -54,12 +54,12 @@ struct VERTEX_CONSTANT_BUFFER_DX11
 
 struct PS_CONSTANT_BUFFER
 {
-    int32_t format;
-    int32_t useAreaSample;
-    int32_t textureColorRange;
     float   textureSize[2];
     float   textureShowingSize[2];
     float   renderSize[2];
+    int32_t format;
+    int32_t useAreaSample;
+    int32_t textureColorRange;
     uint8_t padding[12];
 };
 static_assert(sizeof(PS_CONSTANT_BUFFER) % 16 == 0, "PS_CONSTANT_BUFFER size must be multiple of 16");
@@ -495,8 +495,6 @@ static void ImGui_ImplDX11_CreateFontsTexture()
     }
 }
 
-    #include "imgui_impl_dx11_pixel_shader.inl"
-
 bool ImGui_ImplDX11_CreateDeviceObjects()
 {
     ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
@@ -585,7 +583,7 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
     // Create the pixel shader
     {
         ID3DBlob *pixelShaderBlob;
-        if (FAILED(D3DCompile(Dx11_PixelShader, strlen(Dx11_PixelShader), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
+        if (FAILED(D3DCompile(getShaderCode(), strlen(getShaderCode()), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
                               &pixelShaderBlob, nullptr)))
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const
                           // char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
@@ -732,6 +730,16 @@ void ImGui_ImplDX11_InvalidateDeviceObjects()
     {
         bd->pVertexShader->Release();
         bd->pVertexShader = nullptr;
+    }
+    if (bd->pNearestSampler)
+    {
+        bd->pNearestSampler->Release();
+        bd->pNearestSampler = nullptr;
+    }
+    if (bd->pPixelConstantBuffer)
+    {
+        bd->pPixelConstantBuffer->Release();
+        bd->pPixelConstantBuffer = nullptr;
     }
 }
 

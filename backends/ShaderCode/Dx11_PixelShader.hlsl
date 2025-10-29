@@ -20,12 +20,12 @@ struct PS_INPUT {
 sampler gSampler;
 Texture2D gTextures[4];
 cbuffer ConstantBuffer : register(b0) {
-  int format;
-  int useAreaSample;
-  int textureColorRange;
   float2 textureSize;
   float2 textureShowingSize;
   float2 renderSize;
+  int format;
+  int useAreaSample;
+  int textureColorRange;
 };
 
 float3 yuvToRgb(float3 yuv) {
@@ -49,7 +49,7 @@ float4 simpleSampleTexture(int idx, float2 uv) {
 float4 sampleTexture(int idx, float2 uv) {
   float2 texScale = textureShowingSize / renderSize;
 
-  if (useAreaSample == 0 || (texScale.x < 2.0 && texScale.y < 2.0)) {
+  if (useAreaSample == 0 || texScale.x < 2.0 || texScale.y < 2.0) {
     return simpleSampleTexture(idx, uv);
   }
 

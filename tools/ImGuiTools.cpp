@@ -1554,7 +1554,9 @@ namespace ImGui
 
     void FontChooseWindow::exit()
     {
+#ifdef IMGUI_ENABLE_FREETYPE
         freeTexture(mFontDisplayTexture);
+#endif
     }
 
     ConfirmDialog::ConfirmDialog(const std::string &title, const std::string &message) : ImGuiPopup(title), mMessage(message)

@@ -30,7 +30,20 @@ type "%INFILE%" >> "%OUTFILE%"
 echo(>> "%OUTFILE%"
 :: Add trailing content
 echo ^)^";>> "%OUTFILE%"
+echo(>> "%OUTFILE%"
+(
 
+set "line1=namespace ImGui"
+set "line2={"
+set "line3=const char *getShaderCode()"
+echo !line1!
+echo !line2!
+echo     !line3!
+echo     !line2!
+echo         return %VARNAME%;
+echo     }
+echo }
+) >> "%OUTFILE%"
 echo Conversion completed: "%OUTFILE%"
 
 exit /b 0

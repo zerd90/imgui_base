@@ -106,7 +106,9 @@ namespace ImGui
                 return 3;
             case ImGuiImageFormat_NV12:
             case ImGuiImageFormat_NV21:
+#if IMGUI_RENDER_API == IMGUI_RENDER_API_DX11
             case ImGuiImageFormat_Dx11:
+#endif
                 return 2;
             case ImGuiImageFormat_RGBA:
             case ImGuiImageFormat_BGRA:

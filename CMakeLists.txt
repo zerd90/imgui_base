@@ -58,29 +58,6 @@ if(PROJECT_IS_TOP_LEVEL)
         add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
         add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
     endif()
-else()
-    if(USING_FREETYPE)
-        set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
-            ${PROJECT_SOURCE_DIR}/imgui-source/
-            ${PROJECT_SOURCE_DIR}/backends
-            ${PROJECT_SOURCE_DIR}/tools
-            ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include
-            PARENT_SCOPE
-        )
-        if(CMAKE_SYSTEM_NAME MATCHES Windows)
-            set(LINK_DIRECTORIES ${LINK_DIRECTORIES}
-                ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win
-                PARENT_SCOPE
-            )
-        endif()
-    else()
-        set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
-            ${PROJECT_SOURCE_DIR}/imgui-source/
-            ${PROJECT_SOURCE_DIR}/backends
-            ${PROJECT_SOURCE_DIR}/tools
-            PARENT_SCOPE
-        )
-    endif()
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES Windows AND ${CMAKE_CXX_COMPILER_ID} MATCHES GNU)
@@ -175,7 +152,6 @@ if(USING_FREETYPE)
     include_directories(${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include)
     if(CMAKE_SYSTEM_NAME MATCHES Windows)
         set(CURRENT_DLL_LIST ${CURRENT_DLL_LIST} ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/bin/freetype.dll)
-        link_directories(${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win)
     endif()
 endif()
 
@@ -203,13 +179,13 @@ if(BACKEND_TYPE MATCHES WIN32_DX11)
         ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11.cpp
         ${PROJECT_SOURCE_DIR}/backends/imgui_impl_win32.cpp
         ${PROJECT_SOURCE_DIR}/backends/imgui_main_win32_dx11.cpp
-        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.inl
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.cpp
     )
     add_custom_command(
-        OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.inl
+        OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_dx11_pixel_shader.cpp
         COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.bat
         ARGS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\Dx11_PixelShader.hlsl
-        ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_dx11_pixel_shader.inl
+        ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_dx11_pixel_shader.cpp
         DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Dx11_PixelShader.hlsl
     )
 elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
@@ -218,26 +194,26 @@ elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
         ${PROJECT_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
         ${PROJECT_SOURCE_DIR}/backends/imgui_main_glfw_opengl3.cpp
         ${PROJECT_SOURCE_DIR}/backends/glad/src/glad.c
-        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.cpp
     )
     set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
         backends/glad/include
     )
     if(${CMAKE_SYSTEM_NAME} MATCHES Windows)
-        message(STATUS add custom command for imgui_impl_opengl3_fragment_shader.inl)
+        message(STATUS add custom command for imgui_impl_opengl3_fragment_shader.cpp)
         add_custom_command(
-            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.cpp
             COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.bat
             ARGS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\OpenGL_FragmentShader.glsl
-            ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_opengl3_fragment_shader.inl
+            ARGS ${PROJECT_SOURCE_DIR}\\backends\\imgui_impl_opengl3_fragment_shader.cpp
             DEPENDS ${PROJECT_SOURCE_DIR}\\backends\\ShaderCode\\OpenGL_FragmentShader.glsl
         )
     else()
         add_custom_command(
-            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            OUTPUT ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.cpp
             COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.sh
             ARGS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/OpenGL_FragmentShader.glsl
-            ARGS ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.inl
+            ARGS ${PROJECT_SOURCE_DIR}/backends/imgui_impl_opengl3_fragment_shader.cpp
             DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/OpenGL_FragmentShader.glsl
         )
     endif()
@@ -259,15 +235,23 @@ set(INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES}
 include_directories(${INCLUDE_DIRECTORIES})
 
 if(NOT TARGET ${PROJECT_NAME})
-    message(STATUS "BACKEND_SRC_LIST: ${BACKEND_SRC_LIST}")
     add_library(${PROJECT_NAME} STATIC ${IMGUI_BASE_SRC_LIST} ${BACKEND_SRC_LIST})
-
+    target_include_directories(${PROJECT_NAME} PUBLIC
+        ${PROJECT_SOURCE_DIR}/imgui-source
+        ${PROJECT_SOURCE_DIR}/backends
+        ${PROJECT_SOURCE_DIR}/tools
+    )
+    if(USING_FREETYPE)
+        target_include_directories(${PROJECT_NAME} PUBLIC
+            ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include
+        )
+    endif()
     if(USING_FREETYPE)
         set(CURRENT_LINK_LIBRARIES ${CURRENT_LINK_LIBRARIES} freetype)
-        target_compile_definitions(${PROJECT_NAME}
-            PUBLIC
-            IMGUI_ENABLE_FREETYPE
-        )
+        target_compile_definitions(${PROJECT_NAME} PUBLIC IMGUI_ENABLE_FREETYPE)
+        if(CMAKE_SYSTEM_NAME MATCHES Windows)
+            target_link_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win)
+        endif()
     endif()
 
     if(WINDOW_API MATCHES "WIN32")
@@ -291,7 +275,7 @@ if(COMPILE_DEMO)
     else()
         add_executable(imguiDemo demo.cpp)
     endif()
-    target_link_libraries(imguiDemo ${PROJECT_NAME} ${CURRENT_LINK_LIBRARIES} ${EXE_LINK_LIBRARIES})
+    target_link_libraries(imguiDemo ${PROJECT_NAME})
     install(TARGETS imguiDemo
         DESTINATION ${PROJECT_SOURCE_DIR}/bin
     )
