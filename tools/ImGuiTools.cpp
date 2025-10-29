@@ -824,7 +824,7 @@ namespace ImGui
 
     void ImageWindow::clear()
     {
-        mTexture = RenderSource();
+        mTexture = RenderSource(mTexture.sampleType);
         clearDrawList();
     }
 

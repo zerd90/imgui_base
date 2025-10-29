@@ -118,6 +118,7 @@ namespace ImGui
     struct RenderSource
     {
         RenderSource() {}
+        RenderSource(ImGuiImageSampleType sampleType) : sampleType(sampleType) {}
         explicit RenderSource(TextureSource &textureSource, ImGuiImageSampleType sampleType);
         uintptr_t            textureID[IMGUI_IMAGE_MAX_PLANES] = {0};
         ImGuiImageFormat     imageFormat                       = ImGuiImageFormat_RGBA;
