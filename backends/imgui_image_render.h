@@ -42,14 +42,20 @@ namespace ImGui
 #if IMGUI_RENDER_API == IMGUI_RENDER_API_DX11
         ImGuiImageFormat_Dx11,
 #endif
+
+        ImGuiImageFormat_Max,
     };
+#define INVALID_IMAGE_FORMAT(t) ((t) < 0 || (t) >= ImGuiImageFormat_Max)
 
     // for YUV format
     enum ImGuiImageColorRange
     {
         ImGuiImageColorRange_0_255,
         ImGuiImageColorRange_16_235,
+
+        ImGuiImageColorRange_Max,
     };
+#define INVALID_COLOR_RANGE(t) ((t) < 0 || (t) >= ImGuiImageColorRange_Max)
 
     int          getTextureFormat(ImGuiImageFormat imageFormat);
     unsigned int getPlaneCount(ImGuiImageFormat format);
@@ -64,7 +70,10 @@ namespace ImGui
 
         // implement by shader Code
         ImGuiImageSampleType_Area,
+
+        ImGuiImageSampleType_Max,
     };
+#define INVALID_SAMPLE_TYPE(t) ((t) < 0 || (t) >= ImGuiImageSampleType_Max)
 
     struct ImageData
     {
