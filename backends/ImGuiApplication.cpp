@@ -917,7 +917,8 @@ void ImGuiApplication::initSettingsWindow()
                               });
 
     addSettingWindowItemBool(settingPath, "V-Sync", &mGuiVSync);
-    addSettingWindowItemBool(settingPath, "Show UI Status", &mShowUIStatus);
+    addSettingWindowItemButton(
+        settingPath, "Show UI Status", [this]() { mShowUIStatus = true; }, "", [this]() { return mShowUIStatus; });
     if (mEnableFontChanging)
     {
         addSettingWindowItemButton(settingPath, "Font", [this]() { mFontChooser.open(); });
