@@ -626,6 +626,34 @@ void ImGuiApplication::addSettingWindowItemCombo(const vector<std::string> &cate
 
     category->items.push_back(item);
 }
+
+void ImGuiApplication::addSettingWindowItemCombo(const std::vector<std::string> &categoryPath, const std::string &label,
+                                                 ComboTag                                     *data,
+                                                 const ImGuiInputCombo::GetComboItemsCallback &getComboItemsCallback,
+                                                 const std::function<void()> &onChange, const std::string &tooltip,
+                                                 const std::function<bool()> isDisabled)
+{
+    IM_ASSERT(data != nullptr);
+    auto *category = findCategory(categoryPath);
+    if (category == nullptr)
+        return;
+
+    SettingWindowItem item;
+    item.type       = SettingWindowItemTypeCombo;
+    item.label      = label;
+    item.onChange   = onChange;
+    item.isDisabled = isDisabled;
+
+    item.data.comboItem.comboData = data;
+    auto comboInput               = std::make_shared<ImGuiInputCombo>(label, true);
+    comboInput->setToolTip(tooltip);
+    comboInput->setGetComboItemsCallback(getComboItemsCallback);
+    comboInput->setSelected(*data);
+    item.settingInput = comboInput;
+
+    category->items.push_back(item);
+}
+
 void ImGuiApplication::addSettingWindowItemPath(const vector<std::string> &categoryPath, const std::string &label,
                                                 std::string *data, uint32_t flags, const std::vector<FilterSpec> &typeFilters,
                                                 const std::function<void()> &onChange, const std::string &tooltip,

@@ -12,7 +12,12 @@
     #ifdef _MSC_VER
         #pragma comment(lib, "d3dcompiler") // Automatically link with d3dcompiler.lib as we are using D3DCompile() below.
     #endif
-
+    #include <filesystem>
+    #include <fstream>
+    #include <iostream>
+    #include "imgui_common_tools.h"
+namespace fs = std::filesystem;
+using std::string;
 using namespace ImGui;
 
 // DirectX11 data
@@ -433,11 +438,15 @@ void ImGui_ImplDX11_RenderDrawData(ImDrawData *draw_data)
 
 static void ImGui_ImplDX11_CreateFontsTexture()
 {
+
     // Build texture atlas
     ImGuiIO             &io = ImGui::GetIO();
     ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
-    unsigned char       *pixels;
-    int                  width, height;
+
+    waitFontPixPreload();
+
+    unsigned char *pixels;
+    int            width, height;
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     // Upload texture to graphics system
@@ -497,6 +506,7 @@ static void ImGui_ImplDX11_CreateFontsTexture()
 
 bool ImGui_ImplDX11_CreateDeviceObjects()
 {
+
     ImGui_ImplDX11_Data *bd = ImGui_ImplDX11_GetBackendData();
     if (!bd->pd3dDevice)
         return false;
@@ -582,19 +592,56 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
 
     // Create the pixel shader
     {
-        ID3DBlob *pixelShaderBlob;
-        if (FAILED(D3DCompile(getShaderCode(), strlen(getShaderCode()), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
-                              &pixelShaderBlob, nullptr)))
-            return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const
-                          // char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
-        if (bd->pd3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr,
-                                              &bd->pPixelShader)
-            != S_OK)
+        ID3DBlob       *pixelShaderBlob;
+        string          csoFilePath = (fs::u8path(getResourcesDir()) / "pixelShader.cso").u8string();
+        std::error_code ec;
+        bool            loadFromFile = false;
+        do
         {
+            if (!fs::exists(csoFilePath, ec))
+            {
+                break;
+            }
+            if (ec)
+            {
+                break;
+            }
+            if (FAILED(D3DReadFileToBlob(utf8ToUnicode(csoFilePath).c_str(), &pixelShaderBlob)))
+                break;
+
+            if (FAILED(bd->pd3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(),
+                                                         nullptr, &bd->pPixelShader)))
+            {
+                pixelShaderBlob->Release();
+                break;
+            }
+            loadFromFile = true;
+            printf("Load %s\n", utf8ToLocal(csoFilePath).c_str());
+        } while (0);
+        if (!loadFromFile)
+        {
+            if (FAILED(D3DCompile(getShaderCode(), strlen(getShaderCode()), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
+                                  &pixelShaderBlob, nullptr)))
+                return false;
+
+            if (bd->pd3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr,
+                                                  &bd->pPixelShader)
+                != S_OK)
+            {
+                pixelShaderBlob->Release();
+                return false;
+            }
+            if (fs::exists(csoFilePath, ec))
+            {
+                fs::remove(csoFilePath, ec);
+            }
+            std::ofstream ofs;
+            ofs.open(csoFilePath, std::ios::binary);
+            ofs.write((char *)pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize());
+            ofs.close();
+            printf("Save %s\n", utf8ToLocal(csoFilePath).c_str());
             pixelShaderBlob->Release();
-            return false;
         }
-        pixelShaderBlob->Release();
     }
 
     D3D11_BUFFER_DESC constantBufferDesc;

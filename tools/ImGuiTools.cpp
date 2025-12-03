@@ -1216,7 +1216,6 @@ namespace ImGui
     void FontChooseWindow::showContent()
     {
         float maxItemWidth = 0;
-        bool  fontChanged  = false;
 
 #ifdef IMGUI_ENABLE_FREETYPE
 
@@ -1226,6 +1225,14 @@ namespace ImGui
         if (mFontFamiliesCombo.selectChanged())
         {
             updateFontStyles();
+            int   fontFamilyIdx = mFontFamiliesCombo.getSelected();
+            int   fontIdx       = mFontStylesCombo.getSelected();
+            auto &font          = mSystemFontFamilies[fontFamilyIdx].fonts[fontIdx];
+            mFontFamilyName     = mSystemFontFamilies[fontFamilyIdx].displayName;
+
+            mNewFont.fontPath = font.path;
+            mNewFont.fontIdx  = font.index;
+
             mFontSelectChanged = true;
         }
 
@@ -1240,27 +1247,13 @@ namespace ImGui
 
         ImVec2 inputEndPos = GetCursorScreenPos();
 
-        int   fontFamilyIdx = mFontFamiliesCombo.getSelected();
-        int   fontIdx       = mFontStylesCombo.getSelected();
-        auto &font          = mSystemFontFamilies[fontFamilyIdx].fonts[fontIdx];
-        mFontFamilyName     = mSystemFontFamilies[fontFamilyIdx].displayName;
-
-        mNewFont.fontPath = font.path;
-        mNewFont.fontIdx  = font.index;
-
         ImVec2 displaySize = CalcTextSize(mFontFamilyName.c_str());
         if (displaySize.x + 50 > mFontSelect.itemSize().x)
         {
             mFontSelect.setItemWidth(displaySize.x + 50);
         }
 
-        if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontIdx != mOldFont.fontIdx
-            || mNewFont.fontSize != mOldFont.fontSize)
-        {
-            fontChanged = true;
-        }
-
-        if (mFontSelectChanged)
+        if (mFontSelectChanged || mFontDisplayTexture.textureID[0] == 0)
         {
             updateFontDisplayTexture();
             mFontSelectChanged = false;
@@ -1326,9 +1319,6 @@ namespace ImGui
             mNewFont.fontSize = mFontSizeInput.getValue();
         }
         maxItemWidth = std::max(maxItemWidth, mFontSizeInput.itemSize().x);
-
-        if (mNewFont.fontPath != mOldFont.fontPath || mNewFont.fontSize != mOldFont.fontSize)
-            fontChanged = true;
 #endif
 
         ImVec2 curCursorPos = GetCursorScreenPos();
@@ -1345,7 +1335,7 @@ namespace ImGui
 
         ImGui::SetCursorScreenPos(showPos);
 
-        mApplyButton.showDisabled(!fontChanged);
+        mApplyButton.showDisabled(mNewFont == mOldFont);
         if (mApplyButton.isClicked())
         {
             mConfirmWindow.open();
@@ -1354,10 +1344,11 @@ namespace ImGui
         mCancelButton.show(false);
         if (mCancelButton.isClicked())
         {
-            mNewFont = mOldFont;
 #ifdef IMGUI_ENABLE_FREETYPE
-            setCurrentFont(mOldFont.fontPath, mOldFont.fontIdx, mOldFont.fontSize);
+            if (mNewFont != mOldFont)
+                setCurrentFont(mOldFont.fontPath, mOldFont.fontIdx, mOldFont.fontSize);
 #endif
+            mNewFont = mOldFont;
             close();
         }
 

@@ -80,8 +80,6 @@ bool doGUIRender(GLFWwindow *window)
         // Setup Platform/Renderer backends
         ImGui_ImplOpenGL3_Init(glsl_version);
 
-        gUserApp->loadResources();
-
         io = &ImGui::GetIO();
     }
 
@@ -194,6 +192,8 @@ int main(int argc, char **argv)
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
     gUserApp->initSettingsWindow();
+    gUserApp->loadResources();
+    startFontPixPreload();
 
     // Create window with graphics context
     GLFWwindow *window = glfwCreateWindow(gUserApp->getWindowInitialRect().w, gUserApp->getWindowInitialRect().h,

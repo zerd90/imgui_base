@@ -603,6 +603,7 @@ bool ImGui_ImplOpenGL3_CreateFontsTexture()
     // Build texture atlas
     unsigned char *pixels;
     int            width, height;
+    waitFontPixPreload();
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width,
                                  &height); // Load as RGBA 32-bit (75% of the memory is wasted, but default font is so small)
                                            // because it is more likely to be compatible with user's existing shaders. If your
@@ -851,6 +852,9 @@ namespace ImGui
 
     bool updateImageTexture(ImageData &image, TextureSource &texture)
     {
+        if (!glad_glGetError)
+            return false;
+
     #define DO_NOTING \
         do            \
         {             \
@@ -904,7 +908,13 @@ namespace ImGui
                     return false;
             }
 
-            GL_CALL(glGenTextures(1, &tex));
+            do
+            {
+                glad_glGenTextures(1, &tex);
+                GLenum gl_err = glad_glGetError();
+                if (gl_err != 0)
+                    fprintf((__acrt_iob_func(2)), "GL error 0x%x returned from '%s'.\n", gl_err, "glGenTextures(1, &tex)");
+            } while (0);
             if (0 == tex)
                 return false;
             GL_CALL(glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));

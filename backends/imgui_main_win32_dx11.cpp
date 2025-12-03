@@ -125,6 +125,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 
     gUserApp->initSettingsWindow();
+    gUserApp->loadResources();
+
+    startFontPixPreload();
 
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
@@ -191,8 +194,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-
-    gUserApp->loadResources();
 
     {
         std::vector<std::string> tmpArgs;

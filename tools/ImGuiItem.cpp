@@ -267,7 +267,7 @@ bool IImGuiInput::showItem()
 
     if (mLabelOnLeft)
     {
-        ImVec2 pos   = GetCursorScreenPos();
+        ImVec2 pos = GetCursorScreenPos();
         SetCursorScreenPos(pos + ImVec2(0, (mItemSize.y - GetTextLineHeight()) / 2));
         string label = mLabel;
 
@@ -296,6 +296,17 @@ bool IImGuiInput::showItem()
 }
 
 ImGuiInputCombo::ImGuiInputCombo(const std::string &title, bool labelOnLeft) : IImGuiInput(title, labelOnLeft) {}
+
+void ImGuiInputCombo::setGetComboItemsCallback(const GetComboItemsCallback &callback)
+{
+    mGetComboItemsCallback = callback;
+    if (mGetComboItemsCallback)
+    {
+        mGetComboItemsCallback(mSelects);
+        if (mSelects.find(mCurrSelect) == mSelects.end())
+            mCurrSelect = mSelects.begin()->first;
+    }
+}
 
 void ImGuiInputCombo::addSelectableItem(ComboTag tag, const std::string &itemDisplayStr)
 {
@@ -334,6 +345,12 @@ bool ImGuiInputCombo::showInputItem()
     ComboTag lastSelect = mCurrSelect;
 
     string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+    if (mGetComboItemsCallback)
+    {
+        mGetComboItemsCallback(mSelects);
+        if (mSelects.find(mCurrSelect) == mSelects.end())
+            mCurrSelect = mSelects.begin()->first;
+    }
     if (BeginCombo(showLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str(), mComboFlags))
     {
         for (auto &item : mSelects)

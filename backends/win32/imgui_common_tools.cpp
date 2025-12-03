@@ -531,7 +531,6 @@ namespace ImGui
     {
         wchar_t cur_dir[1024] = {0};
         GetModuleFileNameW(0, cur_dir, sizeof(cur_dir));
-        wprintf(L"current dir %s\n", cur_dir);
         return unicodeToUtf8(cur_dir);
     }
 

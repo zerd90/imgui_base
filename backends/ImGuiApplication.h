@@ -174,6 +174,11 @@ namespace ImGui
                                        const std::function<void()>                         &onChange   = nullptr,
                                        const std::string                                   &tooltip    = std::string(),
                                        const std::function<bool()>                          isDisabled = nullptr);
+        void addSettingWindowItemCombo(const std::vector<std::string> &categoryPath, const std::string &label, ComboTag *data,
+                                       const ImGuiInputCombo::GetComboItemsCallback &getComboItemsCallback,
+                                       const std::function<void()>                  &onChange   = nullptr,
+                                       const std::string                            &tooltip    = std::string(),
+                                       const std::function<bool()>                   isDisabled = nullptr);
         void addSettingWindowItemPath(const std::vector<std::string> &categoryPath, const std::string &label, std::string *data,
                                       uint32_t flags = 0, const std::vector<FilterSpec> &typeFilters = std::vector<FilterSpec>(),
                                       const std::function<void()> &onChange = nullptr, const std::string &tooltip = std::string(),

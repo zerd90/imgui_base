@@ -1,12 +1,16 @@
 
+#include <filesystem>
 #include <algorithm>
+#include <thread>
 
 #include "imgui_common_tools.h"
 
 using std::string;
 using std::stringstream;
+using std::thread;
 using std::vector;
 using std::wstring;
+namespace fs = std::filesystem;
 
 namespace ImGui
 {
@@ -57,6 +61,40 @@ namespace ImGui
             {"*.log", "Log Files" },
         };
         return gTextFilterSpecs;
+    }
+
+    std::string getResourcesDir()
+    {
+        string          exePath      = getApplicationPath();
+        auto            exeDir       = fs::u8path(exePath).parent_path();
+        auto            resourcesDir = exeDir / "resources";
+        std::error_code ec;
+        if (!fs::exists(resourcesDir, ec))
+            fs::create_directory(resourcesDir, ec);
+        return resourcesDir.u8string();
+    }
+
+    static thread *gThreadFontPixPreload = nullptr;
+
+    void startFontPixPreload()
+    {
+        if (gThreadFontPixPreload)
+            return;
+        gThreadFontPixPreload = new thread(
+            []
+            {
+                auto          &io = ImGui::GetIO();
+                unsigned char *pixels;
+                int            width, height;
+                io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+            });
+    }
+
+    void waitFontPixPreload()
+    {
+        if (!gThreadFontPixPreload)
+            return;
+        gThreadFontPixPreload->join();
     }
 
 #ifdef IMGUI_ENABLE_FREETYPE

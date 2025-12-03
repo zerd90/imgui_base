@@ -76,6 +76,9 @@ namespace ImGui
     // from errno
     std::string getSystemError();
 
+    void startFontPixPreload();
+    void waitFontPixPreload();
+
     // Platform Relative
 
 #if defined(WIN32) || defined(_WIN32)
@@ -146,6 +149,7 @@ namespace ImGui
 #endif
 
     // End Platform Relative
+    std::string getResourcesDir();
 
     // Backend Relative
     void setApplicationTitle(const std::string &title);

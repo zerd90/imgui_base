@@ -288,11 +288,15 @@ namespace ImGui
     // use ComboTag to distinguish between different selectable items
     class ImGuiInputCombo : public IImGuiInput
     {
+
     public:
+        using GetComboItemsCallback = std::function<void(std::map<ComboTag, std::string> &)>;
+
         ImGuiInputCombo(const std::string &title, bool labelOnLeft = false);
         virtual ~ImGuiInputCombo() {}
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_COMBO_FLAGS, ComboFlag, mComboFlags)
 
+        void     setGetComboItemsCallback(const GetComboItemsCallback &callback);
         void     addSelectableItem(ComboTag tag, const std::string &itemDisplayStr);
         void     removeSelectableItem(ComboTag tag);
         bool     selectChanged();
@@ -306,6 +310,7 @@ namespace ImGui
     private:
         IMGUI_COMBO_FLAGS               mComboFlags = ImGuiComboFlags_WidthFitPreview;
         std::map<ComboTag, std::string> mSelects;
+        GetComboItemsCallback           mGetComboItemsCallback;
         ComboTag                        mCurrSelect = 0;
     };
 

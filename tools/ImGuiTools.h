@@ -278,11 +278,16 @@ namespace ImGui
 #endif
 
     private:
-        struct
+        struct FontInfo
         {
             std::string fontPath;
             int         fontIdx;
             float       fontSize = 0;
+            bool        operator==(const FontInfo &other) const
+            {
+                return fontPath == other.fontPath && fontIdx == other.fontIdx && fontSize == other.fontSize;
+            }
+            bool operator!=(const FontInfo &other) const { return !(*this == other); }
         } mOldFont, mNewFont;
         bool mFontSelectChanged = false;
 
