@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "imgui_common_tools.h"
+#include "ImGuiBaseTypes.h"
 
 using std::string;
 using std::stringstream;
@@ -103,6 +104,49 @@ namespace ImGui
     {
         if (fontFamilies.empty())
             return;
+        FT_Library ftLibrary = nullptr;
+        FT_Error   err       = FT_Init_FreeType(&ftLibrary);
+        if (err)
+        {
+            printf("init freetype library fail: %s\n", FT_Error_String(err));
+            return;
+        }
+
+        ImGuiResourceGuard guard([&]() { FT_Done_FreeType(ftLibrary); });
+
+        for (auto &family : fontFamilies)
+        {
+            for (auto &font : family.fonts)
+            {
+                FT_Face face;
+                err = FT_New_Face(ftLibrary, font.path.c_str(), font.index, &face);
+                if (err)
+                {
+                    printf("load font %s fail: %s\n", font.path.c_str(), FT_Error_String(err));
+                    continue;
+                }
+                auto os2    = (TT_OS2 *)FT_Get_Sfnt_Table(face, ft_sfnt_os2);
+                int  weight = 400;
+                int  width  = 5;
+                int  italic = 0;
+                if (os2)
+                {
+                    weight = (int)os2->usWeightClass;
+                    width  = (int)os2->usWidthClass;
+                    if (os2->fsSelection & (0x1 << 9))
+                        italic = 1; // oblique
+                    else if (os2->fsSelection & 0x1)
+                        italic = 2; // italic
+                    else
+                        italic = 0;
+                }
+                font.weight = weight;
+                font.width  = width;
+                font.italic = italic;
+                FT_Done_Face(face);
+            }
+        }
+
         std::sort(fontFamilies.begin(), fontFamilies.end(),
                   [](const FreetypeFontFamilyInfo &a, const FreetypeFontFamilyInfo &b)
                   {
@@ -122,33 +166,16 @@ namespace ImGui
             std::sort(family.fonts.begin(), family.fonts.end(),
                       [](const FreetypeFontInfo &a, const FreetypeFontInfo &b)
                       {
-                          static vector<string> commonStyles = {"Regular", "UltraLight", "Thin",      "ExtraLight",
-                                                                "Light",   "Medium",     "SemiLight", "SemiBold",
-                                                                "Bold",    "ExtraBold",  "UltraBold"};
-
-                          auto aIter = std::find_if(std::begin(commonStyles), std::end(commonStyles),
-                                                    [&a](const string &s) { return a.style.find(s) != string::npos; });
-                          auto bIter = std::find_if(std::begin(commonStyles), std::end(commonStyles),
-                                                    [&b](const string &s) { return b.style.find(s) != string::npos; });
-
-                          if (aIter == commonStyles.end() && a.style == "Italic")
-                              aIter = commonStyles.begin();
-                          if (bIter == commonStyles.end() && b.style == "Italic")
-                              bIter = commonStyles.begin();
-
-                          if (aIter != commonStyles.end() && bIter != commonStyles.end())
-                          {
-                              if (aIter == bIter)
-                              {
-                                  if (a.style.find("Italic") != string::npos)
-                                      return false;
-                                  else if (b.style.find("Italic") != string::npos)
-                                      return true;
-                              }
-
-                              return aIter < bIter;
-                          }
-                          return a.style < b.style;
+                          bool res = false;
+                          if (a.width != b.width)
+                              res = a.width < b.width;
+                          else if (a.weight != b.weight)
+                              res = a.weight < b.weight;
+                          else if (a.italic != b.italic)
+                              res = a.italic < b.italic;
+                          else
+                              res = a.style < b.style;
+                          return res;
                       });
         }
     }

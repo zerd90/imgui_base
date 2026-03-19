@@ -1237,7 +1237,12 @@ namespace ImGui
         }
 
         if (mFontStylesCombo.selectChanged())
+        {
+            auto &font        = mSystemFontFamilies[mFontFamiliesCombo.getSelected()].fonts[mFontStylesCombo.getSelected()];
+            mNewFont.fontPath = font.path;
+            mNewFont.fontIdx  = font.index;
             mFontSelectChanged = true;
+        }
 
         if (mFontSizeInput.isNativeActive())
         {

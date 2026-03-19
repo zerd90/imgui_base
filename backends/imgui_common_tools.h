@@ -10,6 +10,7 @@
 #ifdef IMGUI_ENABLE_FREETYPE
     #include "ft2build.h"
     #include FT_FREETYPE_H
+    #include FT_TRUETYPE_TABLES_H
 #endif
 
 #include "imgui_internal.h"
@@ -133,7 +134,11 @@ namespace ImGui
         std::string style;
         std::string styleDisplayName;
         std::string path;
-        uint32_t    index;
+        uint32_t    index = 0;
+
+        int weight = 400;
+        int width  = 5;
+        int italic = 0;
     };
 
     struct FreetypeFontFamilyInfo
