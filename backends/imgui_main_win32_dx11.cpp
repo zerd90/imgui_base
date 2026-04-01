@@ -142,7 +142,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                       nullptr,
                       nullptr,
                       L"ImGui Example",
-                      nullptr};
+                      (HICON)gUserApp->getIconHandle()};
     ::RegisterClassExW(&wc);
 
     HWND hwnd = ::CreateWindowExW(0, wc.lpszClassName, utf8ToUnicode(gUserApp->getAppName()).c_str(), WS_OVERLAPPEDWINDOW,
@@ -382,9 +382,13 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             g_ResizeWidth  = (UINT)LOWORD(lParam); // Queue resize
             g_ResizeHeight = (UINT)HIWORD(lParam);
             RECT win_rect;
-            if (GetWindowRect(hWnd, &win_rect))
-                gUserApp->windowRectChange(
-                    {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
+            WINDOWPLACEMENT wndPlacement = {sizeof(WINDOWPLACEMENT)};
+            if (GetWindowRect(hWnd, &win_rect) && GetWindowPlacement(hWnd, &wndPlacement)
+                && wndPlacement.showCmd != SW_SHOWMINIMIZED && wndPlacement.showCmd != SW_SHOWMAXIMIZED)
+            {
+                    gUserApp->windowRectChange(
+                        {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
+            }
             return 0;
         }
         case WM_SYSCOMMAND:
@@ -431,9 +435,13 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
         case WM_MOVE:
         {
             RECT win_rect;
-            if (GetWindowRect(hWnd, &win_rect))
+            WINDOWPLACEMENT wndPlacement = {sizeof(WINDOWPLACEMENT)};
+            if (GetWindowRect(hWnd, &win_rect) && GetWindowPlacement(hWnd, &wndPlacement)
+                && wndPlacement.showCmd != SW_SHOWMINIMIZED && wndPlacement.showCmd != SW_SHOWMAXIMIZED)
+            {
                 gUserApp->windowRectChange(
                     {win_rect.left, win_rect.top, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top});
+            }
             if (g_resources_initialized && !gRendering && doGUIRender())
                 g_exit = true;
 

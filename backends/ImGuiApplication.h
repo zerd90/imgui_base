@@ -132,6 +132,9 @@ namespace ImGui
         // load resources like Fonts; this should be called after preset() and configs loading, before first NewFrame(),
         void loadResources();
 
+        // return the handle of the icon, only for windows platform now
+        virtual void *getIconHandle() { return nullptr; };
+
         bool VSyncEnabled();
         void restart();
         void addLog(const std::string &logString);
