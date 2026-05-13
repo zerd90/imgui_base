@@ -3,6 +3,7 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
+#include "misc/cpp/imgui_stdlib.h"
 #include "ImGuiItem.h"
 
 using namespace ImGui;
@@ -14,9 +15,11 @@ IImGuiItem::IImGuiItem(const std::string &label)
     mLabel = label;
 }
 
+static int s_itemId = 0;
+
 IImGuiItem::IImGuiItem()
 {
-    mLabel = "##" + std::to_string(rand());
+    mLabel = "##" + std::to_string(s_itemId++);
 }
 
 void IImGuiItem::setLabel(const std::string &label)
@@ -115,6 +118,7 @@ void IImGuiItem::updateItemStatus()
         mLastActiveTime = GetTime();
     if (mItemStatus[ImGuiItemDeactivated])
         mLastDeactiveTime = GetTime();
+#undef UPDATE_STATUS
 }
 
 bool IImGuiItem::isHoveredFor(uint32_t timeMs)
@@ -295,6 +299,12 @@ bool IImGuiInput::showItem()
     return res;
 }
 
+bool ImGuiInputString::showInputItem()
+{
+    const std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel;
+    return ImGui::InputText(showLabel.c_str(), &mValue, ImGuiInputTextFlags_EnterReturnsTrue);
+}
+
 ImGuiInputCombo::ImGuiInputCombo(const std::string &title, bool labelOnLeft) : IImGuiInput(title, labelOnLeft) {}
 
 void ImGuiInputCombo::setGetComboItemsCallback(const GetComboItemsCallback &callback)
@@ -304,7 +314,7 @@ void ImGuiInputCombo::setGetComboItemsCallback(const GetComboItemsCallback &call
     {
         mGetComboItemsCallback(mSelects);
         if (mSelects.find(mCurrSelect) == mSelects.end())
-            mCurrSelect = mSelects.begin()->first;
+            mCurrSelect = mSelects.empty() ? 0 : mSelects.begin()->first;
     }
 }
 
@@ -349,7 +359,7 @@ bool ImGuiInputCombo::showInputItem()
     {
         mGetComboItemsCallback(mSelects);
         if (mSelects.find(mCurrSelect) == mSelects.end())
-            mCurrSelect = mSelects.begin()->first;
+            mCurrSelect = mSelects.empty() ? 0 : mSelects.begin()->first;
     }
     if (BeginCombo(showLabel.c_str(), mSelects.empty() ? "" : mSelects[mCurrSelect].c_str(), mComboFlags))
     {
@@ -571,9 +581,6 @@ ImGuiItemTable &ImGuiItemTable::addColumn(const std::string &name)
 
 void ImGuiItemTable::insertColumn(unsigned int index, const std::string &name)
 {
-    if (index < 0)
-        return;
-
     if (index >= mColumnNames.size())
     {
         addColumn(name);
@@ -659,15 +666,13 @@ bool ImGuiItemTable::showItem()
     if (mGetRowCountCallback)
         rowCount = mGetRowCountCallback();
 
-    PushStyleColor(ImGuiCol_TableRowBgAlt, (ImU32)ImColor(255, 0, 0));
+    PushStyleColor(ImGuiCol_TableRowBgAlt, ImColor(255, 0, 0).Value);
     if (ImGui::BeginTable(mLabel.c_str(), (int)mColumnNames.size(), mTableFlags, mManualItemSize))
     {
         ImGui::TableSetupScrollFreeze(mFreezeCols, mFreezeRows);
 
         for (auto &col : mColumnNames)
             ImGui::TableSetupColumn(col.c_str());
-
-        ImGui::TableSetupScrollFreeze(0, 1);
 
         for (auto &headerSize : mHeadersSize)
             headerSize.y = ImGui::TableGetHeaderRowHeight();
@@ -721,7 +726,7 @@ bool ImGuiItemTable::showItem()
                     }
                 }
 
-                ImGui::TextUnformatted(mGetCellCallback(row, col).c_str());
+                ImGui::TextUnformatted(mGetCellCallback ? mGetCellCallback(row, col).c_str() : "");
             }
         }
 
@@ -753,15 +758,13 @@ void ImGuiItemTable::setDataCallbacks(const std::function<size_t()>             
 }
 void IImGuiInput::updateItemStatus()
 {
-    mItemSize = GetItemRectSize();
+    IImGuiItem::updateItemStatus();
     if (mLabelOnLeft)
     {
-        mItemSize.x += CalcTextSize(mLabel.c_str(), nullptr, true).x + ImGui::GetStyle().ItemInnerSpacing.x;
+        const float spacingUsed =
+            (mSpacing >= 0.f) ? mSpacing : ImGui::GetStyle().ItemInnerSpacing.x;
+        mItemSize.x += CalcTextSize(mLabel.c_str(), nullptr, true).x + spacingUsed;
     }
-    UPDATE_STATUS(ImGuiItemHovered, IsItemHovered(mHoveredFlags));
-    UPDATE_STATUS(ImGuiItemActive, IsItemActive());
-    UPDATE_STATUS(ImGuiItemActivated, IsItemActivated());
-    UPDATE_STATUS(ImGuiItemDeactivated, IsItemDeactivated());
 }
 void IImGuiInput::setInputBoxSize(ImVec2 size)
 {
@@ -782,8 +785,106 @@ void IImGuiInput::setInputBoxSize(ImVec2 size)
 
 void IImGuiInput::setInputBoxWidth(float width)
 {
-    if (mSpacing)
-        width += mSpacing + CalcTextSize(mLabel.c_str(), nullptr, true).x;
+    const float spacingUsed =
+        (mSpacing >= 0.f) ? mSpacing : ImGui::GetStyle().ItemInnerSpacing.x;
+    width += spacingUsed;
+    width += CalcTextSize(mLabel.c_str(), nullptr, true).x;
     if (mManualItemSize.x != width)
         mManualItemSize.x = width;
+}
+
+ImGuiSwitch::ImGuiSwitch(const std::string &label) : IImGuiItem(label) {}
+
+bool ImGuiSwitch::showItem()
+{
+    ImGuiWindow *window = GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    ImGuiContext     &g     = *GImGui;
+    const ImGuiStyle &style = g.Style;
+    const ImGuiID     id    = window->GetID(mLabel.c_str());
+
+    const ImVec2 label_size = CalcTextSize(mLabel.c_str(), NULL, true);
+    const float  track_h    = GetFrameHeight() * 0.85f;
+    const float  track_w    = track_h * 1.95f;
+    const ImVec2 pos        = window->DC.CursorPos;
+
+    const float  inner_h = label_size.y + style.FramePadding.y * 2.0f;
+    const float  total_h = ImMax(inner_h, track_h);
+    const float  total_w = track_w + (label_size.x > 0.0f ? style.ItemInnerSpacing.x + label_size.x : 0.0f);
+    const ImRect total_bb(pos, pos + ImVec2(total_w, total_h));
+
+    ItemSize(total_bb, style.FramePadding.y);
+    const bool item_added = ItemAdd(total_bb, id);
+
+    bool hovered = false, held = false;
+    bool pressed = false;
+    if (item_added)
+    {
+        pressed = ButtonBehavior(total_bb, id, &hovered, &held);
+        if (pressed)
+        {
+            mSwitchState = !mSwitchState;
+            MarkItemEdited(id);
+        }
+    }
+
+    // 滑块与轨道随 mKnobT 动画；再次点击时目标立即切换并用更高系数追赶，实现「打断」
+    const float target = mSwitchState ? 1.f : 0.f;
+    const float dt     = g.IO.DeltaTime;
+    const float k      = pressed ? 40.f : 18.f;
+    if (ImAbs(mKnobT - target) > 0.0005f)
+        mKnobT = ImLerp(mKnobT, target, ImMin(1.f, dt * k));
+    else
+        mKnobT = target;
+
+    if (!item_added)
+        return false;
+
+    const float  track_x0 = pos.x;
+    const float  track_y0 = pos.y + (total_h - track_h) * 0.5f;
+    const ImRect track_bb(ImVec2(track_x0, track_y0), ImVec2(track_x0 + track_w, track_y0 + track_h));
+
+    RenderNavCursor(total_bb, id);
+
+    const float rounding = track_h * 0.5f;
+    const float pad      = ImMax(2.0f, track_h * 0.12f);
+    const float knob_r   = (track_h - pad * 2.0f) * 0.5f;
+
+    ImVec4 track_col_v = ImLerp(GetStyleColorVec4(ImGuiCol_FrameBg), GetStyleColorVec4(ImGuiCol_SliderGrabActive), mKnobT);
+    if (hovered)
+    {
+        ImVec4 h    = ImLerp(GetStyleColorVec4(ImGuiCol_FrameBgHovered), GetStyleColorVec4(ImGuiCol_SliderGrabActive), mKnobT);
+        track_col_v = ImLerp(track_col_v, h, 0.45f);
+    }
+    if (held && hovered)
+    {
+        ImVec4 a    = ImLerp(GetStyleColorVec4(ImGuiCol_FrameBgActive), GetStyleColorVec4(ImGuiCol_SliderGrabActive), mKnobT);
+        track_col_v = ImLerp(track_col_v, a, 0.35f);
+    }
+    const ImU32 track_col = ColorConvertFloat4ToU32(track_col_v);
+
+    window->DrawList->AddRectFilled(track_bb.Min, track_bb.Max, track_col, rounding);
+
+    const float knob_travel = ImMax(0.0f, track_w - pad * 2.0f - knob_r * 2.0f);
+    const float knob_cx     = track_bb.Min.x + pad + knob_r + knob_travel * mKnobT;
+    const float knob_cy     = (track_bb.Min.y + track_bb.Max.y) * 0.5f;
+
+    const ImU32 knob_fill = GetColorU32(ImGuiCol_Text);
+    window->DrawList->AddCircleFilled(ImVec2(knob_cx, knob_cy), knob_r, knob_fill);
+    window->DrawList->AddCircle(ImVec2(knob_cx, knob_cy), knob_r, GetColorU32(ImGuiCol_Border), 0, 1.0f);
+
+    if (label_size.x > 0.0f)
+    {
+        const ImVec2 label_pos(pos.x + track_w + style.ItemInnerSpacing.x, pos.y + (total_h - label_size.y) * 0.5f);
+        RenderText(label_pos, mLabel.c_str());
+    }
+
+    return pressed;
+}
+
+void ImGuiSwitch::updateItemStatus()
+{
+    IImGuiItem::updateItemStatus();
 }

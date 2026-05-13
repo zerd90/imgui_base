@@ -6,6 +6,9 @@
 #include <vector>
 #include <functional>
 #include <limits>
+#include <type_traits>
+#include <cfloat>
+
 #include "imgui.h"
 #include "ImGuiBaseTypes.h"
 
@@ -73,7 +76,7 @@ namespace ImGui
         std::string         mLabel;
 
     protected:
-        bool                  mItemStatus[ImGuiItemActionButt];
+        bool                  mItemStatus[ImGuiItemActionButt] = {false};
         std::function<void()> mActionCallbacks[ImGuiItemActionButt];
         std::string           mToolTip;
 
@@ -200,26 +203,25 @@ namespace ImGui
 
         void setStep(T step, T stepFast = 0)
         {
-            mStep = step;
-            if (0 == stepFast)
-                stepFast = step;
-            else
-                mStepFast = stepFast;
+            mStep     = step;
+            mStepFast = (stepFast == T{}) ? step : stepFast;
         }
 
     protected:
         virtual bool showInputItem() override
         {
-            std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
-            bool        res;
+            static_assert(std::is_same_v<T, int> || std::is_same_v<T, float>, "ImGuiInput only supports int and float");
+
+            std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : std::string(mLabel);
+            bool        res       = false;
             if (mSyncValue)
                 mValue = *mSyncValue;
 
-            if constexpr (std::is_same<T, int>::value)
+            if constexpr (std::is_same_v<T, int>)
             {
                 res = ImGui::InputInt(showLabel.c_str(), &mValue, mStep, mStepFast);
             }
-            else if constexpr (std::is_same<T, float>::value)
+            else if constexpr (std::is_same_v<T, float>)
             {
                 res = ImGui::InputFloat(showLabel.c_str(), &mValue, mStep, mStepFast);
             }
@@ -259,26 +261,7 @@ namespace ImGui
         void               setValue(const std::string &newValue) { mValue = newValue; }
 
     protected:
-        virtual bool showInputItem() override
-        {
-            std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
-
-            bool res = ImGui::InputText(
-                showLabel.c_str(), (char *)mValue.c_str(), mValue.capacity() + 1,
-                ImGuiInputTextFlags_CallbackResize | ImGuiInputTextFlags_EnterReturnsTrue,
-                [](ImGuiInputTextCallbackData *data)
-                {
-                    std::string *valueString = (std::string *)data->UserData;
-                    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-                    {
-                        valueString->resize(data->BufTextLen);
-                        data->Buf = (char *)valueString->c_str();
-                    }
-                    return 0;
-                },
-                &mValue);
-            return res;
-        }
+        virtual bool showInputItem() override;
 
     private:
         std::string mValue;
@@ -314,12 +297,40 @@ namespace ImGui
         ComboTag                        mCurrSelect = 0;
     };
 
+    // SliderScalar 内部 SliderBehavior 对 min/max 有「不超过全量程约一半」的限制（见 imgui_widgets.cpp），
+    // 不能用 std::numeric_limits<T>::min/max() 作为默认 Slider 范围。
+    template <typename T>
+    constexpr T ImGuiSliderRangeMinDefault()
+    {
+        if constexpr (std::is_same_v<T, float>)
+            return -FLT_MAX / 2.f;
+        if constexpr (std::is_same_v<T, double>)
+            return -DBL_MAX / 2.0;
+        if constexpr (std::is_integral_v<T> && std::is_unsigned_v<T>)
+            return T{};
+        if constexpr (std::is_integral_v<T>)
+            return T((std::numeric_limits<T>::min)() / 2);
+        return (std::numeric_limits<T>::min)();
+    }
+
+    template <typename T>
+    constexpr T ImGuiSliderRangeMaxDefault()
+    {
+        if constexpr (std::is_same_v<T, float>)
+            return FLT_MAX / 2.f;
+        if constexpr (std::is_same_v<T, double>)
+            return DBL_MAX / 2.0;
+        if constexpr (std::is_integral_v<T>)
+            return T((std::numeric_limits<T>::max)() / 2);
+        return (std::numeric_limits<T>::max)();
+    }
+
     template <typename T, int sliderCount>
     class ImGuiInputSlider : public IImGuiInput
     {
     public:
         ImGuiInputSlider() : IImGuiInput() { getDataType(); }
-        ImGuiInputSlider(const std::string &label, bool labelOnLeft) : IImGuiInput(label, labelOnLeft) { getDataType(); }
+        ImGuiInputSlider(const std::string &label, bool labelOnLeft = false) : IImGuiInput(label, labelOnLeft) { getDataType(); }
 
         DEFINE_FLAGS_VARIABLE_OPERARION(IMGUI_SLIDER_FLAGS, SliderFlag, mSliderFlags)
 
@@ -330,10 +341,10 @@ namespace ImGui
     protected:
         void getDataType()
         {
-            static_assert(!(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint16_t>
-                            || std::is_same_v<T, int16_t> || std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>
-                            || std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float>
-                            || std::is_same_v<T, double>));
+            static_assert(std::is_same_v<T, uint8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint16_t>
+                          || std::is_same_v<T, int16_t> || std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>
+                          || std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, float>
+                          || std::is_same_v<T, double>);
 
             dataType = std::is_same_v<T, uint8_t>  ? ImGuiDataType_U8
                      : std::is_same_v<T, int8_t>   ? ImGuiDataType_S8
@@ -349,7 +360,7 @@ namespace ImGui
 
         virtual bool showInputItem() override
         {
-            std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : mLabel.c_str();
+            std::string showLabel = mLabelOnLeft ? ("##" + mLabel) : std::string(mLabel);
 
             if constexpr (sliderCount > 1)
                 return SliderScalarN(showLabel.c_str(), dataType, mValues, sliderCount, &mValueMinimum, &mValueMaximum, mFormat,
@@ -360,9 +371,9 @@ namespace ImGui
 
     private:
         IMGUI_DATATYPE dataType;
-        T              mValueMinimum = (std::numeric_limits<T>::min)();
-        T              mValueMaximum = (std::numeric_limits<T>::max)();
-        T              mValues[sliderCount];
+        T              mValueMinimum = ImGuiSliderRangeMinDefault<T>();
+        T              mValueMaximum = ImGuiSliderRangeMaxDefault<T>();
+        T              mValues[sliderCount]{};
 
         IMGUI_SLIDER_FLAGS mSliderFlags = ImGuiSliderFlags_AlwaysClamp;
         const char        *mFormat      = nullptr;
@@ -421,7 +432,7 @@ namespace ImGui
         virtual bool showItem() override;
 
     private:
-        float       mFraction;
+        float       mFraction = 0;
         std::string mShowInfo;
 
         bool   mIsClicked[ImGuiMouseButton_COUNT] = {false};
@@ -476,6 +487,28 @@ namespace ImGui
         std::function<std::string(size_t, size_t)>        mGetCellCallback;
         std::function<bool(size_t rowIdx, size_t colIdx)> mCellClickableCallback;
         std::function<void(size_t rowIdx, size_t colIdx)> mCellClickedCallback;
+    };
+
+    class ImGuiSwitch : public IImGuiItem
+    {
+    public:
+        ImGuiSwitch(const std::string &label);
+
+        bool isOn() const { return mSwitchState; }
+        void setOn(bool on, bool immediate = false)
+        {
+            mSwitchState = on;
+            if (immediate)
+                mKnobT = on ? 1.f : 0.f;
+        }
+
+    protected:
+        bool showItem() override;
+        void updateItemStatus() override;
+
+    private:
+        bool  mSwitchState = false;
+        float mKnobT       = 0.f; // 0=关, 1=开，与 mSwitchState 目标平滑插值（可点击打断）
     };
 
 } // namespace ImGui

@@ -832,6 +832,9 @@ namespace ImGui
     {
         ImGuiDockNode *dock_node = ImGui::DockContextFindNodeByID(ImGui::GetCurrentContext(), dock);
 
+        if (!dock_node)
+            return;
+
         if (dock_node->IsSplitNode())
         {
             *outDockDir         = dock_node->ChildNodes[0]->ID;
@@ -1167,8 +1170,7 @@ namespace ImGui
           mFontFamiliesCombo("##font Families"), mFontStylesCombo("##font style"),
 #endif
           mFontSizeInput("##Font Size", DEF_FONT_SIZE, false, MIN_FONT_SIZE, MAX_FONT_SIZE, 0.5, 1.0), mApplyButton("Apply"),
-          mCancelButton("Cancel"), mConfirmWindow("Apply Font", "Restart Application To Apply New Font"),
-          mRestartButton("Restart Now"), mLatterButton("Restart Latter")
+          mCancelButton("Cancel"), mConfirmWindow("Apply Font", "Restart Application To Apply New Font")
     {
         mWindowFlags |= ImGuiWindowFlags_NoResize;
         mManualSizeCond = ImGuiCond_Always;
@@ -1238,9 +1240,9 @@ namespace ImGui
 
         if (mFontStylesCombo.selectChanged())
         {
-            auto &font        = mSystemFontFamilies[mFontFamiliesCombo.getSelected()].fonts[mFontStylesCombo.getSelected()];
-            mNewFont.fontPath = font.path;
-            mNewFont.fontIdx  = font.index;
+            auto &font         = mSystemFontFamilies[mFontFamiliesCombo.getSelected()].fonts[mFontStylesCombo.getSelected()];
+            mNewFont.fontPath  = font.path;
+            mNewFont.fontIdx   = font.index;
             mFontSelectChanged = true;
         }
 
@@ -1434,7 +1436,7 @@ namespace ImGui
     void FontChooseWindow::updateFontStyles()
     {
         size_t idx = mFontFamiliesCombo.getSelected();
-        if (idx >= 0 && idx < mSystemFontFamilies.size())
+        if (idx < mSystemFontFamilies.size())
         {
             mFontStylesCombo.clear();
             for (size_t i = 0; i < mSystemFontFamilies[idx].fonts.size(); i++)

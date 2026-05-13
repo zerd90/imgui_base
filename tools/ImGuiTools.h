@@ -222,7 +222,7 @@ namespace ImGui
         std::function<void(const std::string &, void *)> mSaveDataCallback;
 
         std::string mLastSaveDir;
-        void       *mUserData;
+        void       *mUserData = nullptr;
 
         ImS64 mSelectOffset = 0;
         ImS64 mScrollPos    = 0;
@@ -310,8 +310,6 @@ namespace ImGui
         ImGuiButton     mCancelButton;
 
         ConfirmDialog mConfirmWindow;
-        ImGuiButton   mRestartButton;
-        ImGuiButton   mLatterButton;
     };
 
     void splitDock(ImGuiID dock, ImGuiDir splitDir, float sizeRatioForNodeDir, ImGuiID *outDockDir, ImGuiID *outDockOppositeDir);
