@@ -160,6 +160,7 @@ if(NOT PROJECT_IS_TOP_LEVEL)
 endif()
 
 set(IMGUI_BASE_SRC_LIST ${IMGUI_BASE_SRC_LIST}
+    ${PROJECT_SOURCE_DIR}/imgui-source/misc/cpp/imgui_stdlib.cpp
     ${PROJECT_SOURCE_DIR}/backends/imgui_common_tools.cpp
     ${PROJECT_SOURCE_DIR}/backends/imgui_image_render.cpp
     ${PROJECT_SOURCE_DIR}/backends/ImGuiApplication.cpp
