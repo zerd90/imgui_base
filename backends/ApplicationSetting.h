@@ -10,35 +10,37 @@
 
 namespace ImGui
 {
+
+    using SettingSetValFunc = std::function<void(const void *)>;
+    using SettingGetValFunc = std::function<void(void *)>;
+
     struct SettingValue
     {
         enum SettingType
         {
             // single value
             SettingSingleValue = 0x00010000,
-            SettingInt         = 0x00010001,
-            SettingFloat       = 0x00010002,
-            SettingDouble      = 0x00010003,
-            SettingStr         = 0x00010004,
-            SettingBool        = 0x00010005,
+            SettingInt         = 0x00010001, // SettingSetValFunc(int *) SettingGetValFunc(int **)
+            SettingFloat       = 0x00010002, // SettingSetValFunc(float *) SettingGetValFunc(float **)
+            SettingDouble      = 0x00010003, // SettingSetValFunc(double *) SettingGetValFunc(double **)
+            SettingStr         = 0x00010004, // SettingSetValFunc(const char *) SettingGetValFunc(char **)
+            SettingBool        = 0x00010005, // SettingSetValFunc(bool *) SettingGetValFunc(bool **)
 
             // constant length
             SettingArray     = 0x00020000,
-            SettingArrInt    = 0x00020001,
-            SettingArrFloat  = 0x00020002,
-            SettingArrDouble = 0x00020003,
+            SettingArrInt    = 0x00020001, // SettingSetValFunc(int *) SettingGetValFunc(int *)
+            SettingArrFloat  = 0x00020002, // SettingSetValFunc(float *) SettingGetValFunc(float *)
+            SettingArrDouble = 0x00020003, // SettingSetValFunc(double *) SettingGetValFunc(double *)
 
             // variable length
             SettingVector       = 0x00030000,
-            SettingVectorInt    = 0x00030001,
-            SettingVectorFloat  = 0x00030002,
-            SettingVectorDouble = 0x00030003,
-            SettingVectorStr    = 0x00030004,
+            SettingVectorInt    = 0x00030001, // SettingSetValFunc(int *) SettingGetValFunc(std::vector<int> *)
+            SettingVectorFloat  = 0x00030002, // SettingSetValFunc(float *) SettingGetValFunc(std::vector<float> *)
+            SettingVectorDouble = 0x00030003, // SettingSetValFunc(double *) SettingGetValFunc(std::vector<double> *)
+            SettingVectorStr    = 0x00030004, // SettingSetValFunc(const char *) SettingGetValFunc(std::vector<std::string> *)
         };
-        SettingValue(SettingType type, std::string name, std::function<void(const void *)> setVal,
-                     std::function<void(void *)> getVal, int arrLen);
-        SettingValue(SettingType type, std::string name, std::function<void(const void *)> setVal,
-                     std::function<void(void *)> getVal);
+        SettingValue(SettingType type, std::string name, SettingSetValFunc setVal, SettingGetValFunc getVal, int arrLen);
+        SettingValue(SettingType type, std::string name, SettingSetValFunc setVal, SettingGetValFunc getVal);
 
     private:
         void checkVariable();
@@ -48,8 +50,8 @@ namespace ImGui
         std::string mName;
         int         mArrLen = 0;
 
-        std::function<void(const void *)> mSetVal;
-        std::function<void(void *)>       mGetVal;
+        SettingSetValFunc mSetVal;
+        SettingGetValFunc mGetVal;
     };
 
     void *WinSettingsHandler_ReadOpen(ImGuiContext *, ImGuiSettingsHandler *handler, const char *name);
