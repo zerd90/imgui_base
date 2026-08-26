@@ -152,7 +152,23 @@ namespace ImGui
 
     string selectDir(const string &initDirPath)
     {
-        // TODO
+        NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+        [openPanel setCanChooseFiles:NO];
+        [openPanel setCanChooseDirectories:YES];
+        [openPanel setCanCreateDirectories:YES];
+        setInitDir(initDirPath, openPanel);
+
+        NSInteger result = [openPanel runModal];
+        if (result == NSModalResponseOK)
+        {
+            return [[[openPanel URL] path] UTF8String];
+        }
+        if (result != NSModalResponseCancel)
+        {
+            gLastError = strerror(errno);
+        }
+
+        return string();
     }
 
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
@@ -302,7 +318,20 @@ namespace ImGui
 
     std::string getSystemPictureFolder()
     {
-        // TODO
+        NSError *error = nil;
+        NSURL *picturesURL = [[NSFileManager defaultManager] URLForDirectory:NSPicturesDirectory
+                                                                       inDomain:NSUserDomainMask
+                                                              appropriateForURL:nil
+                                                                         create:NO
+                                                                          error:&error];
+        if (!picturesURL)
+        {
+            if (error)
+                gLastError = [[error localizedDescription] UTF8String];
+            return string();
+        }
+
+        return [[picturesURL path] UTF8String];
     }
 
 #ifdef IMGUI_ENABLE_FREETYPE

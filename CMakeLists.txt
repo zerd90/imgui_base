@@ -9,7 +9,7 @@ execute_process(
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-option(COMPILE_DEMO "Compile Demo" ON)
+option(COMPILE_DEMO "Compile Demo" OFF)
 
 set(IMGUI_WINDOW_API_WIN32 0)
 set(IMGUI_WINDOW_API_GLFW 1)

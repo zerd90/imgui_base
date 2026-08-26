@@ -908,13 +908,7 @@ namespace ImGui
                     return false;
             }
 
-            do
-            {
-                glad_glGenTextures(1, &tex);
-                GLenum gl_err = glad_glGetError();
-                if (gl_err != 0)
-                    fprintf((__acrt_iob_func(2)), "GL error 0x%x returned from '%s'.\n", gl_err, "glGenTextures(1, &tex)");
-            } while (0);
+            GL_CALL(glad_glGenTextures(1, &tex));
             if (0 == tex)
                 return false;
             GL_CALL(glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
