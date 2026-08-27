@@ -289,8 +289,9 @@ namespace ImGui
             }
             bool operator!=(const FontInfo &other) const { return !(*this == other); }
         } mOldFont, mNewFont;
+#ifdef IMGUI_ENABLE_FREETYPE
         bool mFontSelectChanged = false;
-
+#endif
         std::function<void(const std::string &, int, float, bool)> mOnFontChanged;
 
 #ifdef IMGUI_ENABLE_FREETYPE
