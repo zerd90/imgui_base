@@ -9,7 +9,7 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include "imgui.h"
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "ImGuiApplication.h"

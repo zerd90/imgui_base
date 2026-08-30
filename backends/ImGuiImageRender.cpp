@@ -2,14 +2,14 @@
 #include <vector>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui_image_render.h"
+#include "ImGuiImageRender.h"
 
 namespace ImGui
 {
     int getPlaneInfo(ImGuiImageFormat format, unsigned int imageWidth, unsigned int imageHeight, unsigned int plane,
                      unsigned int *bytesPerPixel, unsigned int *width, unsigned int *height)
     {
-        if (plane < 0 || plane >= getPlaneCount(format))
+        if (plane >= getPlaneCount(format))
         {
             return -1;
         }

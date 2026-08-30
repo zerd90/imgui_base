@@ -1,8 +1,8 @@
 #ifndef IMGUI_DISABLE
 
     #include "imgui.h"
-    #include "imgui_common_tools.h"
-    #include "imgui_image_render.h"
+    #include "ImGuiCommonTools.h"
+    #include "ImGuiImageRender.h"
     #include "imgui_impl_dx11.h"
 
     // DirectX
@@ -15,7 +15,6 @@
     #include <filesystem>
     #include <fstream>
     #include <iostream>
-    #include "imgui_common_tools.h"
 namespace fs = std::filesystem;
 using std::string;
 using namespace ImGui;

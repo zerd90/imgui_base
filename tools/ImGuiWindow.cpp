@@ -2,7 +2,7 @@
 #include <algorithm>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 #include "ImGuiWindow.h"
 
 using std::string;

@@ -9,6 +9,7 @@
 #include "ImGuiTools.h"
 #include "ImGuiWindow.h"
 #include "ApplicationSetting.h"
+
 #define ADD_APPLICATION_LOG(fmt, ...)                                 \
     do                                                                \
     {                                                                 \

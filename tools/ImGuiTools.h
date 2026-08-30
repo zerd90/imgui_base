@@ -7,11 +7,11 @@
 #include <map>
 
 #include "imgui.h"
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 #include "ImGuiItem.h"
 
 #include "ImGuiWindow.h"
-#include "imgui_image_render.h"
+#include "ImGuiImageRender.h"
 
 #define MOUSE_IN_WINDOW(mousePos, winPos, winSize)                                                             \
     (((mousePos).x >= (winPos).x) && ((mousePos).x < (winPos).x + (winSize).x) && ((mousePos).y >= (winPos).y) \

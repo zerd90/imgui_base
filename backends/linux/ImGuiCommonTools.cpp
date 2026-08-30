@@ -6,7 +6,7 @@
 #include <pwd.h>
 #include <iconv.h>
 
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 
 using std::string;
 using std::stringstream;

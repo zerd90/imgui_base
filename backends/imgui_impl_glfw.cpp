@@ -102,7 +102,7 @@
 #include "imgui.h"
 #ifndef IMGUI_DISABLE
     #include "imgui_impl_glfw.h"
-    #include "imgui_common_tools.h"
+    #include "ImGuiCommonTools.h"
 
     // Clang warnings with -Weverything
     #if defined(__clang__)

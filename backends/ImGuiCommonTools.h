@@ -14,6 +14,7 @@
 #endif
 
 #include "imgui_internal.h"
+#include "ImGuiApiTypes.h"
 
 #if defined(_WIN32)
     #include <Windows.h>
@@ -27,12 +28,6 @@
 
 namespace ImGui
 {
-
-#define IMGUI_WINDOW_API_WIN32 0
-#define IMGUI_WINDOW_API_GLFW  1
-
-#define IMGUI_RENDER_API_DX11   0
-#define IMGUI_RENDER_API_OPENGL 1
 
     template <typename _T>
     static inline auto arrayMakeSharedPtr(size_t length)

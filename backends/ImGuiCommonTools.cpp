@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <thread>
 
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 #include "ImGuiBaseTypes.h"
 
 using std::string;

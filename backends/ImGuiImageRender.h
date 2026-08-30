@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "imgui.h"
+#include "ImGuiApiTypes.h"
 
 #define IMGUI_IMAGE_MAX_PLANES 4
 

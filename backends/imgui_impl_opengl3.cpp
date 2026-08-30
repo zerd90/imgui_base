@@ -16,7 +16,7 @@
 //  ES 3.0    300       "#version 300 es"   = WebGL 2.0
 //----------------------------------------
 
-#include "imgui_image_render.h"
+#include "ImGuiImageRender.h"
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
     #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -47,7 +47,7 @@
         #pragma GCC diagnostic ignored "-Wcast-function-type" // warning: cast between incompatible function types (for loader)
     #endif
 
-    #include "imgui_common_tools.h"
+    #include "ImGuiCommonTools.h"
 
     #include "glad/glad.h"
 

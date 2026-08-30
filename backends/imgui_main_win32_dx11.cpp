@@ -9,7 +9,7 @@
 #include <d3d11.h>
 #include <tchar.h>
 
-#include "imgui_common_tools.h"
+#include "ImGuiCommonTools.h"
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include "ImGuiApplication.h"
