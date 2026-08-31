@@ -10,6 +10,14 @@ execute_process(
 option(COMPILE_DEMO "Compile Demo" OFF)
 if(CMAKE_SYSTEM_NAME MATCHES Windows AND ${CMAKE_SIZEOF_VOID_P} EQUAL 8) #仅在64位Windows下使用freetype
     option(USING_FREETYPE "Using Freetype for font rendering and font choosing" ON)
+elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+    if(EXISTS /opt/homebrew/opt/freetype2)
+        message(STATUS "Using Freetype for font rendering and font choosing from /opt/homebrew/opt/freetype2")
+        option(USING_FREETYPE "Using Freetype for font rendering and font choosing" ON)
+    else()
+        message(STATUS " /opt/homebrew/opt/freetype2 not found")
+        option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
+    endif()
 else()
     option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
 endif()
@@ -151,6 +159,13 @@ add_library(${PROJECT_NAME} STATIC
     ${IMGUI_BASE_SRC_LIST}
     ${BACKEND_SRC_LIST}
 )
+
+if(APPLE)
+    target_compile_options(${PROJECT_NAME} PUBLIC
+        $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-nontrivial-memcall>
+    )
+endif()
+
 target_include_directories(${PROJECT_NAME}
     PUBLIC
     ${PROJECT_SOURCE_DIR}/backends
@@ -258,10 +273,6 @@ if(USING_MINGW)
 endif()
 
 if(USING_FREETYPE)
-    target_include_directories(${PROJECT_NAME}
-        PUBLIC
-        ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include
-    )
 
     target_link_libraries(${PROJECT_NAME}
         PUBLIC
@@ -272,19 +283,29 @@ if(USING_FREETYPE)
         IMGUI_ENABLE_FREETYPE
     )
     if(CMAKE_SYSTEM_NAME MATCHES Windows)
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+            ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/include
+        )
+
         target_link_directories(${PROJECT_NAME}
             PUBLIC
             ${PROJECT_SOURCE_DIR}/3rdlibrary/freetype/lib/win
         )
-    endif()
-
-    if(CMAKE_SYSTEM_NAME MATCHES Windows)
         # for font listing
         target_link_libraries(${PROJECT_NAME}
             PUBLIC
             Dwrite
         )
     elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+            /opt/homebrew/opt/freetype/include/freetype2
+        )
+        target_link_directories(${PROJECT_NAME}
+            PUBLIC
+            /opt/homebrew/opt/freetype/lib
+        )
         target_link_libraries(${PROJECT_NAME}
             PUBLIC
             "-framework CoreText"
