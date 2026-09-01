@@ -8,7 +8,7 @@
 #include <AppKit/AppKit.h>
 #import <AppKit/NSOpenPanel.h>
 #include <Foundation/Foundation.h>
-#import <UniformTypeIdentifiers/UTType.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <objc/NSObjCRuntime.h>
 #include <iconv.h>
 
@@ -114,9 +114,26 @@ namespace ImGui
         return true;
     }
 
+    NSInteger runPanelModal(NSSavePanel *panel)
+    {
+        if ([NSApp activationPolicy] != NSApplicationActivationPolicyRegular)
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [NSApp activateIgnoringOtherApps:YES];
+
+        __block NSInteger result = NSModalResponseCancel;
+        if ([NSThread isMainThread])
+        {
+            result = [panel runModal];
+        }
+        else
+        {
+            dispatch_sync(dispatch_get_main_queue(), ^{ result = [panel runModal]; });
+        }
+        return result;
+    }
+
     void setFilter(const vector<FilterSpec> &typeFilters, NSSavePanel *pPanel)
     {
-        // 从 typeFilters 中提取允许的文件 UTI
         NSMutableArray<UTType *> *allowedContentTypes = [NSMutableArray array];
         for (const auto &filterSpec : typeFilters)
         {
@@ -125,20 +142,22 @@ namespace ImGui
             {
                 size_t endPos = filterSpec.filter.find(';', pos);
                 if (endPos == string::npos)
-                {
                     endPos = filterSpec.filter.length();
-                }
+
                 string ext = filterSpec.filter.substr(pos + 2, endPos - (pos + 2));
-                [allowedContentTypes addObject:[UTType typeWithFilenameExtension:[NSString stringWithUTF8String:ext.c_str()]]];
-                pos = endPos;
+                pos        = endPos;
+                if (ext.empty())
+                    continue;
+
+                NSString *extStr = [NSString stringWithUTF8String:ext.c_str()];
+                UTType   *type   = [UTType typeWithTag:extStr tagClass:UTTagClassFilenameExtension conformingToType:UTTypeData];
+                if (type)
+                    [allowedContentTypes addObject:type];
             }
         }
 
-        // 设置允许的文件类型
         if ([allowedContentTypes count] > 0)
-        {
             [pPanel setAllowedContentTypes:allowedContentTypes];
-        }
     }
 
     void setInitDir(const string &initDirPath, NSSavePanel *pPanel)
@@ -158,7 +177,7 @@ namespace ImGui
         [openPanel setCanCreateDirectories:YES];
         setInitDir(initDirPath, openPanel);
 
-        NSInteger result = [openPanel runModal];
+        NSInteger result = runPanelModal(openPanel);
         if (result == NSModalResponseOK)
         {
             return [[[openPanel URL] path] UTF8String];
@@ -174,11 +193,14 @@ namespace ImGui
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+        [openPanel setCanChooseFiles:YES];
+        [openPanel setCanChooseDirectories:NO];
+        [openPanel setAllowsMultipleSelection:NO];
 
         setFilter(typeFilters, openPanel);
         setInitDir(initDirPath, openPanel);
 
-        NSInteger result = [openPanel runModal];
+        NSInteger result = runPanelModal(openPanel);
         if (result == NSModalResponseOK)
         {
             return [[[openPanel URL] path] UTF8String];
@@ -194,12 +216,14 @@ namespace ImGui
     vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         NSOpenPanel *openPanel = [NSOpenPanel openPanel];
-        [openPanel setAllowsMultipleSelection:true];
+        [openPanel setCanChooseFiles:YES];
+        [openPanel setCanChooseDirectories:NO];
+        [openPanel setAllowsMultipleSelection:YES];
         setFilter(typeFilters, openPanel);
         setInitDir(initDirPath, openPanel);
 
         vector<string> selectFiles;
-        NSInteger      result = [openPanel runModal];
+        NSInteger      result = runPanelModal(openPanel);
         if (result == NSModalResponseOK)
         {
             auto files = [openPanel URLs]; // 注意[panel Urls]的路径是 file:///User/GJH/....
@@ -215,7 +239,7 @@ namespace ImGui
         setFilter(typeFilters, savePanel);
         setInitDir(initDirPath, savePanel);
 
-        auto result = [savePanel runModal];
+        auto result = runPanelModal(savePanel);
         if (NSModalResponseOK == result)
         {
             std::string res = [[[savePanel URL] path] UTF8String];
