@@ -318,12 +318,28 @@ if(NOT PROJECT_IS_TOP_LEVEL)
     set(RENDER_API ${RENDER_API} PARENT_SCOPE)
 endif()
 
-if(COMPILE_DEMO)
-    if(CMAKE_SYSTEM_NAME MATCHES Windows)
-        add_executable(imguiDemo WIN32 demo.cpp)
+function(imgui_add_executable TARGET_NAME)
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        add_executable(${TARGET_NAME} WIN32 ${ARGN})
+
+        if(CMAKE_COMPILER_IS_GNUCXX)
+            target_link_options(${TARGET_NAME} PRIVATE -mwindows)
+        endif()
+    elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        set(CMAKE_MACOSX_RPATH ON)
+        set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+        set(CMAKE_INSTALL_RPATH "@loader_path")
+
+        add_executable(${TARGET_NAME} MACOSX_BUNDLE ${ARGN})
     else()
-        add_executable(imguiDemo demo.cpp)
+        add_executable(${TARGET_NAME} ${ARGN})
     endif()
+endfunction()
+
+
+
+if(COMPILE_DEMO)
+    imgui_add_executable(imguiDemo demo.cpp)
     target_link_libraries(imguiDemo ${PROJECT_NAME})
     install(TARGETS imguiDemo
         DESTINATION ${PROJECT_SOURCE_DIR}/bin
