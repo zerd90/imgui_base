@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <algorithm>
 #include <thread>
+#include <fstream>
+#include <cstdint>
 
 #include "ImGuiCommonTools.h"
 #include "ImGuiBaseTypes.h"
@@ -181,5 +183,116 @@ namespace ImGui
     }
 
 #endif
+
+    namespace
+    {
+        constexpr uint32_t kShaderCacheMagic   = 0x42534D49; // 'IMSB'
+        constexpr uint32_t kShaderCacheVersion = 1;
+        constexpr uint32_t kShaderCacheMaxText = 4096;
+        constexpr uint32_t kShaderCacheMaxBlob = 16 * 1024 * 1024;
+
+        bool shaderKeyComplete(const ShaderBinaryKey &key)
+        {
+            return !key.compileTime.empty() && !key.systemVersion.empty() && !key.gpuName.empty() && !key.driverVersion.empty();
+        }
+
+        bool readPod(std::istream &in, void *data, size_t size)
+        {
+            in.read(reinterpret_cast<char *>(data), static_cast<std::streamsize>(size));
+            return static_cast<bool>(in);
+        }
+
+        bool readU32(std::istream &in, uint32_t &value)
+        {
+            return readPod(in, &value, sizeof(value));
+        }
+
+        bool readText(std::istream &in, std::string &text)
+        {
+            uint32_t length = 0;
+            if (!readU32(in, length) || length > kShaderCacheMaxText)
+                return false;
+            text.resize(length);
+            return length == 0 || readPod(in, text.data(), length);
+        }
+
+        bool writePod(std::ostream &out, const void *data, size_t size)
+        {
+            out.write(reinterpret_cast<const char *>(data), static_cast<std::streamsize>(size));
+            return static_cast<bool>(out);
+        }
+
+        bool writeU32(std::ostream &out, uint32_t value)
+        {
+            return writePod(out, &value, sizeof(value));
+        }
+
+        bool writeText(std::ostream &out, const std::string &text)
+        {
+            if (text.size() > kShaderCacheMaxText)
+                return false;
+            return writeU32(out, static_cast<uint32_t>(text.size())) && (text.empty() || writePod(out, text.data(), text.size()));
+        }
+    } // namespace
+
+    std::string getExecutableCompileTime()
+    {
+        std::error_code ec;
+        const auto      writeTime = fs::last_write_time(fs::u8path(getApplicationPath()), ec);
+        if (ec)
+            return {};
+        return std::to_string(static_cast<long long>(writeTime.time_since_epoch().count()));
+    }
+
+    bool loadCachedShaderBinary(const std::string &path, const ShaderBinaryKey &key, std::vector<uint8_t> &binary,
+                                uint32_t &binaryFormat)
+    {
+        binary.clear();
+        binaryFormat = 0;
+        if (!shaderKeyComplete(key))
+            return false;
+
+        std::ifstream in(fs::u8path(path), std::ios::binary);
+        if (!in)
+            return false;
+
+        uint32_t        magic   = 0;
+        uint32_t        version = 0;
+        uint32_t        format  = 0;
+        ShaderBinaryKey stored;
+        uint32_t        blobSize = 0;
+        if (!readU32(in, magic) || magic != kShaderCacheMagic || !readU32(in, version) || version != kShaderCacheVersion
+            || !readU32(in, format) || !readText(in, stored.compileTime) || !readText(in, stored.systemVersion)
+            || !readText(in, stored.gpuName) || !readText(in, stored.driverVersion) || !readU32(in, blobSize) || blobSize == 0
+            || blobSize > kShaderCacheMaxBlob)
+            return false;
+        if (stored.compileTime != key.compileTime || stored.systemVersion != key.systemVersion || stored.gpuName != key.gpuName
+            || stored.driverVersion != key.driverVersion)
+            return false;
+
+        binary.resize(blobSize);
+        if (!readPod(in, binary.data(), blobSize))
+        {
+            binary.clear();
+            return false;
+        }
+        binaryFormat = format;
+        return true;
+    }
+
+    bool saveCachedShaderBinary(const std::string &path, const ShaderBinaryKey &key, const void *data, size_t size,
+                                uint32_t binaryFormat)
+    {
+        if (!shaderKeyComplete(key) || data == nullptr || size == 0 || size > kShaderCacheMaxBlob)
+            return false;
+
+        std::ofstream out(fs::u8path(path), std::ios::binary | std::ios::trunc);
+        if (!out)
+            return false;
+        const auto blobSize = static_cast<uint32_t>(size);
+        return writeU32(out, kShaderCacheMagic) && writeU32(out, kShaderCacheVersion) && writeU32(out, binaryFormat)
+            && writeText(out, key.compileTime) && writeText(out, key.systemVersion) && writeText(out, key.gpuName)
+            && writeText(out, key.driverVersion) && writeU32(out, blobSize) && writePod(out, data, size);
+    }
 
 } // namespace ImGui

@@ -26,13 +26,17 @@ message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 
 set(IMGUI_WINDOW_API_WIN32 0)
 set(IMGUI_WINDOW_API_GLFW 1)
+set(IMGUI_WINDOW_API_OSX 2)
 
 set(IMGUI_RENDER_API_DX11 0)
 set(IMGUI_RENDER_API_OPENGL 1)
+set(IMGUI_RENDER_API_METAL 2)
 
 if("${BACKEND_TYPE}" STREQUAL "")
     if(CMAKE_SYSTEM_NAME MATCHES Windows)
         set(BACKEND_TYPE WIN32_DX11)
+    elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+        set(BACKEND_TYPE OSX_METAL)
     else()
         set(BACKEND_TYPE GLFW_OPENGL3)
     endif()
@@ -101,10 +105,25 @@ elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
         )
     endif()
 
+elseif(BACKEND_TYPE MATCHES OSX_METAL)
+    if(NOT APPLE)
+        message(FATAL_ERROR "OSX_METAL is only available on Apple platforms")
+    endif()
+    set(WINDOW_API "OSX")
+    set(RENDER_API "METAL")
+    enable_language(OBJCXX)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
+        COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.sh
+        ARGS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Media_Shader.metal
+        ARGS ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
+        DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Media_Shader.metal
+    )
 else()
     message(FATAL_ERROR "BACKEND_TYPE not Available, Available Options:\n\
 				WIN32_DX11\n\
-				GLFW_OPENGL3"
+				GLFW_OPENGL3\n\
+				OSX_METAL"
     )
 endif()
 
@@ -153,6 +172,13 @@ elseif(BACKEND_TYPE MATCHES GLFW_OPENGL3)
         ${PROJECT_SOURCE_DIR}/backends/glad/src/glad.c
         ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_opengl3_fragment_shader.cpp
     )
+elseif(BACKEND_TYPE MATCHES OSX_METAL)
+    set(BACKEND_SRC_LIST ${BACKEND_SRC_LIST}
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_metal.mm
+        ${PROJECT_SOURCE_DIR}/backends/imgui_impl_osx.mm
+        ${PROJECT_SOURCE_DIR}/backends/imgui_main_osx_metal.mm
+        ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
+    )
 endif()
 
 add_library(${PROJECT_NAME} STATIC
@@ -164,6 +190,7 @@ if(APPLE)
     target_compile_options(${PROJECT_NAME} PUBLIC
         $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-nontrivial-memcall>
     )
+    target_compile_options(${PROJECT_NAME} PRIVATE -fobjc-arc)
 endif()
 
 target_include_directories(${PROJECT_NAME}
@@ -192,6 +219,18 @@ elseif(WINDOW_API MATCHES "GLFW")
         )
     endif()
 
+elseif(WINDOW_API MATCHES "OSX")
+    set(IMGUI_WINDOW_API ${IMGUI_WINDOW_API_OSX})
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+        "-framework Cocoa"
+        "-framework Carbon"
+        "-framework GameController"
+        "-framework QuartzCore"
+        "-framework Metal"
+        "-framework MetalKit"
+        "-framework UniformTypeIdentifiers"
+    )
 endif()
 
 if(RENDER_API MATCHES "D3D11")
@@ -207,6 +246,8 @@ if(RENDER_API MATCHES "D3D11")
             dwmapi
         )
     endif()
+elseif(RENDER_API MATCHES "METAL")
+    set(IMGUI_RENDER_API ${IMGUI_RENDER_API_METAL})
 elseif(RENDER_API MATCHES "OPENGL3")
     set(IMGUI_RENDER_API ${IMGUI_RENDER_API_OPENGL})
 

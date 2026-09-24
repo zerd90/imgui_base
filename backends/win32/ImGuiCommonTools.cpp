@@ -534,6 +534,18 @@ namespace ImGui
         return unicodeToUtf8(cur_dir);
     }
 
+    std::string getSystemVersion()
+    {
+        using RtlGetVersionFn = LONG(WINAPI *)(PRTL_OSVERSIONINFOW);
+        auto rtlGetVersion = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
+        RTL_OSVERSIONINFOW info{};
+        info.dwOSVersionInfoSize = sizeof(info);
+        if (rtlGetVersion == nullptr || rtlGetVersion(&info) != 0)
+            return {};
+        return std::to_string(info.dwMajorVersion) + "." + std::to_string(info.dwMinorVersion) + "."
+             + std::to_string(info.dwBuildNumber);
+    }
+
     std::string getSystemPictureFolder()
     {
         string result;

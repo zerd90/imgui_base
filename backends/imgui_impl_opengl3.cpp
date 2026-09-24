@@ -50,6 +50,26 @@
     #include "ImGuiCommonTools.h"
 
     #include "glad/glad.h"
+    #define GLFW_INCLUDE_NONE
+    #include <GLFW/glfw3.h>
+    #include <vector>
+    #include <filesystem>
+namespace fs = std::filesystem;
+
+    #ifndef GL_PROGRAM_BINARY_LENGTH
+        #define GL_PROGRAM_BINARY_LENGTH 0x8741
+    #endif
+    #ifndef GL_NUM_PROGRAM_BINARY_FORMATS
+        #define GL_NUM_PROGRAM_BINARY_FORMATS 0x87FE
+    #endif
+    #ifndef GL_PROGRAM_BINARY_RETRIEVABLE_HINT
+        #define GL_PROGRAM_BINARY_RETRIEVABLE_HINT 0x8257
+    #endif
+
+using GlGetProgramBinaryFn  = void(APIENTRY *)(GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat,
+                                              void *binary);
+using GlProgramBinaryFn     = void(APIENTRY *)(GLuint program, GLenum binaryFormat, const void *binary, GLsizei length);
+using GlProgramParameteriFn = void(APIENTRY *)(GLuint program, GLenum pname, GLint value);
 
     // [Debugging]
     #define IMGUI_IMPL_OPENGL_DEBUG
@@ -738,28 +758,86 @@ void main()
     vertex_shader   = vertex_shader_glsl_130;
     fragment_shader = getShaderCode();
 
-    // Create shaders
-    GLuint vert_handle = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vert_handle, 1, &vertex_shader, nullptr);
-    glCompileShader(vert_handle);
-    CheckShader(vert_handle, "vertex shader");
+    ShaderBinaryKey key;
+    key.compileTime   = getExecutableCompileTime();
+    key.systemVersion = getSystemVersion();
+    if (const char *renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER)))
+        key.gpuName = renderer;
+    if (const char *version = reinterpret_cast<const char *>(glGetString(GL_VERSION)))
+        key.driverVersion = version;
 
-    GLuint frag_handle = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(frag_handle, 1, &fragment_shader, nullptr);
-    glCompileShader(frag_handle);
-    CheckShader(frag_handle, "fragment shader");
+    auto getProgramBinary  = reinterpret_cast<GlGetProgramBinaryFn>(glfwGetProcAddress("glGetProgramBinary"));
+    auto programBinary     = reinterpret_cast<GlProgramBinaryFn>(glfwGetProcAddress("glProgramBinary"));
+    auto programParameteri = reinterpret_cast<GlProgramParameteriFn>(glfwGetProcAddress("glProgramParameteri"));
 
-    // Link
-    bd->ShaderHandle = glCreateProgram();
-    glAttachShader(bd->ShaderHandle, vert_handle);
-    glAttachShader(bd->ShaderHandle, frag_handle);
-    glLinkProgram(bd->ShaderHandle);
-    CheckProgram(bd->ShaderHandle, "shader program");
+    const std::string    programPath = (fs::u8path(getResourcesDir()) / "openglProgram.bin").u8string();
+    std::vector<uint8_t> cachedBlob;
+    uint32_t             cachedFormat = 0;
+    bool                 loaded       = false;
+    if (programBinary != nullptr && loadCachedShaderBinary(programPath, key, cachedBlob, cachedFormat) && !cachedBlob.empty())
+    {
+        bd->ShaderHandle = glCreateProgram();
+        programBinary(bd->ShaderHandle, cachedFormat, cachedBlob.data(), static_cast<GLsizei>(cachedBlob.size()));
+        (void)glGetError();
+        GLint linkStatus = GL_FALSE;
+        glGetProgramiv(bd->ShaderHandle, GL_LINK_STATUS, &linkStatus);
+        if (linkStatus == GL_TRUE)
+        {
+            loaded = true;
+            printf("Load %s\n", programPath.c_str());
+        }
+        else
+        {
+            glDeleteProgram(bd->ShaderHandle);
+            bd->ShaderHandle = 0;
+        }
+    }
 
-    glDetachShader(bd->ShaderHandle, vert_handle);
-    glDetachShader(bd->ShaderHandle, frag_handle);
-    glDeleteShader(vert_handle);
-    glDeleteShader(frag_handle);
+    if (!loaded)
+    {
+        // Create shaders
+        GLuint vert_handle = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vert_handle, 1, &vertex_shader, nullptr);
+        glCompileShader(vert_handle);
+        CheckShader(vert_handle, "vertex shader");
+
+        GLuint frag_handle = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(frag_handle, 1, &fragment_shader, nullptr);
+        glCompileShader(frag_handle);
+        CheckShader(frag_handle, "fragment shader");
+
+        // Link
+        bd->ShaderHandle = glCreateProgram();
+        if (programParameteri != nullptr)
+            programParameteri(bd->ShaderHandle, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+        glAttachShader(bd->ShaderHandle, vert_handle);
+        glAttachShader(bd->ShaderHandle, frag_handle);
+        glLinkProgram(bd->ShaderHandle);
+        CheckProgram(bd->ShaderHandle, "shader program");
+
+        glDetachShader(bd->ShaderHandle, vert_handle);
+        glDetachShader(bd->ShaderHandle, frag_handle);
+        glDeleteShader(vert_handle);
+        glDeleteShader(frag_handle);
+
+        GLint formatCount = 0;
+        glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formatCount);
+        (void)glGetError();
+        if (getProgramBinary != nullptr && formatCount > 0)
+        {
+            GLint binaryLength = 0;
+            glGetProgramiv(bd->ShaderHandle, GL_PROGRAM_BINARY_LENGTH, &binaryLength);
+            if (binaryLength > 0)
+            {
+                std::vector<uint8_t> blob(static_cast<size_t>(binaryLength));
+                GLsizei              written = 0;
+                GLenum               format  = 0;
+                getProgramBinary(bd->ShaderHandle, binaryLength, &written, &format, blob.data());
+                if (written > 0 && saveCachedShaderBinary(programPath, key, blob.data(), static_cast<size_t>(written), format))
+                    printf("Save %s\n", programPath.c_str());
+            }
+        }
+    }
 
     for (int i = 0; i < 3; i++)
     {

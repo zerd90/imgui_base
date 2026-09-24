@@ -151,6 +151,22 @@ namespace ImGui
     // End Platform Relative
     std::string getResourcesDir();
 
+    std::string getExecutableCompileTime();
+    std::string getSystemVersion();
+
+    struct ShaderBinaryKey
+    {
+        std::string compileTime;
+        std::string systemVersion;
+        std::string gpuName;
+        std::string driverVersion;
+    };
+
+    bool loadCachedShaderBinary(const std::string &path, const ShaderBinaryKey &key, std::vector<uint8_t> &binary,
+                                uint32_t &binaryFormat);
+    bool saveCachedShaderBinary(const std::string &path, const ShaderBinaryKey &key, const void *data, size_t size,
+                                uint32_t binaryFormat);
+
     // Backend Relative
     void setApplicationTitle(const std::string &title);
 

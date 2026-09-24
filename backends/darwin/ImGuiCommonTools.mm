@@ -127,7 +127,9 @@ namespace ImGui
         }
         else
         {
-            dispatch_sync(dispatch_get_main_queue(), ^{ result = [panel runModal]; });
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                result = [panel runModal];
+            });
         }
         return result;
     }
@@ -262,6 +264,13 @@ namespace ImGui
         return [bundlePath UTF8String];
     }
 
+    std::string getSystemVersion()
+    {
+        NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
+        return std::to_string(version.majorVersion) + "." + std::to_string(version.minorVersion) + "."
+             + std::to_string(version.patchVersion);
+    }
+
     string utf8ToLocal(const string &str)
     {
         return str;
@@ -342,12 +351,12 @@ namespace ImGui
 
     std::string getSystemPictureFolder()
     {
-        NSError *error = nil;
-        NSURL *picturesURL = [[NSFileManager defaultManager] URLForDirectory:NSPicturesDirectory
-                                                                       inDomain:NSUserDomainMask
-                                                              appropriateForURL:nil
-                                                                         create:NO
-                                                                          error:&error];
+        NSError *error       = nil;
+        NSURL   *picturesURL = [[NSFileManager defaultManager] URLForDirectory:NSPicturesDirectory
+                                                                    inDomain:NSUserDomainMask
+                                                           appropriateForURL:nil
+                                                                      create:NO
+                                                                       error:&error];
         if (!picturesURL)
         {
             if (error)
