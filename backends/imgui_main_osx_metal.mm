@@ -19,14 +19,14 @@
 
 using namespace ImGui;
 
-static MTKView           *g_view      = nil;
-static id<MTLCommandQueue> g_queue    = nil;
-static bool                g_exit     = false;
+static MTKView            *g_view      = nil;
+static id<MTLCommandQueue> g_queue     = nil;
+static bool                g_exit      = false;
 static bool                g_rendering = false;
-static bool                g_ready    = false;
+static bool                g_ready     = false;
 
-static const NSWindowStyleMask kWindowStyle = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable
-                                              | NSWindowStyleMaskMiniaturizable;
+static const NSWindowStyleMask kWindowStyle =
+    NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable;
 
 static NSRect TopLeftContentRectToFrame(int x, int y, int w, int h)
 {
@@ -75,7 +75,7 @@ static CGFloat WindowScale(NSWindow *window)
 // texture to the new view until we replace it.
 static ViewPixelSize PixelSizeForWindow(NSWindow *window)
 {
-    const NSRect content = [window contentRectForFrameRect:window.frame];
+    const NSRect  content = [window contentRectForFrameRect:window.frame];
     ViewPixelSize size;
     size.pointsW = std::max(content.size.width, (CGFloat)1);
     size.pointsH = std::max(content.size.height, (CGFloat)1);
@@ -99,10 +99,10 @@ static void ApplyDrawableSize(MTKView *view, CGSize points, CGFloat scale)
     self = [super initWithFrame:frameRect device:device];
     if (self != nil)
     {
-        self.autoResizeDrawable = NO;
+        self.autoResizeDrawable        = NO;
         self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawDuringViewResize;
         self.layerContentsPlacement    = NSViewLayerContentsPlacementTopLeft;
-        [self registerForDraggedTypes:@[NSPasteboardTypeFileURL]];
+        [self registerForDraggedTypes:@[ NSPasteboardTypeFileURL ]];
     }
     return self;
 }
@@ -127,8 +127,8 @@ static void ApplyDrawableSize(MTKView *view, CGSize points, CGFloat scale)
 - (BOOL)performDragOperation:(id<NSDraggingInfo>)sender
 {
     std::vector<std::string> files;
-    NSArray<NSURL *>        *urls = [sender.draggingPasteboard readObjectsForClasses:@[NSURL.class]
-                                                                             options:@{NSPasteboardURLReadingFileURLsOnlyKey : @YES}];
+    NSArray<NSURL *>        *urls = [sender.draggingPasteboard readObjectsForClasses:@[ NSURL.class ]
+                                                                      options:@{NSPasteboardURLReadingFileURLsOnlyKey : @YES}];
     for (NSURL *url in urls)
     {
         if (url.isFileURL && url.path != nil)
@@ -141,9 +141,73 @@ static void ApplyDrawableSize(MTKView *view, CGSize points, CGFloat scale)
 
 @end
 
+static NSString *ApplicationMenuName()
+{
+    NSDictionary        *bundleInfo = [[NSBundle mainBundle] infoDictionary];
+    NSArray<NSString *> *nameKeys   = @[ @"CFBundleDisplayName", @"CFBundleName", @"CFBundleExecutable" ];
+    for (NSString *key in nameKeys)
+    {
+        id name = bundleInfo[key];
+        if ([name isKindOfClass:[NSString class]] && [name length] > 0)
+            return name;
+    }
+    NSString *processName = [[NSProcessInfo processInfo] processName];
+    return processName.length > 0 ? processName : @"Application";
+}
+
+static void InstallApplicationMenu()
+{
+    NSString *appName = ApplicationMenuName();
+    NSMenu   *menubar = [[NSMenu alloc] init];
+    NSApp.mainMenu    = menubar;
+
+    NSMenuItem *appMenuItem = [menubar addItemWithTitle:@"" action:NULL keyEquivalent:@""];
+    NSMenu     *appMenu     = [[NSMenu alloc] initWithTitle:appName];
+    appMenuItem.submenu     = appMenu;
+
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"About %@", appName]
+                       action:@selector(orderFrontStandardAboutPanel:)
+                keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    NSMenu *servicesMenu = [[NSMenu alloc] init];
+    NSApp.servicesMenu   = servicesMenu;
+    [[appMenu addItemWithTitle:@"Services" action:NULL keyEquivalent:@""] setSubmenu:servicesMenu];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Hide %@", appName] action:@selector(hide:) keyEquivalent:@"h"];
+    NSMenuItem *hideOthers               = [appMenu addItemWithTitle:@"Hide Others"
+                                                action:@selector(hideOtherApplications:)
+                                         keyEquivalent:@"h"];
+    hideOthers.keyEquivalentModifierMask = NSEventModifierFlagOption | NSEventModifierFlagCommand;
+    [appMenu addItemWithTitle:@"Show All" action:@selector(unhideAllApplications:) keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Quit %@", appName] action:@selector(terminate:) keyEquivalent:@"q"];
+
+    NSMenuItem *windowMenuItem = [menubar addItemWithTitle:@"" action:NULL keyEquivalent:@""];
+    NSMenu     *windowMenu     = [[NSMenu alloc] initWithTitle:@"Window"];
+    NSApp.windowsMenu          = windowMenu;
+    windowMenuItem.submenu     = windowMenu;
+    [windowMenu addItemWithTitle:@"Minimize" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    [windowMenu addItemWithTitle:@"Zoom" action:@selector(performZoom:) keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    [windowMenu addItemWithTitle:@"Bring All to Front" action:@selector(arrangeInFront:) keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *fullScreen               = [windowMenu addItemWithTitle:@"Enter Full Screen"
+                                                   action:@selector(toggleFullScreen:)
+                                            keyEquivalent:@"f"];
+    fullScreen.keyEquivalentModifierMask = NSEventModifierFlagControl | NSEventModifierFlagCommand;
+
+    SEL setAppleMenuSelector = NSSelectorFromString(@"setAppleMenu:");
+    if ([NSApp respondsToSelector:setAppleMenuSelector])
+    {
+        IMP implementation                = [NSApp methodForSelector:setAppleMenuSelector];
+        void (*setAppleMenu)(id, SEL, id) = (void (*)(id, SEL, id))implementation;
+        setAppleMenu(NSApp, setAppleMenuSelector, appMenu);
+    }
+}
+
 static bool doGUIRender();
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
+@interface                             AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate>
 @property(nonatomic, strong) NSWindow *window;
 @end
 
@@ -198,12 +262,12 @@ static bool doGUIRender()
         return false;
     }
 
-    const ViewPixelSize size = PixelSizeForWindow(g_view.window);
+    const ViewPixelSize size      = PixelSizeForWindow(g_view.window);
     const NSRect        viewFrame = NSMakeRect(0, 0, size.pointsW, size.pointsH);
     if (!NSEqualRects(g_view.frame, viewFrame))
         g_view.frame = viewFrame;
 
-    CAMetalLayer *layer = (CAMetalLayer *)g_view.layer;
+    CAMetalLayer *layer      = (CAMetalLayer *)g_view.layer;
     layer.contentsScale      = size.scale;
     layer.drawableSize       = size.pixels;
     layer.displaySyncEnabled = gUserApp->VSyncEnabled();
@@ -216,7 +280,7 @@ static bool doGUIRender()
         return false;
     }
 
-    MTLRenderPassDescriptor *renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+    MTLRenderPassDescriptor *renderPassDescriptor        = [MTLRenderPassDescriptor renderPassDescriptor];
     renderPassDescriptor.colorAttachments[0].texture     = drawable.texture;
     renderPassDescriptor.colorAttachments[0].loadAction  = MTLLoadActionClear;
     renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
@@ -286,12 +350,12 @@ int main(int argc, char **argv)
 
         AppDelegate *delegate = [[AppDelegate alloc] init];
         [NSApp setDelegate:delegate];
-        delegate.window = [[NSWindow alloc] initWithContentRect:frame
+        delegate.window                    = [[NSWindow alloc] initWithContentRect:frame
                                                       styleMask:kWindowStyle
                                                         backing:NSBackingStoreBuffered
                                                           defer:NO];
-        delegate.window.delegate = delegate;
-        delegate.window.title    = [NSString stringWithUTF8String:gUserApp->getAppName().c_str()];
+        delegate.window.delegate           = delegate;
+        delegate.window.title              = [NSString stringWithUTF8String:gUserApp->getAppName().c_str()];
         delegate.window.releasedWhenClosed = NO;
 
         ImVec2 minSize, maxSize;
@@ -301,7 +365,7 @@ int main(int argc, char **argv)
         if (maxSize.x > 0 && maxSize.y > 0)
             delegate.window.contentMaxSize = NSMakeSize(maxSize.x, maxSize.y);
 
-        g_view = [[AppMTKView alloc] initWithFrame:delegate.window.contentView.bounds device:device];
+        g_view                       = [[AppMTKView alloc] initWithFrame:delegate.window.contentView.bounds device:device];
         g_view.autoresizingMask      = NSViewWidthSizable | NSViewHeightSizable;
         g_view.paused                = YES;
         g_view.enableSetNeedsDisplay = NO;
@@ -325,6 +389,7 @@ int main(int argc, char **argv)
         }
 
         [delegate.window makeKeyAndOrderFront:nil];
+        InstallApplicationMenu();
         [NSApp activateIgnoringOtherApps:YES];
         [NSApp finishLaunching];
 
@@ -354,7 +419,7 @@ int main(int argc, char **argv)
                 if (g_exit)
                     break;
 
-                g_rendering = true;
+                g_rendering     = true;
                 const bool quit = doGUIRender();
                 g_rendering     = false;
                 if (quit)
