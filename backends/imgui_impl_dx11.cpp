@@ -591,34 +591,91 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
 
     // Create the pixel shader
     {
-        ID3DBlob       *pixelShaderBlob;
-        string          csoFilePath = (fs::u8path(getResourcesDir()) / "pixelShader.cso").u8string();
-        std::error_code ec;
-        bool            loadFromFile = false;
-        do
+        auto windowsGpuDriverVersion = [](const wchar_t *gpuName) -> std::string
         {
-            if (!fs::exists(csoFilePath, ec))
-            {
-                break;
-            }
-            if (ec)
-            {
-                break;
-            }
-            if (FAILED(D3DReadFileToBlob(utf8ToUnicode(csoFilePath).c_str(), &pixelShaderBlob)))
-                break;
+            if (gpuName == nullptr || gpuName[0] == L'\0')
+                return {};
+            HKEY adapters = nullptr;
+            if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+                              L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}", 0, KEY_READ,
+                              &adapters)
+                != ERROR_SUCCESS)
+                return {};
 
-            if (FAILED(bd->pd3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(),
-                                                         nullptr, &bd->pPixelShader)))
+            std::string matched;
+            std::string onlyVersion;
+            int         adapterCount = 0;
+            for (DWORD index = 0;; ++index)
             {
-                pixelShaderBlob->Release();
-                break;
+                wchar_t subName[64] = {};
+                DWORD   subNameLen  = static_cast<DWORD>(sizeof(subName) / sizeof(subName[0]));
+                if (RegEnumKeyExW(adapters, index, subName, &subNameLen, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS)
+                    break;
+                HKEY adapterKey = nullptr;
+                if (RegOpenKeyExW(adapters, subName, 0, KEY_READ, &adapterKey) != ERROR_SUCCESS)
+                    continue;
+                wchar_t description[512] = {};
+                wchar_t version[128]     = {};
+                DWORD   descriptionSize  = sizeof(description);
+                DWORD   versionSize      = sizeof(version);
+                DWORD   type             = 0;
+                RegQueryValueExW(adapterKey, L"DriverDesc", nullptr, &type, reinterpret_cast<LPBYTE>(description),
+                                 &descriptionSize);
+                type        = 0;
+                versionSize = sizeof(version);
+                RegQueryValueExW(adapterKey, L"DriverVersion", nullptr, &type, reinterpret_cast<LPBYTE>(version), &versionSize);
+                RegCloseKey(adapterKey);
+                if (version[0] == L'\0')
+                    continue;
+                ++adapterCount;
+                onlyVersion = unicodeToUtf8(version);
+                if (wcscmp(description, gpuName) == 0 || wcsstr(description, gpuName) != nullptr
+                    || wcsstr(gpuName, description) != nullptr)
+                {
+                    matched = onlyVersion;
+                    break;
+                }
             }
-            loadFromFile = true;
-            printf("Load %s\n", utf8ToLocal(csoFilePath).c_str());
-        } while (0);
-        if (!loadFromFile)
+            RegCloseKey(adapters);
+            if (!matched.empty())
+                return matched;
+            return adapterCount == 1 ? onlyVersion : std::string();
+        };
+
+        ShaderBinaryKey key;
+        key.compileTime         = getExecutableCompileTime();
+        key.systemVersion       = getSystemVersion();
+        IDXGIDevice *dxgiDevice = nullptr;
+        if (SUCCEEDED(bd->pd3dDevice->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void **>(&dxgiDevice)))
+            && dxgiDevice != nullptr)
         {
+            IDXGIAdapter *adapter = nullptr;
+            if (SUCCEEDED(dxgiDevice->GetAdapter(&adapter)) && adapter != nullptr)
+            {
+                DXGI_ADAPTER_DESC desc = {};
+                if (SUCCEEDED(adapter->GetDesc(&desc)))
+                {
+                    key.gpuName       = unicodeToUtf8(desc.Description);
+                    key.driverVersion = windowsGpuDriverVersion(desc.Description);
+                }
+                adapter->Release();
+            }
+            dxgiDevice->Release();
+        }
+
+        const string         csoFilePath = (fs::u8path(getResourcesDir()) / "pixelShader.bin").u8string();
+        std::vector<uint8_t> cachedBlob;
+        uint32_t             cachedFormat = 0;
+        bool                 loaded =
+            loadCachedShaderBinary(csoFilePath, key, cachedBlob, cachedFormat) && !cachedBlob.empty()
+            && SUCCEEDED(bd->pd3dDevice->CreatePixelShader(cachedBlob.data(), cachedBlob.size(), nullptr, &bd->pPixelShader));
+        if (loaded)
+        {
+            printf("Load %s\n", utf8ToLocal(csoFilePath).c_str());
+        }
+        else
+        {
+            ID3DBlob *pixelShaderBlob = nullptr;
             if (FAILED(D3DCompile(getShaderCode(), strlen(getShaderCode()), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0,
                                   &pixelShaderBlob, nullptr)))
                 return false;
@@ -630,15 +687,9 @@ bool ImGui_ImplDX11_CreateDeviceObjects()
                 pixelShaderBlob->Release();
                 return false;
             }
-            if (fs::exists(csoFilePath, ec))
-            {
-                fs::remove(csoFilePath, ec);
-            }
-            std::ofstream ofs;
-            ofs.open(csoFilePath, std::ios::binary);
-            ofs.write((char *)pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize());
-            ofs.close();
-            printf("Save %s\n", utf8ToLocal(csoFilePath).c_str());
+            if (saveCachedShaderBinary(csoFilePath, key, pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(),
+                                       0))
+                printf("Save %s\n", utf8ToLocal(csoFilePath).c_str());
             pixelShaderBlob->Release();
         }
     }

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <pwd.h>
 #include <iconv.h>
+#include <sys/utsname.h>
 
 #include "ImGuiCommonTools.h"
 
@@ -466,6 +467,14 @@ namespace ImGui
         }
         exePathStr[len] = '\0';
         return exePathStr;
+    }
+
+    std::string getSystemVersion()
+    {
+        utsname info{};
+        if (uname(&info) != 0)
+            return {};
+        return info.release;
     }
 
     std::string getSystemPictureFolder()
