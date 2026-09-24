@@ -504,7 +504,7 @@ namespace ImGui
             return pos;
         };
 
-        auto transThickness = [&](float thickness) { return thickness * imgScaledSize.x / mTexture.width; };
+        auto transThickness = [&](float thickness) { return MAX(1.f, thickness); };
 
         if (0 == mTexture.textureID[0])
             goto _CHILD_OVER_;
@@ -576,8 +576,6 @@ namespace ImGui
                         ImVec2 start     = transImgCoord(pval->startPos);
                         ImVec2 end       = transImgCoord(pval->endPos);
                         float  thickness = transThickness(pval->thickness);
-                        if (thickness < 0)
-                            thickness = 1;
                         ImGui::GetWindowDrawList()->AddLine(start, end, pval->color, thickness);
                     }
                     break;
@@ -611,9 +609,6 @@ namespace ImGui
                             points.push_back(transImgCoord(point));
                         }
                         float thickness = transThickness(pval->thickness);
-                        if (thickness < 0)
-                            thickness = 1;
-
                         ImGui::GetWindowDrawList()->AddPolyline(points.data(), (int)points.size(), pval->color, 0, thickness);
                     }
 
@@ -648,12 +643,29 @@ namespace ImGui
                 {
                     if (auto pval = std::get_if<DrawTextParam>(&param.param))
                     {
-                        ImVec2  pos  = transImgCoord(pval->pos);
-                        ImFont *font = ImGui::GetFont();
-                        float   size = pval->size * imgScaledSize.x / mTexture.width;
-                        if (size < 0)
-                            size = 0;
-                        ImGui::GetWindowDrawList()->AddText(font, size, pos, pval->color, pval->text.c_str());
+                        ImVec2         pos  = transImgCoord(pval->pos);
+                        ImFont        *font = ImGui::GetFont();
+                        float          size = MAX(0.1f, pval->size);
+                        vector<string> lines;
+                        auto           remain = pval->text;
+                        while (!remain.empty())
+                        {
+                            if (remain.find('\n') != string::npos)
+                            {
+                                lines.push_back(remain.substr(0, remain.find('\n')));
+                                remain = remain.substr(remain.find('\n') + 1);
+                            }
+                            else
+                            {
+                                lines.push_back(remain);
+                                remain.clear();
+                            }
+                        }
+                        for (auto &line : lines)
+                        {
+                            ImGui::GetWindowDrawList()->AddText(font, size, pos, pval->color, line.c_str());
+                            pos.y += ImGui::GetTextLineHeight() * size / GetFontSize();
+                        }
                     }
                     break;
                 }
