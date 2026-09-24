@@ -112,6 +112,13 @@ elseif(BACKEND_TYPE MATCHES OSX_METAL)
     set(WINDOW_API "OSX")
     set(RENDER_API "METAL")
     enable_language(OBJCXX)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
+        COMMAND ${PROJECT_SOURCE_DIR}/cmdTools/TransShaderCode.sh
+        ARGS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Media_Shader.metal
+        ARGS ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
+        DEPENDS ${PROJECT_SOURCE_DIR}/backends/ShaderCode/Media_Shader.metal
+    )
 else()
     message(FATAL_ERROR "BACKEND_TYPE not Available, Available Options:\n\
 				WIN32_DX11\n\
@@ -170,6 +177,7 @@ elseif(BACKEND_TYPE MATCHES OSX_METAL)
         ${PROJECT_SOURCE_DIR}/backends/imgui_impl_metal.mm
         ${PROJECT_SOURCE_DIR}/backends/imgui_impl_osx.mm
         ${PROJECT_SOURCE_DIR}/backends/imgui_main_osx_metal.mm
+        ${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_metal_shader.cpp
     )
 endif()
 
