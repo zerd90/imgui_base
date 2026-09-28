@@ -447,7 +447,7 @@ namespace ImGui
 
         ImVec2 cursorPosOnImage = mImageShowPos + (mouseInWindow * (float)mTexture.width / imgScaleSize.x);
         mImageScale             = mImageScale * powf(SCALE_SPEED, GetIO().MouseWheel);
-        mImageScale             = MAX(SCALE_MIN, MIN(mImageScale, SCALE_MAX));
+        mImageScale             = MAX(mMinScale, MIN(mImageScale, mMaxScale));
 
         imgScaleSize = mImgBaseSize * mImageScale;
 
@@ -737,6 +737,8 @@ namespace ImGui
         mIsChildWindow = embed;
         if (embed)
             mOpened = true;
+        mMinScale = SCALE_MIN;
+        mMaxScale = SCALE_MAX;
     }
 
     void ImageWindow::setControlButtonEnable(bool enable)
@@ -777,6 +779,12 @@ namespace ImGui
         mImageScale     = input.scale;
         mImageShowPos.x = input.showPos.x;
         mImageShowPos.y = input.showPos.y;
+    }
+
+    void ImageWindow::setScaleLimit(float minScale, float maxScale)
+    {
+        mMinScale = minScale > 0 ? minScale : std::numeric_limits<float>::min();
+        mMaxScale = maxScale > 0 ? maxScale : std::numeric_limits<float>::max();
     }
 
     void ImageWindow::popScale()

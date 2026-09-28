@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <limits>
 
 #include "imgui.h"
 #include "ImGuiCommonTools.h"
@@ -168,6 +169,10 @@ namespace ImGui
         void pushScale(const DisplayInfo &input);
         void popScale();
         void setScale(const DisplayInfo &input);
+
+        // based on fit to window size, -1 - no limit; default is 0.2 - 500
+        void setScaleLimit(float minScale, float maxScale);
+
         void resetScale();
         void setOneOnOne();
 
@@ -187,6 +192,9 @@ namespace ImGui
         DisplayInfo  mDisplayInfo;
 
         std::vector<DisplayInfo> mScaleStack;
+
+        float mMinScale = std::numeric_limits<float>::min();
+        float mMaxScale = std::numeric_limits<float>::max();
 
         ImVec2 mImgBaseSize      = {0, 0};
         ImVec2 mImageShowPos     = {0, 0};
