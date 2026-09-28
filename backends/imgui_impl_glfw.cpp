@@ -1668,6 +1668,52 @@ namespace ImGui
             return nullptr;
         return bd->Window;
     }
+
+    float getDisplayRefreshRate()
+    {
+        GLFWwindow *window = nullptr;
+        if (ImGui::GetCurrentContext() != nullptr)
+            window = getMainWindow();
+        GLFWmonitor *monitor = nullptr;
+        if (window != nullptr)
+        {
+            monitor = glfwGetWindowMonitor(window);
+            if (monitor == nullptr)
+            {
+                int wx = 0, wy = 0, ww = 0, wh = 0;
+                glfwGetWindowPos(window, &wx, &wy);
+                glfwGetWindowSize(window, &ww, &wh);
+                const int cx = wx + ww / 2;
+                const int cy = wy + wh / 2;
+
+                int           monitorCount = 0;
+                GLFWmonitor **monitors    = glfwGetMonitors(&monitorCount);
+                for (int i = 0; i < monitorCount; i++)
+                {
+                    int mx = 0, my = 0;
+                    glfwGetMonitorPos(monitors[i], &mx, &my);
+                    const GLFWvidmode *mode = glfwGetVideoMode(monitors[i]);
+                    if (mode == nullptr)
+                        continue;
+                    if (cx >= mx && cx < mx + mode->width && cy >= my && cy < my + mode->height)
+                    {
+                        monitor = monitors[i];
+                        break;
+                    }
+                }
+            }
+        }
+        if (monitor == nullptr)
+            monitor = glfwGetPrimaryMonitor();
+        if (monitor == nullptr)
+            return 60.f;
+
+        const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+        if (mode == nullptr || mode->refreshRate <= 1)
+            return 60.f;
+        return (float)mode->refreshRate;
+    }
+
     ImRect maximizeMainWindow()
     {
         GLFWwindow *window = getMainWindow();

@@ -114,6 +114,7 @@
     #include <tchar.h>
     #include <dwmapi.h>
     #include <stdio.h>
+    #include <vector>
 
     #include <Shlobj.h>
     #include <shlwapi.h>
@@ -1711,6 +1712,52 @@ namespace ImGui
         if (!bd)
             return nullptr;
         return bd->hWnd;
+    }
+
+    float getDisplayRefreshRate()
+    {
+        HWND hwnd = nullptr;
+        if (ImGui::GetCurrentContext() != nullptr)
+            hwnd = getMainWindow();
+        HMONITOR hMon = MonitorFromWindow(hwnd ? hwnd : nullptr, MONITOR_DEFAULTTONEAREST);
+        MONITORINFOEXW mi = {};
+        mi.cbSize = sizeof(mi);
+        if (!GetMonitorInfoW(hMon, &mi))
+            return 60.f;
+
+        UINT32 pathCount = 0;
+        UINT32 modeCount = 0;
+        if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) == ERROR_SUCCESS && pathCount > 0
+            && modeCount > 0)
+        {
+            std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
+            std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
+            if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr)
+                == ERROR_SUCCESS)
+            {
+                for (UINT32 i = 0; i < pathCount; i++)
+                {
+                    DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
+                    sourceName.header.type      = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+                    sourceName.header.size      = sizeof(sourceName);
+                    sourceName.header.adapterId = paths[i].sourceInfo.adapterId;
+                    sourceName.header.id        = paths[i].sourceInfo.id;
+                    if (DisplayConfigGetDeviceInfo(&sourceName.header) != ERROR_SUCCESS)
+                        continue;
+                    if (wcscmp(mi.szDevice, sourceName.viewGdiDeviceName) != 0)
+                        continue;
+                    const DISPLAYCONFIG_RATIONAL &rr = paths[i].targetInfo.refreshRate;
+                    if (rr.Denominator != 0 && rr.Numerator != 0)
+                        return (float)rr.Numerator / (float)rr.Denominator;
+                }
+            }
+        }
+
+        DEVMODEW dm = {};
+        dm.dmSize   = sizeof(dm);
+        if (EnumDisplaySettingsW(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 1)
+            return (float)dm.dmDisplayFrequency;
+        return 60.f;
     }
 
     ImRect maximizeMainWindow()

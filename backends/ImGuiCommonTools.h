@@ -171,6 +171,8 @@ namespace ImGui
     void setApplicationTitle(const std::string &title);
 
     ImRect getDisplayWorkArea();
+    // Refresh rate of the display that currently hosts the main window. Returns Hz; falls back to 60.
+    float  getDisplayRefreshRate();
     ImRect getMainWindowRect();
     ImRect maximizeMainWindow();
     void   normalizeApplication(const ImRect &winRect);

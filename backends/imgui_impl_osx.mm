@@ -30,6 +30,7 @@
 #include <string>
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <GameController/GameController.h>
 #import <time.h>
 
@@ -1186,6 +1187,38 @@ namespace ImGui
         if (screen == nil)
             return ImRect(0, 0, 640, 360);
         return ImGui_ImplOSX_CocoaRectToTopLeft(screen.visibleFrame);
+    }
+
+    float getDisplayRefreshRate()
+    {
+        NSWindow* window = nil;
+        if (ImGui::GetCurrentContext() != nullptr)
+            window = ImGui_ImplOSX_MainWindow();
+        NSScreen* screen = (window != nil && window.screen != nil) ? window.screen : ImGui_ImplOSX_PrimaryScreen();
+        if (screen == nil)
+            return 60.f;
+
+        NSNumber* screenNumber = screen.deviceDescription[@"NSScreenNumber"];
+        if (screenNumber != nil)
+        {
+            CGDirectDisplayID displayID = (CGDirectDisplayID)screenNumber.unsignedIntValue;
+            CGDisplayModeRef  mode      = CGDisplayCopyDisplayMode(displayID);
+            if (mode != nil)
+            {
+                double rate = CGDisplayModeGetRefreshRate(mode);
+                CGDisplayModeRelease(mode);
+                if (rate > 1.0)
+                    return (float)rate;
+            }
+        }
+
+        if (@available(macOS 10.15, *))
+        {
+            NSInteger fps = screen.maximumFramesPerSecond;
+            if (fps > 1)
+                return (float)fps;
+        }
+        return 60.f;
     }
 
     void normalizeApplication(const ImRect& winRect)
