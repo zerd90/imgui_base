@@ -372,6 +372,11 @@ function(imgui_add_executable TARGET_NAME)
         set(CMAKE_INSTALL_RPATH "@loader_path")
 
         add_executable(${TARGET_NAME} MACOSX_BUNDLE ${ARGN})
+        set_target_properties(${TARGET_NAME} PROPERTIES
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.imgui.${TARGET_NAME}"
+            MACOSX_BUNDLE_BUNDLE_NAME ${TARGET_NAME}
+            MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        )
     else()
         add_executable(${TARGET_NAME} ${ARGN})
     endif()

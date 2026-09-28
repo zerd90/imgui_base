@@ -116,6 +116,9 @@ namespace ImGui
 
     NSInteger runPanelModal(NSSavePanel *panel)
     {
+        if (!panel)
+            return NSModalResponseCancel;
+
         if ([NSApp activationPolicy] != NSApplicationActivationPolicyRegular)
             [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         [NSApp activateIgnoringOtherApps:YES];
@@ -136,6 +139,9 @@ namespace ImGui
 
     void setFilter(const vector<FilterSpec> &typeFilters, NSSavePanel *pPanel)
     {
+        if (!pPanel)
+            return;
+
         NSMutableArray<UTType *> *allowedContentTypes = [NSMutableArray array];
         for (const auto &filterSpec : typeFilters)
         {
@@ -164,16 +170,32 @@ namespace ImGui
 
     void setInitDir(const string &initDirPath, NSSavePanel *pPanel)
     {
-        if (initDirPath.empty())
+        if (!pPanel || initDirPath.empty())
             return;
 
-        NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:initDirPath.c_str()]];
-        [pPanel setDirectoryURL:url];
+        std::error_code ec;
+        fs::path        path = fs::u8path(initDirPath);
+        if (fs::is_regular_file(path, ec))
+            path = path.parent_path();
+        if (path.empty() || !fs::is_directory(path, ec))
+            return;
+
+        NSString *pathStr = [NSString stringWithUTF8String:path.u8string().c_str()];
+        if (!pathStr)
+            return;
+
+        [pPanel setDirectoryURL:[NSURL fileURLWithPath:pathStr isDirectory:YES]];
     }
 
     string selectDir(const string &initDirPath)
     {
         NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+        if (!openPanel)
+        {
+            gLastError = "NSOpenPanel openPanel returned nil; set a non-empty CFBundleIdentifier in Info.plist";
+            dbg("%s\n", gLastError.c_str());
+            return string();
+        }
         [openPanel setCanChooseFiles:NO];
         [openPanel setCanChooseDirectories:YES];
         [openPanel setCanCreateDirectories:YES];
@@ -195,6 +217,12 @@ namespace ImGui
     string selectFile(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
         NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+        if (!openPanel)
+        {
+            gLastError = "NSOpenPanel openPanel returned nil; set a non-empty CFBundleIdentifier in Info.plist";
+            dbg("%s\n", gLastError.c_str());
+            return string();
+        }
         [openPanel setCanChooseFiles:YES];
         [openPanel setCanChooseDirectories:NO];
         [openPanel setAllowsMultipleSelection:NO];
@@ -217,15 +245,21 @@ namespace ImGui
 
     vector<string> selectMultipleFiles(const vector<FilterSpec> &typeFilters, const string &initDirPath)
     {
-        NSOpenPanel *openPanel = [NSOpenPanel openPanel];
+        vector<string> selectFiles;
+        NSOpenPanel   *openPanel = [NSOpenPanel openPanel];
+        if (!openPanel)
+        {
+            gLastError = "NSOpenPanel openPanel returned nil; set a non-empty CFBundleIdentifier in Info.plist";
+            dbg("%s\n", gLastError.c_str());
+            return selectFiles;
+        }
         [openPanel setCanChooseFiles:YES];
         [openPanel setCanChooseDirectories:NO];
         [openPanel setAllowsMultipleSelection:YES];
         setFilter(typeFilters, openPanel);
         setInitDir(initDirPath, openPanel);
 
-        vector<string> selectFiles;
-        NSInteger      result = runPanelModal(openPanel);
+        NSInteger result = runPanelModal(openPanel);
         if (result == NSModalResponseOK)
         {
             auto files = [openPanel URLs]; // 注意[panel Urls]的路径是 file:///User/GJH/....
@@ -238,6 +272,12 @@ namespace ImGui
     string getSavePath(const vector<FilterSpec> &typeFilters, const string &defaultExt, const string &initDirPath)
     {
         NSSavePanel *savePanel = [NSSavePanel savePanel];
+        if (!savePanel)
+        {
+            gLastError = "NSSavePanel savePanel returned nil; set a non-empty CFBundleIdentifier in Info.plist";
+            dbg("%s\n", gLastError.c_str());
+            return string();
+        }
         setFilter(typeFilters, savePanel);
         setInitDir(initDirPath, savePanel);
 
