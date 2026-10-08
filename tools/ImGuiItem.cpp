@@ -1,4 +1,5 @@
 
+#include "ImGuiApplication.h"
 #include <algorithm>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -785,6 +786,11 @@ void IImGuiInput::setInputBoxSize(ImVec2 size)
 
 void IImGuiInput::setInputBoxWidth(float width)
 {
+    if (!GetCurrentContext() || !GetFont())
+    {
+        ADD_APPLICATION_LOG("ImGui Context or Font not Initialized\n");
+        return;
+    }
     const float spacingUsed =
         (mSpacing >= 0.f) ? mSpacing : ImGui::GetStyle().ItemInnerSpacing.x;
     width += spacingUsed;

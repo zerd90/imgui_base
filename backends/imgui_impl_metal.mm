@@ -746,9 +746,8 @@ static ImGui::ShaderBinaryKey ImGui_ImplMetal_ShaderKey(id<MTLDevice> device)
     key.compileTime         = ImGui::getExecutableCompileTime();
     key.systemVersion       = ImGui::getSystemVersion();
     key.gpuName             = device.name != nil ? device.name.UTF8String : "";
-    NSBundle *metalBundle   = [NSBundle bundleWithIdentifier:@"com.apple.Metal"];
-    NSString *driverVersion = metalBundle.infoDictionary[@"CFBundleVersion"];
-    key.driverVersion       = driverVersion != nil ? driverVersion.UTF8String : "";
+    // Metal drivers ship with macOS; avoid looking up a system framework bundle here.
+    key.driverVersion = key.systemVersion;
     return key;
 }
 
