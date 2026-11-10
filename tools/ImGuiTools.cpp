@@ -1496,7 +1496,7 @@ namespace ImGui
         std::wstring fontName     = utf8ToUnicode(mFontFamilyName);
         int          totalWidth   = 0;
         int          maxAscender  = 0;
-        unsigned int maxDescender = 0;
+        int          maxDescender = 0;
 
         for (auto c : fontName)
         {
@@ -1508,14 +1508,22 @@ namespace ImGui
             }
 
             totalWidth += face->glyph->advance.x >> 6;
+            // bitmap_top is signed; rows - bitmap_top can be negative when the glyph sits entirely
+            // above the baseline. Must use signed math — unsigned underflow blows up imageHeight.
             maxAscender  = std::max(maxAscender, face->glyph->bitmap_top);
-            maxDescender = std::max(maxDescender, face->glyph->bitmap.rows - face->glyph->bitmap_top);
+            maxDescender = std::max(maxDescender, (int)face->glyph->bitmap.rows - face->glyph->bitmap_top);
         }
 
         int imageWidth  = totalWidth;
         int imageHeight = maxAscender + maxDescender;
+        if (imageWidth <= 0 || imageHeight <= 0)
+        {
+            FT_Done_Face(face);
+            FT_Done_FreeType(ftLibrary);
+            return;
+        }
 
-        size_t imgSize = imageWidth * imageHeight * 4;
+        size_t imgSize = (size_t)imageWidth * (size_t)imageHeight * 4;
         auto   image   = std::make_unique<uint8_t[]>(imgSize);
         for (size_t i = 0; i < imgSize; i += 4)
         {
@@ -1533,23 +1541,34 @@ namespace ImGui
                 continue;
 
             FT_Bitmap &bitmap = face->glyph->bitmap;
+            // FreeType pitch may be padded (and can be negative for bottom-up bitmaps).
+            const int  pitch  = bitmap.pitch;
 
             int x = xOffset + face->glyph->bitmap_left;
             int y = maxAscender - face->glyph->bitmap_top;
 
             for (unsigned int row = 0; row < bitmap.rows; ++row)
             {
+                const int py = y + (int)row;
+                if (py < 0 || py >= imageHeight)
+                    continue;
+
+                const unsigned char *srcRow = pitch >= 0 ? bitmap.buffer + row * (unsigned int)pitch
+                                                         : bitmap.buffer + (bitmap.rows - 1 - row) * (unsigned int)(-pitch);
+
                 for (unsigned int col = 0; col < bitmap.width; ++col)
                 {
-                    size_t idx = ((y + row) * imageWidth + (x + col)) * 4;
-                    if (idx < imgSize && idx >= 0)
-                    {
-                        if (bitmap.buffer[row * bitmap.width + col] > 0)
-                            image[idx + 3] = 255;
-                        image[idx]     = 255 - bitmap.buffer[row * bitmap.width + col];
-                        image[idx + 1] = 255 - bitmap.buffer[row * bitmap.width + col];
-                        image[idx + 2] = 255 - bitmap.buffer[row * bitmap.width + col];
-                    }
+                    const int px = x + (int)col;
+                    if (px < 0 || px >= imageWidth)
+                        continue;
+
+                    const unsigned char coverage = srcRow[col];
+                    size_t              idx      = ((size_t)py * (size_t)imageWidth + (size_t)px) * 4;
+                    if (coverage > 0)
+                        image[idx + 3] = 255;
+                    image[idx]     = 255 - coverage;
+                    image[idx + 1] = 255 - coverage;
+                    image[idx + 2] = 255 - coverage;
                 }
             }
 
