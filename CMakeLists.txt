@@ -359,9 +359,23 @@ if(NOT PROJECT_IS_TOP_LEVEL)
     set(RENDER_API ${RENDER_API} PARENT_SCOPE)
 endif()
 
+# Host tool: render first letter -> .bmp/.ico (uses imgui's imstb_truetype.h)
+add_executable(imgui_gen_app_icon ${CMAKE_CURRENT_SOURCE_DIR}/cmdTools/gen_app_icon.cpp)
+target_include_directories(imgui_gen_app_icon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/imgui-source)
+set_target_properties(imgui_gen_app_icon PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    CXX_STANDARD 17
+)
+
+# Usage:
+#   imgui_add_executable(myapp main.cpp)
+#   imgui_add_executable(myapp AUTO_ICON main.cpp)  # optional: auto app icon from first letter
 function(imgui_add_executable TARGET_NAME)
+    cmake_parse_arguments(IMGUI_EXE "AUTO_ICON" "" "" ${ARGN})
+    set(_sources ${IMGUI_EXE_UNPARSED_ARGUMENTS})
+
     if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-        add_executable(${TARGET_NAME} WIN32 ${ARGN})
+        add_executable(${TARGET_NAME} WIN32 ${_sources})
 
         if(CMAKE_COMPILER_IS_GNUCXX)
             target_link_options(${TARGET_NAME} PRIVATE -mwindows)
@@ -371,14 +385,84 @@ function(imgui_add_executable TARGET_NAME)
         set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
         set(CMAKE_INSTALL_RPATH "@loader_path")
 
-        add_executable(${TARGET_NAME} MACOSX_BUNDLE ${ARGN})
+        add_executable(${TARGET_NAME} MACOSX_BUNDLE ${_sources})
         set_target_properties(${TARGET_NAME} PROPERTIES
             MACOSX_BUNDLE_GUI_IDENTIFIER "com.imgui.${TARGET_NAME}"
             MACOSX_BUNDLE_BUNDLE_NAME ${TARGET_NAME}
             MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
         )
     else()
-        add_executable(${TARGET_NAME} ${ARGN})
+        add_executable(${TARGET_NAME} ${_sources})
+    endif()
+
+    if(IMGUI_EXE_AUTO_ICON)
+        string(SUBSTRING "${TARGET_NAME}" 0 1 _icon_letter)
+        string(TOUPPER "${_icon_letter}" _icon_letter)
+
+        set(_icon_dir ${CMAKE_CURRENT_BINARY_DIR}/${TARGET_NAME}_auto_icon)
+        set(_icon_base ${_icon_dir}/AppIcon)
+        file(MAKE_DIRECTORY ${_icon_dir})
+
+        if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+            set(_ico ${_icon_base}.ico)
+            set(_rc ${_icon_dir}/app_icon.rc)
+            # Path inside .rc must use forward slashes
+            file(TO_CMAKE_PATH "${_ico}" _ico_rc_path)
+            file(WRITE ${_rc} "IDI_ICON1 ICON \"${_ico_rc_path}\"\n")
+
+            add_custom_command(
+                OUTPUT ${_ico}
+                COMMAND $<TARGET_FILE:imgui_gen_app_icon> ${_icon_letter} ${_icon_base}
+                DEPENDS imgui_gen_app_icon
+                COMMENT "Generating AUTO_ICON for ${TARGET_NAME} ('${_icon_letter}')"
+                VERBATIM
+            )
+            enable_language(RC)
+            target_sources(${TARGET_NAME} PRIVATE ${_rc} ${_ico})
+            set_source_files_properties(${_ico} PROPERTIES HEADER_FILE_ONLY TRUE)
+            add_dependencies(${TARGET_NAME} imgui_gen_app_icon)
+
+        elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+            set(_bmp ${_icon_base}.bmp)
+            set(_png ${_icon_base}.png)
+            set(_icns ${_icon_base}.icns)
+            set(_iconset ${_icon_dir}/AppIcon.iconset)
+            # Build "@2x" names via concatenation (literal "@2x" is fragile in some tools)
+            set(_at "@")
+
+            add_custom_command(
+                OUTPUT ${_icns}
+                COMMAND $<TARGET_FILE:imgui_gen_app_icon> ${_icon_letter} ${_icon_base}
+                COMMAND sips -s format png ${_bmp} --out ${_png}
+                COMMAND ${CMAKE_COMMAND} -E remove_directory ${_iconset}
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${_iconset}
+                COMMAND sips -z 16 16 ${_png} --out ${_iconset}/icon_16x16.png
+                COMMAND sips -z 32 32 ${_png} --out ${_iconset}/icon_16x16${_at}2x.png
+                COMMAND sips -z 32 32 ${_png} --out ${_iconset}/icon_32x32.png
+                COMMAND sips -z 64 64 ${_png} --out ${_iconset}/icon_32x32${_at}2x.png
+                COMMAND sips -z 128 128 ${_png} --out ${_iconset}/icon_128x128.png
+                COMMAND sips -z 256 256 ${_png} --out ${_iconset}/icon_128x128${_at}2x.png
+                COMMAND sips -z 256 256 ${_png} --out ${_iconset}/icon_256x256.png
+                COMMAND sips -z 512 512 ${_png} --out ${_iconset}/icon_256x256${_at}2x.png
+                COMMAND sips -z 512 512 ${_png} --out ${_iconset}/icon_512x512.png
+                COMMAND sips -z 1024 1024 ${_png} --out ${_iconset}/icon_512x512${_at}2x.png
+                COMMAND iconutil -c icns ${_iconset} -o ${_icns}
+                DEPENDS imgui_gen_app_icon
+                COMMENT "Generating AUTO_ICON for ${TARGET_NAME} ('${_icon_letter}')"
+                VERBATIM
+            )
+
+            set_target_properties(${TARGET_NAME} PROPERTIES
+                MACOSX_BUNDLE_ICON_FILE AppIcon.icns
+            )
+            set_source_files_properties(${_icns} PROPERTIES
+                MACOSX_PACKAGE_LOCATION Resources
+            )
+            target_sources(${TARGET_NAME} PRIVATE ${_icns})
+            add_dependencies(${TARGET_NAME} imgui_gen_app_icon)
+        else()
+            message(STATUS "AUTO_ICON for ${TARGET_NAME}: skipped on ${CMAKE_SYSTEM_NAME}")
+        endif()
     endif()
 endfunction()
 
