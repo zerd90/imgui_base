@@ -171,7 +171,7 @@ namespace ImGui
         void setScale(const DisplayInfo &input);
 
         // based on fit to window size, -1 - no limit; default is 0.2 - 500
-        void setScaleLimit(float minScale, float maxScale);
+        void setScaleLimit(float minScale, float maxScale = -1);
 
         void resetScale();
         void setOneOnOne();

@@ -437,9 +437,9 @@ namespace ImGui
         ImGui::SetClipboardText(totalString.c_str());
     }
 
-#define SCALE_SPEED (1.2f)
-#define SCALE_MAX   (500.f)
-#define SCALE_MIN   (0.2f)
+#define SCALE_SPEED       (1.2f)
+#define DEFAULT_SCALE_MAX (100.f)
+#define DEFAULT_SCALE_MIN (1.f)
 
     void ImageWindow::handleWheelY(ImVec2 &mouseInWindow)
     {
@@ -457,8 +457,12 @@ namespace ImGui
     void ImageWindow::handleDrag(ImVec2 &mouseMove)
     {
         ImVec2 imgScaleSize = mImgBaseSize * mImageScale;
-        mImageShowPos.x     = mImageShowPos.x + (-(int)((mouseMove.x) * mTexture.width / imgScaleSize.x));
-        mImageShowPos.y     = mImageShowPos.y + (-(int)((mouseMove.y) * mTexture.height / imgScaleSize.y));
+        if (imgScaleSize.x <= 0.f || imgScaleSize.y <= 0.f)
+            return;
+        // Keep float: at high zoom, screen→image delta is often < 1 and (int) truncates to 0,
+        // so the pan lags the mouse more as scale grows.
+        mImageShowPos.x -= mouseMove.x * (float)mTexture.width / imgScaleSize.x;
+        mImageShowPos.y -= mouseMove.y * (float)mTexture.height / imgScaleSize.y;
     }
 
     void ImageWindow::showContent()
@@ -737,8 +741,8 @@ namespace ImGui
         mIsChildWindow = embed;
         if (embed)
             mOpened = true;
-        mMinScale = SCALE_MIN;
-        mMaxScale = SCALE_MAX;
+        mMinScale = DEFAULT_SCALE_MIN;
+        mMaxScale = DEFAULT_SCALE_MAX;
     }
 
     void ImageWindow::setControlButtonEnable(bool enable)
@@ -783,8 +787,8 @@ namespace ImGui
 
     void ImageWindow::setScaleLimit(float minScale, float maxScale)
     {
-        mMinScale = minScale > 0 ? minScale : std::numeric_limits<float>::min();
-        mMaxScale = maxScale > 0 ? maxScale : std::numeric_limits<float>::max();
+        mMinScale = minScale > 0 ? minScale : DEFAULT_SCALE_MIN;
+        mMaxScale = maxScale > 0 ? maxScale : DEFAULT_SCALE_MAX;
     }
 
     void ImageWindow::popScale()
