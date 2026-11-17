@@ -7,7 +7,7 @@ execute_process(
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-option(COMPILE_DEMO "Compile Demo" OFF)
+option(IMGUI_BUILD_DEMO "Compile Demo" OFF)
 if(CMAKE_SYSTEM_NAME MATCHES Windows AND ${CMAKE_SIZEOF_VOID_P} EQUAL 8) #仅在64位Windows下使用freetype
     option(USING_FREETYPE "Using Freetype for font rendering and font choosing" ON)
 elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
@@ -21,7 +21,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
 else()
     option(USING_FREETYPE "Using Freetype for font rendering and font choosing" OFF)
 endif()
-message(STATUS "COMPILE_DEMO=${COMPILE_DEMO}")
+message(STATUS "IMGUI_BUILD_DEMO=${IMGUI_BUILD_DEMO}")
 message(STATUS "USING_FREETYPE=${USING_FREETYPE}")
 
 set(IMGUI_WINDOW_API_WIN32 0)
@@ -468,8 +468,8 @@ endfunction()
 
 
 
-if(COMPILE_DEMO)
-    imgui_add_executable(imguiDemo demo.cpp)
+if(IMGUI_BUILD_DEMO)
+    imgui_add_executable(imguiDemo AUTO_ICON demo.cpp)
     target_link_libraries(imguiDemo ${PROJECT_NAME})
     install(TARGETS imguiDemo
         DESTINATION ${PROJECT_SOURCE_DIR}/bin

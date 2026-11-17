@@ -68,7 +68,7 @@ namespace ImGui
 
     std::string getResourcesDir()
     {
-        string          exePath      = getApplicationPath();
+        string          exePath      = getExecutablePath();
         auto            exeDir       = fs::u8path(exePath).parent_path();
         auto            resourcesDir = exeDir / "resources";
         std::error_code ec;
@@ -238,7 +238,7 @@ namespace ImGui
     std::string getExecutableCompileTime()
     {
         std::error_code ec;
-        const auto      writeTime = fs::last_write_time(fs::u8path(getApplicationPath()), ec);
+        const auto      writeTime = fs::last_write_time(fs::u8path(getExecutablePath()), ec);
         if (ec)
             return {};
         return std::to_string(static_cast<long long>(writeTime.time_since_epoch().count()));

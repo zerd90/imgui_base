@@ -111,6 +111,7 @@ namespace ImGui
         ImGuiApplication();
         virtual ~ImGuiApplication() {}
         std::string  getExePath() { return mExePath; };
+        std::string  getAppPath() { return mAppPath; };
         const char  *getConfigPath() { return mConfigPath.c_str(); };
         ImGuiAppRect getWindowInitialRect() { return mWindowRect; };
         void         preset();
@@ -201,6 +202,7 @@ namespace ImGui
         // Set these in presetInternal
         ImGuiAppRect mWindowRect;
         std::string  mApplicationName;
+        std::string  mAppPath;
         std::string  mExePath;
         std::string  mConfigPath;
 

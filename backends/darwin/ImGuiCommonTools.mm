@@ -4,6 +4,8 @@
 #include <ios>
 #include <string>
 #include <unistd.h>
+#include <algorithm>
+#include <ctype.h>
 
 #include <AppKit/AppKit.h>
 #import <AppKit/NSOpenPanel.h>
@@ -34,41 +36,70 @@ namespace ImGui
         return strerror(errno);
     }
 
+    static string shellSingleQuote(const string &s)
+    {
+        string out = "'";
+        for (char c : s)
+        {
+            if (c == '\'')
+                out += "'\\''";
+            else
+                out += c;
+        }
+        out += "'";
+        return out;
+    }
+
     bool restartApplication(const string &scriptPath, const string &programPath)
     {
-        auto pid = getpid();
+        auto   pid     = getpid();
+        string tmpPath = programPath;
 
-        std::string shellContent = R"(
-    target_pid=%PID%
-    program_to_start=%PROGRAM_PATH%
-    timeout_seconds=5
-    elapsed_seconds=0
+        if (tmpPath.empty())
+            return false;
 
-    while kill -0 "$target_pid" 2>/dev/null
-    do
-        if [ "$elapsed_seconds" -ge "$timeout_seconds" ]; then
-            echo "Timeout reached"
-            exit 1
-        fi
-        sleep 1
-        elapsed_seconds=$((elapsed_seconds + 1))
-    done
+        // .app 是目录，不能 exec；用 open -n 启动新实例。普通可执行文件仍用 exec。
+        if (tmpPath.back() == '/')
+            tmpPath = tmpPath.substr(0, tmpPath.size() - 1);
+        string suffix;
+        if (tmpPath.length() >= 4)
+        {
+            suffix = tmpPath.substr(tmpPath.size() - 4);
+            std::transform(suffix.begin(), suffix.end(), suffix.begin(), ::tolower);
+        }
+        const bool  isAppBundle = suffix == ".app";
+        const char *launchCmd   = isAppBundle ? R"(open -n "$program_to_start")" : R"(exec "$program_to_start")";
 
-    exec "$program_to_start"
-    )";
+        std::string shellContent = R"(#!/bin/sh
+target_pid=%PID%
+program_to_start=%PROGRAM_PATH%
+timeout_seconds=10
+elapsed_seconds=0
+
+while kill -0 "$target_pid" 2>/dev/null
+do
+    if [ "$elapsed_seconds" -ge "$timeout_seconds" ]; then
+        exit 1
+    fi
+    sleep 1
+    elapsed_seconds=$((elapsed_seconds + 1))
+done
+
+%LAUNCH_CMD%
+)";
 
         size_t pos = shellContent.find("%PID%");
         if (pos != std::string::npos)
-        {
-            shellContent.replace(pos, 4, std::to_string(pid));
-        }
+            shellContent.replace(pos, 5, std::to_string(pid));
+
         pos = shellContent.find("%PROGRAM_PATH%");
         if (pos != std::string::npos)
-        {
-            shellContent.replace(pos, 14, utf8ToLocal(programPath));
-        }
+            shellContent.replace(pos, 14, shellSingleQuote(utf8ToLocal(programPath)));
 
-        // 写入文件
+        pos = shellContent.find("%LAUNCH_CMD%");
+        if (pos != std::string::npos)
+            shellContent.replace(pos, 12, launchCmd);
+
         string localScriptPath = utf8ToLocal(scriptPath);
         if (fs::exists(localScriptPath))
         {
@@ -298,6 +329,17 @@ namespace ImGui
     void openDebugWindow() {}
 
     std::string getApplicationPath()
+    {
+        NSBundle *mainBundle = [NSBundle mainBundle];
+        NSString *bundlePath = [mainBundle bundlePath];
+        // .app 包返回 .app 路径；非 bundle 可执行文件仍返回 executable 路径
+        if ([bundlePath length] >= 4 &&
+            [[bundlePath substringFromIndex:[bundlePath length] - 4] caseInsensitiveCompare:@".app"] == NSOrderedSame)
+            return [bundlePath UTF8String];
+        return [[mainBundle executablePath] UTF8String];
+    }
+
+    std::string getExecutablePath()
     {
         NSString *bundlePath;
         bundlePath = [[NSBundle mainBundle] executablePath];

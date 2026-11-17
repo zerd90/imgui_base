@@ -120,6 +120,17 @@ namespace ImGui
 
     std::string getApplicationPath();
 
+#ifdef __APPLE__
+    // MacOS下， 如果是.app应用，getApplicationPath 返回.app的路径，getExecutablePath 返回实际可执行文件的路径 xxx.app/Contents/MacOS/xxx
+    // 如果是非.app应用，getApplicationPath 和 getExecutablePath 返回相同的路径
+    std::string getExecutablePath();
+#else
+    static inline std::string getExecutablePath()
+    {
+        return getApplicationPath();
+    }
+#endif
+
     bool restartApplication(const std::string &scriptPath, const std::string &programPath);
 
 #ifdef IMGUI_ENABLE_FREETYPE

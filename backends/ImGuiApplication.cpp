@@ -31,7 +31,8 @@ ImGuiApplication::ImGuiApplication()
     mWindowRect      = {100, 100, 640, 480};
     mApplicationName = "ImGui Application";
 
-    mExePath = getApplicationPath();
+    mExePath = getExecutablePath();
+    mAppPath = getApplicationPath();
 
     fs::path exeDir = fs::u8path(mExePath).parent_path();
     mConfigPath     = localToUtf8((exeDir / "Setting.ini").string());
@@ -250,7 +251,7 @@ void ImGuiApplication::addLog(const std::string &logString)
 
 void ImGuiApplication::restart()
 {
-    if (restartApplication(mScriptPath, mExePath))
+    if (restartApplication(mScriptPath, mAppPath))
         this->close();
 }
 
